@@ -125,9 +125,11 @@ jobs:
 
       # The unit tests of the core, interpreted: undefined behaviour in the
       # pixel code fails here. The slowest tests are marked to be left out
-      # under Miri.
+      # under Miri. The rows are processed one after another (the "parallel"
+      # feature is off): the thread pool is not the code under test, and the
+      # queue inside it breaks the aliasing rules Miri checks by default.
       - name: Unit tests of the core under Miri
-        run: cargo +nightly miri test -p pixelit-core --lib --locked
+        run: cargo +nightly miri test -p pixelit-core --lib --locked --no-default-features
 
   deny:
     name: Dependencies (${{ matrix.checks }})
