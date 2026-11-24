@@ -1,0 +1,65 @@
+[package]
+name = "pixelit-codecs"
+description = "PixelIt codecs: image decoding, encoding, colour management and metadata"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[features]
+default = ["mozjpeg", "webp-lossy", "asm"]
+# MozJPEG (C, needs nasm for SIMD). Without it JPEG is written by the `image` crate.
+mozjpeg = ["dep:mozjpeg"]
+# libwebp (C). Without it WebP is written lossless only.
+webp-lossy = ["dep:webp"]
+# Assembly paths of the AV1 encoder (needs nasm).
+asm = ["ravif/asm"]
+
+[dependencies]
+pixelit-core.workspace = true
+serde.workspace = true
+bytemuck.workspace = true
+rayon.workspace = true
+image = { version = "0.25", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "tiff", "webp", "rayon"] }
+zune-jpeg = "0.5"
+zune-core = "0.5"
+mozjpeg = { version = "0.10", optional = true }
+oxipng = { version = "10", default-features = false, features = ["parallel", "zopfli"] }
+webp = { version = "0.3", default-features = false, optional = true }
+ravif = { version = "0.13", default-features = false, features = ["threading"] }
+rgb = { version = "0.8", features = ["bytemuck"] }
+avif-decode = { version = "3", default-features = false }
+jxl-oxide = "0.12"
+jixel = "0.5"
+rawler = "0.8"
+resvg = { version = "0.50", default-features = false, features = ["text", "system-fonts", "memmap-fonts", "raster-images", "svgz"] }
+psd = "0.3"
+pdfium-render = { version = "0.9", default-features = false, features = ["pdfium_latest", "thread_safe"] }
+moxcms = "0.9"
+kamadak-exif = "0.6"
+img-parts = "0.4"
+png = "0.18"
+
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true
+features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Imaging",
+  "Win32_System_Com",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_UI_Shell",
+]
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+criterion = { version = "0.8", default-features = false }
+
+[[bench]]
+name = "codecs"
+harness = false
+
+[lints]
+workspace = true

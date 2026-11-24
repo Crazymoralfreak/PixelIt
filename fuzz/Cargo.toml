@@ -1,0 +1,41 @@
+# Fuzz targets for `cargo fuzz`, run by .github/workflows/fuzz.yml on a schedule.
+# The package stands outside the PixelIt workspace: it needs a nightly
+# compiler and its own lock file.
+
+[package]
+name = "pixelit-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1"
+pixelit-core = { path = "../crates/pixelit-core" }
+pixelit-codecs = { path = "../crates/pixelit-codecs" }
+
+[[bin]]
+name = "decode"
+path = "fuzz_targets/decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "metadata"
+path = "fuzz_targets/metadata.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pipeline"
+path = "fuzz_targets/pipeline.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

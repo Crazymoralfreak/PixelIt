@@ -1,0 +1,40 @@
+[package]
+name = "pixelit-ai"
+description = "PixelIt AI: components, local models, generation providers, vision models"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+pixelit-core.workspace = true
+pixelit-codecs.workspace = true
+pixelit-engine.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+base64.workspace = true
+sha2.workspace = true
+tracing.workspace = true
+ureq.workspace = true
+fastrand.workspace = true
+native-tls = "0.2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[target.'cfg(windows)'.dependencies.windows]
+workspace = true
+features = [
+  "Win32_Foundation",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Security_Credentials",
+  "Win32_System_SystemInformation",
+  "Win32_System_Threading",
+]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

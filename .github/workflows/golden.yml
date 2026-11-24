@@ -1,0 +1,69 @@
+name: Golden samples
+
+# Writes the pictures that the tests compare the result of every operation
+# with (crates/pixelit-codecs/tests/golden) and commits them to the branch the
+# workflow was started on. Started by hand: once at the beginning, and again
+# after an intended change of an operation. The new pictures are reviewed in
+# the commit like any other change.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  bless:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - uses: ilammy/setup-nasm@v1
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      # Samples are written from the 8-bit run; the 16-bit run of the same
+      # test is then compared with them, so a failure here means the two
+      # depths give different pictures.
+      - name: Write the samples
+        env:
+          PIXELIT_BLESS: "1"
+        run: cargo test -p pixelit-codecs --test golden --locked
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: golden-samples
+          path: crates/pixelit-codecs/tests/golden
+          if-no-files-found: ignore
+
+      - name: Commit the samples
+        run: |
+          git add crates/pixelit-codecs/tests/golden
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Output "The samples did not change."
+            exit 0
+          }
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "Update golden samples"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not commit the samples"
+          }
+          git push
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not push the samples to $env:GITHUB_REF_NAME"
+          }

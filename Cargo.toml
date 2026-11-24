@@ -1,0 +1,97 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/pixelit-core",
+  "crates/pixelit-codecs",
+  "crates/pixelit-engine",
+  "crates/pixelit-ai",
+  "crates/pixelit-worker",
+  "crates/pixelit-tools",
+  "crates/pixelit-cli",
+  "crates/pixelit-mcp",
+  "src-tauri",
+]
+
+[workspace.package]
+version = "1.0.0"
+authors = ["Mityy"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.98"
+repository = "https://github.com/Crazymoralfreak/PixelIt"
+
+[workspace.dependencies]
+pixelit-core = { path = "crates/pixelit-core" }
+pixelit-codecs = { path = "crates/pixelit-codecs" }
+pixelit-engine = { path = "crates/pixelit-engine" }
+pixelit-ai = { path = "crates/pixelit-ai" }
+pixelit-tools = { path = "crates/pixelit-tools" }
+pixelit-cli = { path = "crates/pixelit-cli" }
+pixelit-mcp = { path = "crates/pixelit-mcp" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rayon = "1.12"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+fastrand = "2"
+base64 = "0.22"
+tracing = "0.1"
+blake3 = "1.8"
+sha2 = "0.11"
+bytemuck = "1.25"
+proptest = "1.12"
+tempfile = "3.27"
+
+[workspace.dependencies.ureq]
+version = "2"
+default-features = false
+features = ["json", "native-tls"]
+
+[workspace.dependencies.windows]
+version = "0.62"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# `assert!(list.is_empty())` reads as the intent; the suggested comparison with a typed empty array does not.
+assert_is_empty = "allow"
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_lossless = "allow"
+# Pixel loops read `chunks_exact(CHANNELS)` throughout; `as_chunks` says the same with more noise.
+chunks_exact_to_as_chunks = "allow"
+doc_markdown = "allow"
+float_cmp = "allow"
+many_single_char_names = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+needless_pass_by_value = "allow"
+similar_names = "allow"
+struct_excessive_bools = "allow"
+too_many_arguments = "allow"
+too_many_lines = "allow"
+unreadable_literal = "allow"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# One damaged file must not take the whole batch down: panics unwind and are
+# caught per file, so the release profile keeps `panic = "unwind"`.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "unwind"
+strip = true
+
+[profile.bench]
+lto = "thin"

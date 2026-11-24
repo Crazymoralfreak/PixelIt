@@ -1,0 +1,59 @@
+name: Fuzzing
+
+# Random input for the decoders, the metadata code and the recipe reader
+# (cargo fuzz, the targets are in fuzz/fuzz_targets). Runs once a week and by
+# hand, a quarter of an hour per target. Inputs found earlier are kept in the
+# cache, so every run continues where the previous one stopped. An input that
+# crashes a target is attached to the run as an artifact.
+#
+# The targets run on Linux, where the sanitizers of the nightly compiler work
+# out of the box. The decoders are the same code as on Windows except HEIC,
+# which Windows itself decodes.
+on:
+  schedule:
+    - cron: "0 4 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - decode
+          - metadata
+          - pipeline
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install nightly Rust, cargo-fuzz and nasm
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-fuzz --locked
+          sudo apt-get update
+          sudo apt-get install --yes nasm
+
+      - uses: actions/cache@v6
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - name: Fuzz
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=900 -max_len=65536 -timeout=60 -rss_limit_mb=4096
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: fuzz-findings-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}
+          if-no-files-found: ignore

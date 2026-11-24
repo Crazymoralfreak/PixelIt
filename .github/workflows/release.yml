@@ -1,0 +1,258 @@
+name: Release
+
+# A pushed tag "v<version>" builds the installer and the portable archive,
+# signs the installer for the updater and attaches the files and the update
+# manifest (latest.json) to the GitHub release of that tag.
+#
+# A version with a suffix, such as v1.1.0-beta.1, becomes a pre-release. The
+# stable update address (releases/latest) does not see it. The beta channel
+# reads its manifest from the permanent release "beta-channel", which every
+# release refreshes, stable ones included.
+#
+# Secrets: TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD,
+# the private half of the key whose public half is in src-tauri/tauri.conf.json.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check that the tag matches the version in the project files
+        run: |
+          $tauri = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $npm = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          # The version of every crate comes from [workspace.package] in the root Cargo.toml.
+          $cargo = (Select-String -Path Cargo.toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $expected = $env:GITHUB_REF_NAME -replace '^v', ''
+          foreach ($found in @($tauri, $npm, $cargo)) {
+            if ($found -ne $expected) {
+              throw "Tag $env:GITHUB_REF_NAME does not match the versions: tauri.conf.json $tauri, package.json $npm, Cargo.toml $cargo"
+            }
+          }
+          "VERSION=$expected" >> $env:GITHUB_ENV
+          # A version with a suffix is a pre-release.
+          if ($expected -match '-') {
+            "PRERELEASE=true" >> $env:GITHUB_ENV
+          } else {
+            "PRERELEASE=false" >> $env:GITHUB_ENV
+          }
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      # MozJPEG and the AV1 encoder have assembly parts.
+      - uses: ilammy/setup-nasm@v1
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Dictionaries and the licence list
+        run: |
+          npm run i18n:check
+          if ($LASTEXITCODE -ne 0) {
+            throw "The dictionaries differ"
+          }
+          npm run licenses:check
+          if ($LASTEXITCODE -ne 0) {
+            throw "src/licenses.json is out of date"
+          }
+
+      # The application embeds the built interface, so its tests need it too.
+      - name: Build the interface
+        run: npm run build
+
+      - name: Look for golden samples
+        id: golden
+        run: |
+          if (Test-Path crates/pixelit-codecs/tests/golden/*.png) {
+            "skip=" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Output '::warning title=Golden samples::There are no samples in crates/pixelit-codecs/tests/golden; operations were not compared with samples.'
+            "skip=--skip golden_samples_match" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Tests
+        run: cargo test --workspace --locked -- ${{ steps.golden.outputs.skip }}
+
+      # Runs the type check and the frontend build first (beforeBuildCommand).
+      # tauri.release.conf.json turns the signing of the installer on and adds
+      # the worker to the installer; a local build does not use it and
+      # therefore needs no key.
+      - name: Build and sign the installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "The secret TAURI_SIGNING_PRIVATE_KEY is not set: the installer cannot be signed"
+          }
+          # pixelit-worker is built first: the program that runs the neural
+          # models in its own process. The installer copies it next to PixelIt.
+          # The release config expects the file under src-tauri/binaries with
+          # the target triple in the name.
+          cargo build --release --locked -p pixelit-worker
+          if ($LASTEXITCODE -ne 0) {
+            throw "pixelit-worker was not built"
+          }
+          New-Item -ItemType Directory -Force -Path src-tauri/binaries | Out-Null
+          Copy-Item target/release/pixelit-worker.exe src-tauri/binaries/pixelit-worker-x86_64-pc-windows-msvc.exe -Force
+          npm run tauri build -- --config "$env:GITHUB_WORKSPACE/src-tauri/tauri.release.conf.json"
+          if ($LASTEXITCODE -ne 0) {
+            throw "The build failed"
+          }
+
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          # The crates share one target folder at the root of the repository.
+          $installerName = "PixelIt_${env:VERSION}_x64-setup.exe"
+          $installer = "target/release/bundle/nsis/$installerName"
+          $signatureFile = "$installer.sig"
+          if (-not (Test-Path $installer)) {
+            throw "The installer was not built: $installer"
+          }
+          if (-not (Test-Path $signatureFile)) {
+            throw "The installer was not signed: $signatureFile is missing"
+          }
+
+          # The portable copy: the program, the worker beside it and the marker
+          # that makes PixelIt keep its data in the "data" folder next to itself.
+          $portable = "PixelIt_${env:VERSION}_x64-portable.zip"
+          $portableFolder = Join-Path $env:RUNNER_TEMP "PixelIt"
+          New-Item -ItemType Directory -Force -Path $portableFolder | Out-Null
+          Copy-Item target/release/PixelIt.exe (Join-Path $portableFolder "PixelIt.exe")
+          Copy-Item target/release/pixelit-worker.exe (Join-Path $portableFolder "pixelit-worker.exe")
+          New-Item -ItemType File -Force -Path (Join-Path $portableFolder "portable") | Out-Null
+          Compress-Archive -Path $portableFolder -DestinationPath $portable -Force
+
+          # The manifest that installed copies read to find out about this version.
+          $signature = (Get-Content $signatureFile -Raw).Trim()
+          $entry = [ordered]@{
+            signature = $signature
+            url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$installerName"
+          }
+          $manifest = [ordered]@{
+            version = $env:VERSION
+            notes = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
+            pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            platforms = [ordered]@{
+              "windows-x86_64" = $entry
+              "windows-x86_64-nsis" = $entry
+            }
+          }
+          # WriteAllText writes UTF-8 without a byte order mark, which a JSON reader may reject.
+          $manifestFile = Join-Path (Get-Location) "latest.json"
+          [System.IO.File]::WriteAllText($manifestFile, ($manifest | ConvertTo-Json -Depth 5))
+
+          # The description of the release: the section of this version in CHANGELOG.md.
+          $notes = New-Object System.Collections.Generic.List[string]
+          $inside = $false
+          foreach ($line in Get-Content CHANGELOG.md) {
+            if ($line -match '^##\s') {
+              $inside = $line -match ('^##\s+\[?' + [regex]::Escape($env:VERSION) + '\]?(\s|$)')
+              continue
+            }
+            if ($inside) {
+              $notes.Add($line)
+            }
+          }
+          $notesFile = Join-Path $env:RUNNER_TEMP "notes.md"
+          [System.IO.File]::WriteAllText($notesFile, (($notes -join "`n").Trim() + "`n"))
+
+          $existing = gh release list --limit 1000 --json tagName --jq '.[].tagName'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not read the list of releases"
+          }
+
+          # A release made by hand for this tag is kept; only its files are replaced.
+          if (@($existing) -notcontains $tag) {
+            $arguments = @($tag, "--title", "PixelIt $env:VERSION")
+            if ($notes.Count -gt 0) {
+              $arguments += @("--notes-file", $notesFile)
+            } else {
+              $arguments += "--generate-notes"
+            }
+            if ($env:PRERELEASE -eq "true") {
+              $arguments += "--prerelease"
+            }
+            gh release create @arguments
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not create the release $tag"
+            }
+          }
+          gh release upload $tag $installer $portable --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not upload the files to the release $tag"
+          }
+          # The manifest goes last: it must never point to an installer that is not there yet.
+          gh release upload $tag latest.json --clobber
+          if ($LASTEXITCODE -ne 0) {
+            throw "Could not upload latest.json to the release $tag"
+          }
+
+          # The beta channel. Its manifest lives in a permanent pre-release, so
+          # "releases/latest" never points to it. It moves forward only: a fix
+          # for an older stable line does not take beta users back.
+          $channel = "beta-channel"
+          if (@($existing) -notcontains $channel) {
+            gh release create $channel --prerelease --target $env:GITHUB_SHA --title "Beta channel" --notes "The update manifest of the beta channel of PixelIt. The files of every version are in its own release."
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not create the release $channel"
+            }
+          }
+          $previousFolder = Join-Path $env:RUNNER_TEMP "beta"
+          New-Item -ItemType Directory -Force -Path $previousFolder | Out-Null
+          # A channel without a manifest yet is not an error.
+          gh release download $channel --pattern latest.json --dir $previousFolder --clobber 2>$null
+          $global:LASTEXITCODE = 0
+          $previousFile = Join-Path $previousFolder "latest.json"
+          $newer = $true
+          if (Test-Path $previousFile) {
+            $previous = (Get-Content $previousFile -Raw | ConvertFrom-Json).version
+            $newer = [semver]$env:VERSION -gt [semver]$previous
+          }
+          if ($newer) {
+            gh release upload $channel latest.json --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "Could not upload latest.json to the release $channel"
+            }
+          } else {
+            Write-Output "The beta channel already offers $previous; its manifest is left as it is."
+          }
+
+      - name: Cache statistics
+        if: always()
+        run: sccache --show-stats

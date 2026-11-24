@@ -1,0 +1,47 @@
+# Rules of `cargo deny check` for the dependencies of PixelIt, run by
+# .github/workflows/ci.yml.
+
+[graph]
+# PixelIt is built for 64-bit Windows only.
+targets = ["x86_64-pc-windows-msvc"]
+
+[advisories]
+version = 2
+yanked = "deny"
+# An unmaintained crate deep in the tree is reported by its users; here only
+# the crates PixelIt depends on directly count.
+unmaintained = "workspace"
+
+[licenses]
+version = 2
+# Everything else is refused until it is looked at and added here.
+allow = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "BSL-1.0",
+  "CC0-1.0",
+  "IJG",
+  "Unicode-3.0",
+  # Weak copyleft per file: changes to those files are published, the rest of
+  # the program keeps its own licence.
+  "MPL-2.0",
+]
+exceptions = [
+  # The RAW decoder. LGPL lets a program of another licence use the library
+  # as long as the user can replace the library, which the open source code
+  # of PixelIt provides.
+  { crate = "rawler", allow = ["LGPL-2.1"] },
+]
+
+[bans]
+multiple-versions = "allow"
+# The crates of the workspace refer to each other by path, without a version.
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

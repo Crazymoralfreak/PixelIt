@@ -1,0 +1,30 @@
+# Build output
+/target/
+/dist/
+/node_modules/
+
+# A portable copy assembled locally for a try-out
+/portable/
+
+# The AI worker copied here for the installer by the release workflow
+/src-tauri/binaries/
+/src-tauri/gen/
+
+# Fuzzing: build output, generated inputs and findings
+/fuzz/target/
+/fuzz/corpus/
+/fuzz/artifacts/
+/fuzz/coverage/
+
+# Signing keys never belong in the repository
+*.key
+*.key.pub
+.env
+.env.*
+
+# Editors and the system
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store

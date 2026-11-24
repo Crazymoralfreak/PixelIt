@@ -1,0 +1,149 @@
+name: CI
+
+# Checks of every push and pull request: formatting, lints, tests, the
+# dictionaries, the licence list and the rules for dependencies. Nothing is
+# released from here; releases are built by release.yml from a tag.
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+
+permissions:
+  contents: read
+
+# A push to a branch with an open pull request starts two runs of the same
+# commit; the later one replaces the earlier.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  web:
+    name: Interface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Dictionaries of the 11 languages
+        run: npm run i18n:check
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      # src/licenses.json is generated from Cargo.lock and package.json; the
+      # check fails when a dependency changed and the list was not rebuilt.
+      - name: Licence list is up to date
+        run: npm run licenses:check
+
+  rust:
+    name: Rust
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+
+      # MozJPEG and the AV1 encoder have assembly parts.
+      - uses: ilammy/setup-nasm@v1
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      # The application embeds the built interface, so it comes first.
+      - name: Build the interface
+        run: |
+          npm ci
+          npm run build
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      # The comparison with golden samples needs the samples. They are written
+      # by the "Golden samples" workflow; until its first run the comparison
+      # is skipped with a warning instead of failing every build.
+      - name: Look for golden samples
+        id: golden
+        run: |
+          if (Test-Path crates/pixelit-codecs/tests/golden/*.png) {
+            "skip=" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Output '::warning title=Golden samples::There are no samples in crates/pixelit-codecs/tests/golden. Run the "Golden samples" workflow once; until then operations are not compared with samples.'
+            "skip=--skip golden_samples_match" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Tests
+        run: cargo test --workspace --locked -- ${{ steps.golden.outputs.skip }}
+
+      - name: Cache statistics
+        if: always()
+        run: sccache --show-stats
+
+  miri:
+    name: Miri (pixelit-core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install nightly Rust with Miri
+        run: |
+          rustup toolchain install nightly --profile minimal --component miri
+          cargo +nightly miri setup
+
+      # The unit tests of the core, interpreted: undefined behaviour in the
+      # pixel code fails here. The slowest tests are marked to be left out
+      # under Miri.
+      - name: Unit tests of the core under Miri
+        run: cargo +nightly miri test -p pixelit-core --lib --locked
+
+  deny:
+    name: Dependencies (${{ matrix.checks }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+    # A new advisory about a dependency is a reason to look, not a reason to
+    # block unrelated work.
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check ${{ matrix.checks }}

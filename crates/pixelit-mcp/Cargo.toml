@@ -1,0 +1,25 @@
+[package]
+name = "pixelit-mcp"
+description = "PixelIt MCP: server over stdio and client for external MCP servers"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+pixelit-core.workspace = true
+pixelit-engine.workspace = true
+pixelit-ai.workspace = true
+pixelit-tools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+fastrand.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

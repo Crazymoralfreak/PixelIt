@@ -1,0 +1,31 @@
+[package]
+name = "pixelit-core"
+description = "PixelIt core: pixel buffers, processing steps, pipeline model"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[features]
+default = ["parallel"]
+parallel = ["dep:rayon", "fast_image_resize/rayon"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+rayon = { workspace = true, optional = true }
+fast_image_resize = "6.2"
+ab_glyph = "0.2"
+
+[dev-dependencies]
+proptest.workspace = true
+criterion = { version = "0.8", default-features = false }
+
+[[bench]]
+name = "ops"
+harness = false
+
+[lints]
+workspace = true

@@ -1,0 +1,33 @@
+[package]
+name = "pixelit-engine"
+description = "PixelIt engine: pipeline execution, batch, job queue, storage, watch folders"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+
+[dependencies]
+pixelit-core.workspace = true
+pixelit-codecs.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+chrono.workspace = true
+fastrand.workspace = true
+tracing.workspace = true
+blake3.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "registry"] }
+tracing-appender = "0.2"
+notify = "9"
+trash = { version = "5", default-features = false, features = ["coinit_apartmentthreaded"] }
+ssimulacra2 = "0.5"
+walkdir = "2"
+fontdb = "0.24"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

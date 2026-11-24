@@ -1,0 +1,60 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "PixelIt",
+  "mainBinaryName": "PixelIt",
+  "version": "1.0.0",
+  "identifier": "com.crazymoralfreak.pixelit",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "PixelIt",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 940,
+        "minHeight": 600,
+        "visible": false,
+        "dragDropEnabled": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob: pixelit: http://pixelit.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost",
+      "devCsp": "default-src 'self'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob: pixelit: http://pixelit.localhost; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost ws://localhost:1420"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGQ0QyRTUxMzEzRTY5NEUKUldST2FUNHhVUzdObjYvTTJPMEhIWmFWbXlYK1NoZnR4RUNOTkljSkpJMFh0c2pkZ0xrZE13bHgK",
+      "endpoints": ["https://github.com/Crazymoralfreak/PixelIt/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "fileAssociations": [
+      {
+        "ext": ["jpg", "jpeg", "png", "webp", "avif", "jxl", "heic", "heif", "tif", "tiff", "bmp", "gif"],
+        "name": "PixelIt image",
+        "description": "Image",
+        "role": "Editor"
+      }
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "embedBootstrapper" },
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": ["English", "Russian"],
+        "displayLanguageSelector": false,
+        "installerHooks": "./windows/hooks.nsh"
+      }
+    }
+  }
+}

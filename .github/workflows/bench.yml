@@ -1,0 +1,51 @@
+name: Benchmarks
+
+# Speed of the core operations and of the codecs on a 12-megapixel image
+# (criterion). Runs once a week and by hand; it is not part of the checks of a
+# pull request, because the timing of a shared runner is too noisy to block
+# work on. The numbers are kept as an artifact of the run.
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  bench:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - uses: ilammy/setup-nasm@v1
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Benchmarks of the core
+        run: cargo bench -p pixelit-core --locked
+
+      - name: Benchmarks of the codecs
+        run: cargo bench -p pixelit-codecs --locked
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: criterion
+          path: target/criterion
+          if-no-files-found: ignore
