@@ -139,7 +139,7 @@ function AgentAccess() {
   const [folder, setFolder] = useState("");
 
   return (
-    <Section title={t("mcp.accessTitle")}>
+    <Section title={t("mcp.accessTitle")} collapsible defaultOpen={false}>
       <p className="tool-text">{t("mcp.accessText")}</p>
       <Field label={t("mcp.folders")} hint={agents.folders.length === 0 ? t("mcp.foldersNone") : undefined}>
         <div className="stack">
@@ -234,9 +234,13 @@ export function McpTab() {
     }
   };
 
+  const connected = servers.filter(
+    (server) => server.enabled && statuses.some((status) => status.id === server.id && status.connected),
+  ).length;
+
   return (
     <>
-      <Section title={t("mcp.serverTitle")}>
+      <Section title={t("mcp.serverTitle")} collapsible defaultOpen={false}>
         <p className="tool-text">{t("mcp.serverText")}</p>
         <pre className="snippet">{snippet}</pre>
         <div className="report-actions">
@@ -250,6 +254,18 @@ export function McpTab() {
 
       <Section
         title={t("mcp.clientsTitle")}
+        summary={
+          servers.length === 0 ? null : (
+            <>
+              {connected > 0 ? <Tag tone="ok">{t("mcp.connected")}</Tag> : null}
+              <span>
+                {connected} / {servers.length}
+              </span>
+            </>
+          )
+        }
+        collapsible
+        defaultOpen={false}
         actions={
           <Button small variant="primary" onClick={() => setEditing(BLANK)}>
             {t("mcp.add")}

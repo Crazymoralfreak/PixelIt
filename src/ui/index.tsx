@@ -337,42 +337,54 @@ export function PageFrame({ title, actions, children }: { title: string; actions
   );
 }
 
-/** Titled group of fields inside a page. A collapsible group opens on a click of its title. */
+/**
+ * Titled group of fields inside a page. A collapsible group opens on a click
+ * of its title row; while it is closed its content is not rendered and its
+ * actions are hidden, so nothing happens out of sight.
+ */
 export function Section({
   title,
   children,
   collapsible = false,
   defaultOpen = true,
+  summary,
   actions,
 }: {
   title?: string;
   children: ReactNode;
   collapsible?: boolean;
   defaultOpen?: boolean;
+  /** A short state beside the title: a count, the chosen model. It stays visible while the group is closed. */
+  summary?: ReactNode;
   actions?: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const shown = !collapsible || !title || open;
+  const state = summary ? <span className="section-summary">{summary}</span> : null;
   return (
-    <section className={cx("section", collapsible && !open && "section-collapsed")}>
+    <section className={cx("section", !shown && "section-collapsed")}>
       {title ? (
         <div className="section-head">
-          {collapsible ? (
-            <h2 className="section-title">
+          <h2 className="section-title">
+            {collapsible ? (
               <button
                 type="button"
                 className="section-toggle"
                 aria-expanded={open}
                 onClick={() => setOpen((current) => !current)}
               >
-                <span className={open ? "section-mark section-mark-open" : "section-mark"} aria-hidden="true" />
-                {title}
+                <span className={cx("section-mark", open && "section-mark-open")} aria-hidden="true" />
+                <span className="section-name">{title}</span>
+                {state}
               </button>
-            </h2>
-          ) : (
-            <h2 className="section-title">{title}</h2>
-          )}
-          {actions ? <div className="section-actions">{actions}</div> : null}
+            ) : (
+              <>
+                <span className="section-name">{title}</span>
+                {state}
+              </>
+            )}
+          </h2>
+          {actions && shown ? <div className="section-actions">{actions}</div> : null}
         </div>
       ) : null}
       {shown ? children : null}

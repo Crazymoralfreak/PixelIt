@@ -214,7 +214,7 @@ function ComponentRow({ component }: { component: ComponentStatus }) {
 
 function ComponentsTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSettings) => void }) {
   const { t, td } = useT();
-  const { confirm, showError } = useApp();
+  const { jobs, confirm, showError } = useApp();
   const { hardware, advice, settings, components } = ai;
 
   // One model for every task that has none yet.
@@ -258,9 +258,18 @@ function ComponentsTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings
     </Field>
   );
 
+  const deviceName =
+    settings.device === "gpu" ? t("ai.deviceGpu") : settings.device === "cpu" ? t("ai.deviceCpu") : t("ai.deviceAuto");
+  /** Components that are being downloaded right now. */
+  const installing = new Set(
+    jobs
+      .filter((job) => job.kind === "install" && (job.state === "queued" || job.state === "running" || job.state === "paused"))
+      .map((job) => job.title),
+  );
+
   return (
     <>
-      <Section title={t("ai.hardware")}>
+      <Section title={t("ai.hardware")} collapsible>
         <div className="report-line">
           {t("ai.hardwareText", { ram: formatBytes(hardware.ramMb * 1024 * 1024), threads: hardware.threads })}
         </div>
@@ -280,7 +289,7 @@ function ComponentsTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings
         ) : null}
       </Section>
 
-      <Section title={t("ai.device")}>
+      <Section title={t("ai.device")} summary={<span>{deviceName}</span>} collapsible defaultOpen={false}>
         <Field label={t("ai.runOn")}>
           <Segmented
             value={settings.device}
@@ -317,8 +326,26 @@ function ComponentsTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings
         if (ofKind.length === 0) {
           return null;
         }
+        const ready = ofKind.filter((component) => component.installed).length;
         return (
-          <Section key={kind} title={td(`ai.kind.${kind}`)}>
+          <Section
+            key={kind}
+            title={td(`ai.kind.${kind}`)}
+            summary={
+              <>
+                {ofKind.some((component) => installing.has(component.id)) ? (
+                  <Tag tone="warning">{t("common.working")}</Tag>
+                ) : ready > 0 ? (
+                  <Tag tone="ok">{t("ai.installed")}</Tag>
+                ) : null}
+                <span>
+                  {ready} / {ofKind.length}
+                </span>
+              </>
+            }
+            collapsible
+            defaultOpen={false}
+          >
             <p className="tool-text">{td(`ai.kindText.${kind}`)}</p>
             {ofKind.map((component) => (
               <ComponentRow key={component.id} component={component} />
@@ -364,7 +391,7 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
 
   return (
     <>
-      <Section title={t("ai.privacy")}>
+      <Section title={t("ai.privacy")} collapsible defaultOpen={false}>
         <p className="tool-text">{t("ai.privacyText")}</p>
         <Field label="">
           <div className="stack">
@@ -385,6 +412,8 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
 
       <Section
         title={t("ai.localServers")}
+        collapsible
+        defaultOpen={false}
         actions={
           <Button small disabled={searching} onClick={discover}>
             {searching ? t("common.working") : t("ai.discover")}
@@ -422,17 +451,32 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
         ))}
       </Section>
 
-      <Section title={t("ai.vision")}>
+      <Section
+        title={t("ai.vision")}
+        summary={draft.vision.model ? <span>{draft.vision.model}</span> : null}
+        collapsible
+        defaultOpen={false}
+      >
         <p className="tool-text">{t("ai.visionText")}</p>
         <EndpointFields value={draft.vision} onChange={(vision) => setDraft({ ...draft, vision })} />
       </Section>
 
-      <Section title={t("ai.assistant")}>
+      <Section
+        title={t("ai.assistant")}
+        summary={draft.assistant.model ? <span>{draft.assistant.model}</span> : null}
+        collapsible
+        defaultOpen={false}
+      >
         <p className="tool-text">{t("ai.assistantText")}</p>
         <EndpointFields value={draft.assistant} onChange={(assistant) => setDraft({ ...draft, assistant })} />
       </Section>
 
-      <Section title={t("ai.generation")}>
+      <Section
+        title={t("ai.generation")}
+        summary={<span>{td(`ai.provider.${generation.provider}`)}</span>}
+        collapsible
+        defaultOpen={false}
+      >
         <Field label={t("ai.providerLabel")} hint={td(`ai.providerText.${generation.provider}`)}>
           <Select
             value={generation.provider}
@@ -548,15 +592,15 @@ export default function AiPage({ active }: { active: boolean }) {
       />
       {ai === null ? null : (
         <>
-          <div hidden={tab !== "components"}>
+          <div className="column" hidden={tab !== "components"}>
             <ComponentsTab ai={ai} onSettings={saveSettings} />
           </div>
-          <div hidden={tab !== "providers"}>
+          <div className="column" hidden={tab !== "providers"}>
             <ProvidersTab ai={ai} onSettings={saveSettings} />
           </div>
         </>
       )}
-      <div hidden={tab !== "mcp"}>
+      <div className="column" hidden={tab !== "mcp"}>
         <McpTab />
       </div>
     </PageFrame>

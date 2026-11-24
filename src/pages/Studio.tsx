@@ -328,7 +328,7 @@ export default function StudioPage() {
       <div hidden={tab !== "generate"}>
         <GenerateTab />
       </div>
-      <div hidden={tab !== "vision"}>
+      <div className="column" hidden={tab !== "vision"}>
         <VisionTab />
       </div>
     </PageFrame>

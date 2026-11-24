@@ -8,7 +8,7 @@ import { PathField } from "../components/PathField";
 import { useT } from "../i18n";
 import { formatBytes } from "../lib/format";
 import { LANGUAGES, type Settings } from "../types";
-import { Button, Checkbox, Field, NumberInput, PageFrame, Progress, Section, Segmented, Select } from "../ui";
+import { Button, Checkbox, Field, NumberInput, PageFrame, Progress, Section, Segmented, Select, Tag } from "../ui";
 
 const MODIFIER_CODES = /^(Control|Shift|Alt|Meta)(Left|Right)$/;
 /** Keys that may be a global shortcut without a modifier. */
@@ -82,10 +82,15 @@ export default function SettingsPage() {
   }, []);
 
   const busyUpdate = update.state === "checking" || update.state === "downloading" || update.state === "installing";
+  // A closed group still tells what matters: the language in use, and an update that is waiting or on its way.
+  const languageName =
+    LANGUAGES.find((language) => language.code === settings.language)?.name ?? t("settings.languageSystem");
+  const updatePending =
+    update.state === "available" || update.state === "downloading" || update.state === "ready" || update.state === "installing";
 
   return (
     <PageFrame title={t("nav.settings")}>
-      <Section title={t("settings.interface")}>
+      <Section title={t("settings.interface")} summary={<span>{languageName}</span>} collapsible defaultOpen={false}>
         <Field label={t("settings.language")}>
           <Select
             value={settings.language}
@@ -109,7 +114,7 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
-      <Section title={t("settings.performance")}>
+      <Section title={t("settings.performance")} collapsible defaultOpen={false}>
         <Field label={t("settings.threads")} hint={t("settings.threadsHint")}>
           <NumberInput value={settings.threads} onChange={(threads) => set({ threads })} min={0} max={256} />
         </Field>
@@ -148,7 +153,7 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
-      <Section title={t("settings.files")}>
+      <Section title={t("settings.files")} collapsible defaultOpen={false}>
         <Field label="">
           <div className="stack">
             <Checkbox
@@ -172,7 +177,7 @@ export default function SettingsPage() {
         <OutputEditor value={settings.output} onChange={(output) => set({ output })} />
       </Section>
 
-      <Section title={t("settings.system")}>
+      <Section title={t("settings.system")} collapsible defaultOpen={false}>
         <Field label="">
           <div className="stack">
             <Checkbox
@@ -202,7 +207,18 @@ export default function SettingsPage() {
         </Field>
       </Section>
 
-      <Section title={t("settings.updates")}>
+      <Section
+        title={t("settings.updates")}
+        summary={
+          updatePending ? (
+            <Tag tone="ok">{td(`update.state.${update.state}`, { version: update.version ?? "" })}</Tag>
+          ) : (
+            <span>{info.version}</span>
+          )
+        }
+        collapsible
+        defaultOpen={false}
+      >
         <Field label="">
           <Checkbox
             checked={settings.checkUpdates}
@@ -232,7 +248,7 @@ export default function SettingsPage() {
         {update.state === "downloading" ? <Progress done={update.downloaded} total={update.total} /> : null}
       </Section>
 
-      <Section title={t("settings.data")}>
+      <Section title={t("settings.data")} collapsible defaultOpen={false}>
         <Field label={t("settings.dataFolder")} hint={info.portable ? t("settings.portable") : undefined}>
           <span className="path-text">{info.dataDir}</span>
           <Button small onClick={() => api.revealPath(info.dataDir).catch(showError)}>
