@@ -209,6 +209,10 @@ export interface AiEditOp {
   strength: number;
   /** Number of the attempt: another number asks for another result. */
   variant: number;
+  /** Empty uses the generator from the settings. */
+  provider: string;
+  /** Empty uses the model of that generator. */
+  model: string;
 }
 
 export type Op =
@@ -667,12 +671,20 @@ export interface Endpoint {
 
 export type GenerationProvider = "none" | "comfy" | "forge" | "sdCpp" | "cloud";
 
+export interface ModelDefaults {
+  width: number;
+  height: number;
+  steps: number;
+  cfg: number;
+}
+
 export interface Generation {
   provider: GenerationProvider;
   comfyUrl: string;
   comfyCheckpoint: string;
   comfyWorkflow: string;
   forgeUrl: string;
+  forgeCheckpoint: string;
   sdcppModel: string;
   sdcppArguments: string;
   cloud: Endpoint;
@@ -681,6 +693,12 @@ export interface Generation {
   steps: number;
   cfg: number;
   negative: string;
+  /** Style ids switched on in the studio, in the order they are applied. */
+  styles: string[];
+  /** Size, steps and CFG last used with a generator and a model. The key is `provider` + separator + model. */
+  modelDefaults: Record<string, ModelDefaults>;
+  /** Write the prompt into the PNG. */
+  embedParameters: boolean;
 }
 
 export interface AiSettings {
@@ -775,6 +793,86 @@ export interface GenerateRequest {
   seed: number | null;
   count: number;
   strength: number;
+  /** `none` uses the generator of the settings. */
+  provider: GenerationProvider;
+  /** Empty uses the model of the settings. */
+  model: string;
+  styles: string[];
+}
+
+export interface GenerationModel {
+  id: string;
+  name: string;
+}
+
+export interface ModelList {
+  models: GenerationModel[];
+  selectable: boolean;
+}
+
+export interface PictureParameters {
+  prompt: string;
+  negative: string;
+  steps: number;
+  cfg: number;
+  seed: number;
+  width: number;
+  height: number;
+  model: string;
+}
+
+export type GeneratedKind = "create" | "edit" | "outpaint" | "upscale";
+
+export interface GeneratedPicture {
+  file: string;
+  seed: number;
+  favorite: boolean;
+  width: number;
+  height: number;
+}
+
+/** One request and the pictures it produced. `file` is a full path. */
+export interface GeneratedRecord {
+  id: string;
+  created: number;
+  prompt: string;
+  negative: string;
+  styles: string[];
+  finalPrompt: string;
+  finalNegative: string;
+  provider: GenerationProvider;
+  model: string;
+  width: number;
+  height: number;
+  steps: number;
+  cfg: number;
+  strength: number;
+  source: string;
+  kind: GeneratedKind;
+  pictures: GeneratedPicture[];
+}
+
+export interface Style {
+  id: string;
+  name: string;
+  prompt: string;
+  negative: string;
+  builtin: boolean;
+}
+
+export interface Expand {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+export interface GeneratePreview {
+  index: number;
+  count: number;
+  step: number;
+  steps: number;
+  image: string | null;
 }
 
 export type VisionTask = "describe" | "altText" | "tags" | "name" | "ocr";

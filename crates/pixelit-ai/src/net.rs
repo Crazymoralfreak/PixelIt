@@ -6,7 +6,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,6 +15,8 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
+use tungstenite::client::IntoClientRequest as _;
+use tungstenite::stream::MaybeTlsStream;
 use url::Url;
 
 use pixelit_core::{CancelToken, Error, Result};
@@ -665,6 +667,90 @@ impl Net {
         }
         fs::rename(&part, target)?;
         Ok(())
+    }
+
+    /// Opens a WebSocket. Used for the live progress of ComfyUI; the address
+    /// is the `ws` form of a server the caller has already been allowed to use.
+    pub fn connect_socket(&self, url: &str, key: Option<&str>) -> Result<Socket> {
+        if !url.starts_with("ws://") && !url.starts_with("wss://") {
+            return Err(Error::new("badUrl").with("url", url));
+        }
+        let mut request = url
+            .into_client_request()
+            .map_err(|error| Error::new("badUrl").with("url", url).detail(error))?;
+        if let Some(key) = key.filter(|key| !key.is_empty()) {
+            let value = tungstenite::http::HeaderValue::from_str(&format!("Bearer {key}"))
+                .map_err(|error| Error::new("badKey").detail(error))?;
+            request
+                .headers_mut()
+                .insert(tungstenite::http::header::AUTHORIZATION, value);
+        }
+        let (inner, _) =
+            tungstenite::connect(request).map_err(|error| Error::new("network").detail(error))?;
+        if let Some(tcp) = tcp_of(inner.get_ref()) {
+            let _ = tcp.set_read_timeout(Some(Duration::from_millis(400)));
+        }
+        Ok(Socket { inner })
+    }
+}
+
+/// The `ws` address of a ComfyUI server.
+pub fn websocket_of(http_base: &str, client: &str) -> String {
+    let base = http_base.trim().trim_end_matches('/');
+    let base = if let Some(rest) = base.strip_prefix("https://") {
+        format!("wss://{rest}")
+    } else if let Some(rest) = base.strip_prefix("http://") {
+        format!("ws://{rest}")
+    } else {
+        base.to_owned()
+    };
+    format!("{base}/ws?clientId={client}")
+}
+
+/// One message from a WebSocket.
+pub enum SocketMessage {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+/// An open WebSocket.
+pub struct Socket {
+    inner: tungstenite::WebSocket<MaybeTlsStream<TcpStream>>,
+}
+
+fn tcp_of(stream: &MaybeTlsStream<TcpStream>) -> Option<&TcpStream> {
+    match stream {
+        MaybeTlsStream::Plain(tcp) => Some(tcp),
+        MaybeTlsStream::NativeTls(tls) => Some(tls.get_ref()),
+        #[allow(unreachable_patterns)]
+        _ => None,
+    }
+}
+
+impl Socket {
+    /// The next message, or nothing when the wait ran out.
+    pub fn recv(&mut self) -> Result<Option<SocketMessage>> {
+        match self.inner.read() {
+            Ok(tungstenite::Message::Text(text)) => Ok(Some(SocketMessage::Text(text.to_string()))),
+            Ok(tungstenite::Message::Binary(bytes)) => {
+                Ok(Some(SocketMessage::Binary(bytes.to_vec())))
+            }
+            Ok(tungstenite::Message::Ping(payload)) => {
+                let _ = self.inner.send(tungstenite::Message::Pong(payload));
+                Ok(None)
+            }
+            Ok(tungstenite::Message::Close(_)) => {
+                Err(Error::new("network").detail("socket closed"))
+            }
+            Ok(_) => Ok(None),
+            Err(tungstenite::Error::Io(error))
+                if error.kind() == io::ErrorKind::WouldBlock
+                    || error.kind() == io::ErrorKind::TimedOut =>
+            {
+                Ok(None)
+            }
+            Err(error) => Err(Error::new("network").detail(error)),
+        }
     }
 }
 

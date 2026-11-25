@@ -373,7 +373,7 @@ function AnnotateOverlay({ width, height, op, tool, onChange }: OverlayProps & {
 
 /** Colours of the brush: what is removed, what is redrawn and what is kept. */
 const BRUSH_REMOVE = "rgba(255, 45, 85, 0.55)";
-const BRUSH_EDIT = "rgba(124, 77, 255, 0.55)";
+export const BRUSH_EDIT = "rgba(124, 77, 255, 0.55)";
 const BRUSH_KEEP = "rgba(46, 204, 113, 0.55)";
 
 interface BrushOverlayProps {
@@ -387,7 +387,7 @@ interface BrushOverlayProps {
 }
 
 /** An area painted with a brush, stroke by stroke. */
-function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes }: BrushOverlayProps) {
+export function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes }: BrushOverlayProps) {
   const [draft, setDraft] = useState<Stroke | null>(null);
   /** Where the pointer is: the outline of the brush is drawn there. */
   const [pointer, setPointer] = useState<Point | null>(null);

@@ -295,6 +295,12 @@
  },
  {
   "name": "block-buffer",
+  "version": "0.10.4",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "block-buffer",
   "version": "0.12.1",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
@@ -535,6 +541,12 @@
  },
  {
   "name": "cpufeatures",
+  "version": "0.2.17",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "cpufeatures",
   "version": "0.3.1",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
@@ -578,6 +590,12 @@
  {
   "name": "crossbeam-utils",
   "version": "0.8.23",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "crypto-common",
+  "version": "0.1.7",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
@@ -636,6 +654,12 @@
   "kind": "rust"
  },
  {
+  "name": "data-encoding",
+  "version": "2.11.1",
+  "license": "MIT",
+  "kind": "rust"
+ },
+ {
   "name": "data-url",
   "version": "0.3.2",
   "license": "MIT OR Apache-2.0",
@@ -657,6 +681,12 @@
   "name": "derive_more-impl",
   "version": "2.1.1",
   "license": "MIT",
+  "kind": "rust"
+ },
+ {
+  "name": "digest",
+  "version": "0.10.7",
+  "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
  {
@@ -903,6 +933,12 @@
   "name": "futures-util",
   "version": "0.3.34",
   "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "generic-array",
+  "version": "0.14.7",
+  "license": "MIT",
   "kind": "rust"
  },
  {
@@ -1878,6 +1914,12 @@
   "kind": "rust"
  },
  {
+  "name": "ppv-lite86",
+  "version": "0.2.21",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "precomputed-hash",
   "version": "0.1.1",
   "license": "MIT",
@@ -1956,8 +1998,26 @@
   "kind": "rust"
  },
  {
+  "name": "rand",
+  "version": "0.9.5",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "rand_chacha",
+  "version": "0.9.0",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "rand_core",
   "version": "0.10.1",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "rand_core",
+  "version": "0.9.5",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
@@ -2300,6 +2360,12 @@
  {
   "name": "servo_arc",
   "version": "0.4.3",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "sha1",
+  "version": "0.10.7",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
@@ -2850,6 +2916,12 @@
   "kind": "rust"
  },
  {
+  "name": "tungstenite",
+  "version": "0.26.2",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "typed-path",
   "version": "0.13.0",
   "license": "MIT OR Apache-2.0",
@@ -2937,6 +3009,12 @@
   "name": "utf_types",
   "version": "1.0.0",
   "license": "Apache-2.0 OR MIT",
+  "kind": "rust"
+ },
+ {
+  "name": "utf-8",
+  "version": "0.7.6",
+  "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
  {

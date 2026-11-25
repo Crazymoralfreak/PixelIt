@@ -42,11 +42,13 @@ impl Print {
             ops::resize::resize_to(image, SIDE, SIDE, ResizeFilter::Box, false, None)?.to_rgb8();
         Ok(Self {
             request: format!(
-                "{}\n{}\n{}\n{}",
+                "{}\n{}\n{}\n{}\n{}\n{}",
                 spec.prompt.trim(),
                 spec.strength,
                 spec.variant,
-                serde_json::to_string(&spec.strokes).unwrap_or_default()
+                serde_json::to_string(&spec.strokes).unwrap_or_default(),
+                spec.provider,
+                spec.model,
             ),
             shape: image.width() as f32 / image.height().max(1) as f32,
             picture,

@@ -4,6 +4,8 @@
 //! user enables it, and every endpoint is an address the user typed or
 //! accepted from the search for local servers.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use pixelit_core::Result;
@@ -59,6 +61,55 @@ pub enum GenerationProvider {
     Cloud,
 }
 
+impl GenerationProvider {
+    /// The name used in settings, requests and the interface.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Comfy => "comfy",
+            Self::Forge => "forge",
+            Self::SdCpp => "sdCpp",
+            Self::Cloud => "cloud",
+        }
+    }
+
+    /// `None` when the text is empty or not a generator name.
+    pub fn parse(text: &str) -> Self {
+        match text.trim() {
+            "comfy" => Self::Comfy,
+            "forge" => Self::Forge,
+            "sdCpp" => Self::SdCpp,
+            "cloud" => Self::Cloud,
+            _ => Self::None,
+        }
+    }
+}
+
+/// Size, steps and CFG remembered for one model.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ModelDefaults {
+    pub width: u32,
+    pub height: u32,
+    pub steps: u32,
+    pub cfg: f32,
+}
+
+impl Default for ModelDefaults {
+    fn default() -> Self {
+        Self {
+            width: 1024,
+            height: 1024,
+            steps: 24,
+            cfg: 6.0,
+        }
+    }
+}
+
+fn remember_parameters() -> bool {
+    true
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Generation {
@@ -67,10 +118,13 @@ pub struct Generation {
     /// Checkpoint name as ComfyUI lists it; empty takes the first one.
     pub comfy_checkpoint: String,
     /// Path of a workflow in the ComfyUI API format with `%prompt%`,
-    /// `%negative%`, `%seed%`, `%width%`, `%height%`, `%steps%`, `%cfg%`
-    /// placeholders; empty uses the built-in text-to-image graph.
+    /// `%negative%`, `%image%`, `%checkpoint%`, `%seed%`, `%width%`,
+    /// `%height%`, `%steps%`, `%cfg%` placeholders; empty uses the built-in
+    /// text-to-image graph.
     pub comfy_workflow: String,
     pub forge_url: String,
+    /// Checkpoint name as Forge lists it; empty keeps the model loaded there.
+    pub forge_checkpoint: String,
     /// Path of the checkpoint stable-diffusion.cpp loads.
     pub sdcpp_model: String,
     /// Extra command line arguments of stable-diffusion.cpp.
@@ -82,6 +136,18 @@ pub struct Generation {
     pub steps: u32,
     pub cfg: f32,
     pub negative: String,
+    /// Styles switched on in the studio, in the order they are applied.
+    pub styles: Vec<String>,
+    /// Size, steps and CFG last used with a generator and a model.
+    pub model_defaults: BTreeMap<String, ModelDefaults>,
+    /// Write the prompt into the PNG, in the text block other tools read.
+    #[serde(default = "remember_parameters")]
+    pub embed_parameters: bool,
+}
+
+/// Key of [`Generation::model_defaults`] for one generator and model.
+pub fn defaults_key(provider: GenerationProvider, model: &str) -> String {
+    format!("{}\u{1}{}", provider.name(), model.trim())
 }
 
 impl Default for Generation {
@@ -92,6 +158,7 @@ impl Default for Generation {
             comfy_checkpoint: String::new(),
             comfy_workflow: String::new(),
             forge_url: String::from("http://127.0.0.1:7860"),
+            forge_checkpoint: String::new(),
             sdcpp_model: String::new(),
             sdcpp_arguments: String::new(),
             cloud: Endpoint::default(),
@@ -100,6 +167,9 @@ impl Default for Generation {
             steps: 24,
             cfg: 6.0,
             negative: String::new(),
+            styles: Vec::new(),
+            model_defaults: BTreeMap::new(),
+            embed_parameters: true,
         }
     }
 }
@@ -159,6 +229,17 @@ impl AiSettings {
         generation.width = (generation.width.clamp(64, 4096) / 8) * 8;
         generation.height = (generation.height.clamp(64, 4096) / 8) * 8;
         generation.steps = generation.steps.clamp(1, 150);
+        generation.styles.retain(|id| !id.trim().is_empty());
+        for defaults in generation.model_defaults.values_mut() {
+            defaults.width = (defaults.width.clamp(64, 4096) / 8) * 8;
+            defaults.height = (defaults.height.clamp(64, 4096) / 8) * 8;
+            defaults.steps = defaults.steps.clamp(1, 150);
+            defaults.cfg = if defaults.cfg.is_finite() {
+                defaults.cfg.clamp(0.0, 30.0)
+            } else {
+                6.0
+            };
+        }
         generation.cfg = if generation.cfg.is_finite() {
             generation.cfg.clamp(0.0, 30.0)
         } else {

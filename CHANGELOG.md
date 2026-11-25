@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### Studio
+
+- The generator and its model are chosen in the studio and remembered. The same choice is the default for the rest of the program; an "AI edit" step can override it.
+- One request makes 1 to 4 pictures. The shape is chosen with buttons, and the size, steps and CFG are remembered for each model.
+- "Improve prompt" asks the assistant model to rewrite the text. "Restore" brings the previous text back.
+- Styles add text to the prompt and to what to avoid. Built-in styles can be duplicated; your own can be created, changed, imported and exported as Fooocus JSON.
+- "Edit" changes a whole picture or the area painted with the brush, and can extend the canvas so the generator paints past the edges. The original picture is put back outside that area.
+- While a picture is generated, the tile shows the step and, when the generator sends one, a preview.
+- Each result can make more variants, a similar picture, an edit, or a ×2 / ×4 enlargement with the local upscale model.
+- The history lists every generated picture, with search, favourites, a large view and a before-and-after wipe. Several can be saved to a folder or moved to the recycle bin.
+- A PNG can carry the prompt in the text block other tools read. Dropping such a file on the studio fills the form. The switch is on by default.
+
+### Editor
+
+- Exporting an "AI edit" that is already shown no longer asks to send the picture outside: the result is taken from the cache, and the agreement given for the preview is reused.
+
+### Dependencies
+
+- `tungstenite` (MIT or Apache-2.0) is used for the ComfyUI progress connection. If it cannot connect, generation continues without the live preview.
+
 ## [0.0.2] - 2026-11-25
 
 ### Images from the web

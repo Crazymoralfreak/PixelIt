@@ -9,7 +9,7 @@ use serde_json::Value;
 use tauri::Emitter;
 
 use pixelit_codecs::{encode, encode_media, EncodeOptions};
-use pixelit_core::pipeline::{Conflict, Destination};
+use pixelit_core::pipeline::{Conflict, Destination, Step};
 use pixelit_core::{CancelToken, Error, Image, ImageFormat, Pipeline, Result};
 use pixelit_engine::batch::{self, BatchRequest};
 use pixelit_engine::compose::{self, AnimationSpec, CollageSpec, PdfSpec};
@@ -22,7 +22,7 @@ use pixelit_engine::generators::{
 use pixelit_engine::journal::{Journal, JournalEntry};
 use pixelit_engine::recipes::{self, Recipe, Recipes};
 use pixelit_engine::watch::{WatchRule, WatchRules};
-use pixelit_engine::{scan, Item, Lane, Runner};
+use pixelit_engine::{scan, thumbs, Item, Lane, Runner};
 
 use super::neural::confirm_steps;
 use super::{display, CoreState};
@@ -77,12 +77,40 @@ fn announce(core: &Core, title: &str, done: u32, failed: u32) {
     notify(core.app(), &headline, &body);
 }
 
+/// Long side of the picture compared with the editor cache before asking
+/// about an upload. The editor previews at this size, and the cache matches
+/// a picture with its reduced copy.
+const CONFIRM_SIDE: u32 = 2048;
+
+/// Whether every file would reuse a generator picture already drawn.
+/// Only one generator step can be checked here: it sees the file itself,
+/// while a later one would see the picture the previous one produced.
+fn edits_cover(core: &Core, items: &[Item], steps: &[Step]) -> bool {
+    let needing = steps
+        .iter()
+        .filter(|step| step.enabled && step.op.uses_generator())
+        .count();
+    if needing != 1 || items.is_empty() {
+        return false;
+    }
+    let cancel = CancelToken::new();
+    items.iter().all(|item| {
+        thumbs::load_preview(
+            &core.engine.runner(),
+            &item.source,
+            CONFIRM_SIDE,
+            item.page,
+            &cancel,
+        )
+        .is_ok_and(|preview| core.ai.generator_steps_cached(&[&preview.image], steps))
+    })
+}
+
 /// Queues a batch and returns the number of its job. The report arrives as
 /// the result of the job.
 #[tauri::command(async)]
 pub fn batch_start(core: CoreState<'_>, request: BatchStart) -> Result<u64> {
     core.ensure_not_updating()?;
-    confirm_steps(&core, &request.pipeline.steps, request.confirmed)?;
     let inputs: Vec<PathBuf> = request.inputs.iter().map(PathBuf::from).collect();
     let items = scan::collect(
         &inputs,
@@ -92,6 +120,8 @@ pub fn batch_start(core: CoreState<'_>, request: BatchStart) -> Result<u64> {
     if items.is_empty() {
         return Err(Error::new("noImages"));
     }
+    let cached = edits_cover(&core, &items, &request.pipeline.steps);
+    confirm_steps(&core, &request.pipeline.steps, cached, request.confirmed)?;
     let settings = core.engine.settings();
     let lane = if request.pipeline.uses_ai() {
         Lane::Gpu

@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
 import { useApp } from "../app/context";
 import { useT } from "../i18n";
+import { GeneratorPicker } from "./GeneratorPicker";
 import { AI_KINDS, newStep, OP_KINDS } from "../lib/pipeline";
 import type {
   AdjustOp,
@@ -500,6 +501,12 @@ function AiEditForm({ op, onChange, interactive }: { op: AiEditOp; onChange: (op
           </span>
         </Field>
       ) : null}
+      <GeneratorPicker
+        provider={op.provider === "" ? "" : (op.provider as "comfy" | "forge" | "sdCpp" | "cloud")}
+        model={op.model}
+        allowDefault
+        onChange={(provider, model) => onChange({ ...op, provider, model })}
+      />
       <Field label={t("op.editPrompt")} hint={t("op.editPromptHint")}>
         <TextArea value={op.prompt} onChange={(prompt) => onChange({ ...op, prompt })} rows={3} />
       </Field>

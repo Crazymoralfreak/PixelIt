@@ -638,9 +638,18 @@ function ProvidersTab({
           </>
         ) : null}
         {generation.provider === "forge" ? (
-          <Field label={t("ai.url")}>
-            <TextInput value={generation.forgeUrl} onChange={(forgeUrl) => setGeneration({ forgeUrl })} wide />
-          </Field>
+          <>
+            <Field label={t("ai.url")}>
+              <TextInput value={generation.forgeUrl} onChange={(forgeUrl) => setGeneration({ forgeUrl })} wide />
+            </Field>
+            <Field label={t("ai.forgeCheckpoint")} hint={t("ai.forgeCheckpointHint")}>
+              <TextInput
+                value={generation.forgeCheckpoint}
+                onChange={(forgeCheckpoint) => setGeneration({ forgeCheckpoint })}
+                wide
+              />
+            </Field>
+          </>
         ) : null}
         {generation.provider === "sdCpp" ? (
           <>

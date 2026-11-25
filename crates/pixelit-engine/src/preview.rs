@@ -71,6 +71,37 @@ impl PreviewSession {
         &self.base
     }
 
+    /// Pictures the generator steps would receive, taken from the last render.
+    /// `None` when that render is missing or the steps have changed since, so
+    /// the caller cannot know whether the generator would be asked again.
+    pub fn generator_inputs(&self, steps: &[Step]) -> Option<Vec<&Image>> {
+        let enabled: Vec<&Step> = steps.iter().filter(|step| step.enabled).collect();
+        let keys: Vec<String> = enabled
+            .iter()
+            .map(|step| serde_json::to_string(&step.op).unwrap_or_default())
+            .collect();
+        let mut inputs = Vec::new();
+        for (index, step) in enabled.iter().enumerate() {
+            if !step.op.uses_generator() {
+                continue;
+            }
+            if index == 0 {
+                inputs.push(&self.base);
+                continue;
+            }
+            let known = index <= self.cache.len()
+                && self.cache[..index]
+                    .iter()
+                    .zip(&keys)
+                    .all(|(cached, key)| cached.key == *key);
+            if !known {
+                return None;
+            }
+            inputs.push(&self.cache[index - 1].image);
+        }
+        Some(inputs)
+    }
+
     /// The picture after the enabled steps.
     pub fn render(
         &mut self,

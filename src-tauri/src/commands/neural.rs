@@ -12,10 +12,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::Emitter;
 
-use pixelit_ai::generate::save_generated;
 use pixelit_ai::{
-    llm, secrets, vision, Advice, AiSettings, Capabilities, Found, GenerateRequest, Hardware,
-    Source, Status, VisionTask,
+    llm, secrets, vision, Advice, AiSettings, Capabilities, Found, Hardware, Status, VisionTask,
 };
 use pixelit_core::pipeline::Step;
 use pixelit_core::{Error, Result};
@@ -29,7 +27,7 @@ const VISION_SIDE: u32 = 2048;
 
 /// Refuses a request that leaves this computer until the user has agreed.
 /// The interface shows the question and repeats the call with `confirmed`.
-fn confirm_cloud(core: &Core, leaves_computer: bool, confirmed: bool) -> Result<()> {
+pub(crate) fn confirm_cloud(core: &Core, leaves_computer: bool, confirmed: bool) -> Result<()> {
     if leaves_computer && core.ai.settings().confirm_cloud && !confirmed {
         Err(Error::new("cloudConfirm"))
     } else {
@@ -38,13 +36,15 @@ fn confirm_cloud(core: &Core, leaves_computer: bool, confirmed: bool) -> Result<
 }
 
 /// The same check for editor steps: only changes by a prompt use a provider.
-pub fn confirm_steps(core: &Core, steps: &[Step], confirmed: bool) -> Result<()> {
+/// `cached` means every such step would reuse a picture already drawn, so
+/// nothing is sent anywhere.
+pub fn confirm_steps(core: &Core, steps: &[Step], cached: bool, confirmed: bool) -> Result<()> {
     let prompted = steps
         .iter()
         .any(|step| step.enabled && step.op.uses_generator());
     confirm_cloud(
         core,
-        prompted && core.ai.generation_leaves_computer(),
+        prompted && !cached && core.ai.steps_leave_computer(steps),
         confirmed,
     )
 }
@@ -144,58 +144,6 @@ pub fn ai_discover(core: CoreState<'_>) -> Vec<Found> {
 #[tauri::command(async)]
 pub fn ai_models(core: CoreState<'_>, url: String) -> Result<Vec<String>> {
     llm::models(core.ai.net(), &core.ai.settings(), &url)
-}
-
-// Generation
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GenerateStart {
-    pub request: GenerateRequest,
-    /// Picture to start from, for image-to-image.
-    pub source: Option<String>,
-    /// The user agreed to send the picture and the prompt to a cloud server.
-    #[serde(default)]
-    pub confirmed: bool,
-}
-
-/// Generates pictures as a job. The paths of the saved files arrive as the
-/// result of the job.
-#[tauri::command(async)]
-pub fn generate_start(core: CoreState<'_>, start: GenerateStart) -> Result<u64> {
-    core.ensure_not_updating()?;
-    if start.request.prompt.trim().is_empty() {
-        return Err(Error::new("emptyPrompt"));
-    }
-    confirm_cloud(&core, core.ai.generation_leaves_computer(), start.confirmed)?;
-    let title: String = start.request.prompt.chars().take(60).collect();
-    let core = Arc::clone(core.inner());
-    let jobs = &core.engine.jobs;
-    Ok(jobs.spawn("generate", &title, Lane::Gpu, {
-        let core = Arc::clone(&core);
-        move |job: &JobContext| {
-            let source = match &start.source {
-                Some(path) => Some(
-                    core.engine
-                        .runner()
-                        .load(Path::new(path), 0, &job.cancel)?
-                        .media
-                        .into_first()
-                        .ok_or_else(|| Error::new("emptyImage").with("path", path))?,
-                ),
-                None => None,
-            };
-            let source = source.as_ref().map(|image| Source { image, mask: None });
-            let images = core
-                .ai
-                .generate(&start.request, source.as_ref(), &job.cancel)?;
-            let files: Vec<String> = save_generated(core.paths(), &images)?
-                .iter()
-                .map(|path| display(path))
-                .collect();
-            Ok(json!({ "files": files }))
-        }
-    }))
 }
 
 // Vision

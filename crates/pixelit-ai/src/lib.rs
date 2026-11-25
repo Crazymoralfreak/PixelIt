@@ -6,17 +6,23 @@
 //! missing instead of failing in an unclear way.
 
 pub mod catalog;
+pub mod checkpoints;
 pub mod config;
 pub mod discover;
 mod edits;
 pub mod faces;
 pub mod generate;
 pub mod hardware;
+pub mod history;
 pub mod install;
 pub mod llm;
 pub mod net;
 pub mod onnx;
+pub mod outpaint;
+pub mod parameters;
+pub mod progress;
 pub mod secrets;
+pub mod styles;
 pub mod vision;
 pub mod web;
 pub mod worker;
@@ -26,22 +32,26 @@ use std::sync::{PoisonError, RwLock};
 
 use serde::Serialize;
 
-use pixelit_core::pipeline::{AiBackend, AiEdit, Mask, ResizeFilter};
+use pixelit_core::pipeline::{AiBackend, AiEdit, Mask, Op, ResizeFilter, Step};
 use pixelit_core::{ops, CancelToken, Error, Image, Result};
 use pixelit_engine::Paths;
 
 use crate::edits::{Edits, Print};
 
 pub use crate::catalog::{Entry, Kind};
+pub use crate::checkpoints::{GenerationModel, ModelList};
 pub use crate::config::{AiSettings, DeviceChoice, Endpoint, Generation, GenerationProvider};
 pub use crate::discover::Found;
 pub use crate::faces::Face;
-pub use crate::generate::{GenerateRequest, Source};
+pub use crate::generate::{GenerateRequest, Outcome, Source};
 pub use crate::hardware::{Advice, Hardware};
+pub use crate::history::{GeneratedKind, Picture, Record};
 pub use crate::install::Status;
 pub use crate::llm::{Message, Reply, Role, ToolCall, ToolSpec};
 pub use crate::net::Net;
 pub use crate::onnx::{Device, Onnx};
+pub use crate::outpaint::Expand;
+pub use crate::styles::Style;
 pub use crate::vision::VisionTask;
 pub use crate::web::{WebImage, WebSource};
 
@@ -228,7 +238,8 @@ impl Ai {
         request: &GenerateRequest,
         source: Option<&Source<'_>>,
         cancel: &CancelToken,
-    ) -> Result<Vec<Image>> {
+        tick: &generate::Tick<'_>,
+    ) -> Result<Outcome> {
         generate::generate(
             &self.net,
             &self.paths,
@@ -236,7 +247,68 @@ impl Ai {
             request,
             source,
             cancel,
+            tick,
         )
+    }
+
+    /// Rewrites a prompt into a detailed English prompt with the assistant model.
+    pub fn improve_prompt(&self, text: &str) -> Result<String> {
+        let settings = self.settings();
+        if !settings.assistant.is_set() {
+            return Err(Error::new("providerNotSet"));
+        }
+        let reply = llm::chat(
+            &self.net,
+            &settings,
+            &settings.assistant,
+            &[
+                Message::new(
+                    Role::System,
+                    "Rewrite the user's image prompt into one detailed English prompt. Keep the subject. Return only the prompt, with no quotes and no explanation.",
+                ),
+                Message::new(Role::User, text.trim()),
+            ],
+            &[],
+        )?;
+        let text = reply.content.trim();
+        if text.is_empty() {
+            return Err(Error::new("generationFailed").detail("empty reply"));
+        }
+        Ok(text.to_owned())
+    }
+
+    /// Whether any enabled step would ask a generator that is outside this computer.
+    pub fn steps_leave_computer(&self, steps: &[Step]) -> bool {
+        let settings = self.settings();
+        steps
+            .iter()
+            .filter(|step| step.enabled)
+            .any(|step| match &step.op {
+                Op::AiEdit(spec) if !spec.prompt.trim().is_empty() => {
+                    let chosen = GenerationProvider::parse(&spec.provider);
+                    let provider = match chosen {
+                        GenerationProvider::None => settings.generation.provider,
+                        other => other,
+                    };
+                    generate::leaves_with(&settings, provider)
+                }
+                Op::Inpaint(spec) if !spec.prompt.trim().is_empty() => {
+                    generate::leaves_computer(&settings)
+                }
+                Op::AiEdit(_)
+                | Op::Inpaint(_)
+                | Op::Resize(_)
+                | Op::Crop(_)
+                | Op::Rotate(_)
+                | Op::Flip(_)
+                | Op::Adjust(_)
+                | Op::Filter(_)
+                | Op::Watermark(_)
+                | Op::Annotate(_)
+                | Op::RemoveBackground(_)
+                | Op::Upscale(_)
+                | Op::RestoreFaces(_) => false,
+            })
     }
 
     /// Asks the vision model about a picture.
@@ -268,6 +340,46 @@ impl Ai {
         generate::leaves_computer(&self.settings())
     }
 
+    /// Whether this picture and this change are already in the editor cache,
+    /// so applying the step again does not call the generator.
+    pub fn edit_is_cached(&self, image: &Image, spec: &AiEdit) -> bool {
+        Print::of(image, spec)
+            .ok()
+            .and_then(|print| self.edits.find(&print))
+            .is_some()
+    }
+
+    /// Whether every enabled step that would ask a generator already has its
+    /// picture cached. `inputs` are the pictures those steps would receive,
+    /// in the same order. A prompted inpaint is never cached.
+    pub fn generator_steps_cached(&self, inputs: &[&Image], steps: &[Step]) -> bool {
+        let needing: Vec<&Step> = steps
+            .iter()
+            .filter(|step| step.enabled && step.op.uses_generator())
+            .collect();
+        if needing.len() != inputs.len() {
+            return false;
+        }
+        needing
+            .iter()
+            .zip(inputs)
+            .all(|(step, image)| match &step.op {
+                Op::AiEdit(spec) => self.edit_is_cached(image, spec),
+                Op::Inpaint(_)
+                | Op::Resize(_)
+                | Op::Crop(_)
+                | Op::Rotate(_)
+                | Op::Flip(_)
+                | Op::Adjust(_)
+                | Op::Filter(_)
+                | Op::Watermark(_)
+                | Op::Annotate(_)
+                | Op::RemoveBackground(_)
+                | Op::Upscale(_)
+                | Op::RestoreFaces(_) => false,
+            })
+    }
+
     /// Asks the generator to change a picture: inside the mask, or all of
     /// it without one.
     fn redraw(
@@ -278,7 +390,8 @@ impl Ai {
         cancel: &CancelToken,
     ) -> Result<Image> {
         let source = Source { image, mask };
-        self.generate(request, Some(&source), cancel)?
+        self.generate(request, Some(&source), cancel, &generate::quiet)?
+            .images
             .into_iter()
             .next()
             .ok_or_else(|| Error::new("generationFailed"))
@@ -306,7 +419,7 @@ impl Ai {
 /// Puts a generated picture over the original: inside the mask, or over all
 /// of it without one. The size, the transparency and the depth stay those of
 /// the original.
-fn place(image: &Image, generated: &Image, mask: Option<&Mask>) -> Result<Image> {
+pub fn place(image: &Image, generated: &Image, mask: Option<&Mask>) -> Result<Image> {
     let generated = ops::resize::resize_to(
         generated,
         image.width(),
@@ -409,6 +522,8 @@ impl AiBackend for Ai {
             prompt: spec.prompt.trim().to_owned(),
             strength: (spec.strength / 100.0).clamp(0.05, 1.0),
             seed: Some(u64::from(spec.variant)),
+            provider: GenerationProvider::parse(&spec.provider),
+            model: spec.model.clone(),
             ..GenerateRequest::default()
         };
         let generated = self.redraw(image, mask, &request, cancel)?;
@@ -485,6 +600,33 @@ mod tests {
         let part = place(&image, &generated, Some(&mask)).unwrap();
         assert_eq!(part.pixel8(0, 0), [10, 20, 30, 255]);
         assert_eq!(part.pixel8(1, 0), [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn a_shown_edit_is_reused_without_the_generator() {
+        let (_folder, ai) = ai();
+        let image = Image::new(32, 24, Depth::Eight, Color::rgb(40, 80, 120)).unwrap();
+        let spec = AiEdit {
+            prompt: String::from("make it night"),
+            ..AiEdit::default()
+        };
+        let print = Print::of(&image, &spec).unwrap();
+        ai.edits.remember(print, image.clone());
+        let step = Step::new("edit", Op::AiEdit(spec));
+        assert!(ai.generator_steps_cached(&[&image], std::slice::from_ref(&step)));
+
+        let other = Image::new(32, 24, Depth::Eight, Color::rgb(200, 10, 10)).unwrap();
+        assert!(!ai.generator_steps_cached(&[&other], &[step]));
+
+        let prompted = Step::new(
+            "fill",
+            Op::Inpaint(pixelit_core::pipeline::Inpaint {
+                prompt: String::from("a cat"),
+                ..pixelit_core::pipeline::Inpaint::default()
+            }),
+        );
+        assert!(!ai.generator_steps_cached(&[&image], &[prompted]));
+        assert!(ai.generator_steps_cached(&[], &[]));
     }
 
     #[test]

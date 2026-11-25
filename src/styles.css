@@ -2084,3 +2084,110 @@ p {
   font-size: 20px;
   font-weight: 700;
 }
+
+.studio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.studio-grid-one {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.studio-pending {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  color: var(--text-dim);
+  background: var(--stage);
+  border-radius: 6px;
+}
+
+.studio-source,
+.studio-canvas {
+  position: relative;
+}
+
+.studio-canvas img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+}
+
+.studio-style-row,
+.studio-view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.studio-style-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.studio-style-item,
+.studio-group header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+}
+
+.studio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.studio-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
+  gap: 16px;
+}
+
+.studio-view img,
+.curtain img {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+  background: var(--stage);
+}
+
+.curtain {
+  position: relative;
+}
+
+.curtain-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.curtain-top img {
+  width: auto;
+  max-width: none;
+  height: 100%;
+}
+
+.curtain-range {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: calc(100% - 16px);
+}
+
+@media (max-width: 800px) {
+  .studio-grid,
+  .studio-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

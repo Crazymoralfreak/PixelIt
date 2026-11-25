@@ -628,15 +628,18 @@ export default function EditorPage({ active }: { active: boolean }) {
       }
       setExporting(true);
       try {
-        const id = await withCloud((confirmed) =>
+        const start = (confirmed: boolean) =>
           api.batchStart({
             title: fileName(session.path),
             inputs: [session.path],
             recursive: false,
             pipeline: request,
             confirmed,
-          }),
-        );
+          });
+        // The preview already asked, and the export reuses that answer. A
+        // picture still in the editor cache needs no answer at all: the core
+        // then draws it without calling the generator.
+        const id = await (cloudAgreed.current ? start(true) : withCloud(start));
         const report = await jobResult<BatchReport>(id);
         const item = report.items[0];
         if (item?.error) {

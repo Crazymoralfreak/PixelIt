@@ -2,7 +2,7 @@
 
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
-import type { AppError, ChatEvent, JobInfo, Settings, ToolCall, UpdateStatus } from "../types";
+import type { AppError, ChatEvent, GeneratePreview, JobInfo, Settings, ToolCall, UpdateStatus } from "../types";
 
 export interface AppEvents {
   /** Every change of a job: queued, progress, finished. */
@@ -14,6 +14,10 @@ export interface AppEvents {
   "update:status": UpdateStatus;
   /** Components, models or AI settings changed. */
   "ai:changed": null;
+  /** A picture was added, starred or removed in the studio. */
+  "generated:changed": null;
+  /** A moment of a generation: which picture, which sampler step, and a preview when there is one. */
+  "generate:preview": GeneratePreview;
   /** Connections to MCP servers or their permissions changed. */
   "mcp:changed": null;
   /** A second start of PixelIt passed these files. */
