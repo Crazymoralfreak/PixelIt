@@ -5,6 +5,7 @@
 pub mod agents;
 pub mod files;
 pub mod neural;
+pub mod studio;
 pub mod web;
 pub mod work;
 

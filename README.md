@@ -32,7 +32,7 @@ The files are not signed with a code signing certificate, so Windows SmartScreen
 Nothing of this is installed with the application. Models and components are downloaded on the "Models and AI" page when you ask for them, each one checked against its checksum.
 
 - **Local models** (ONNX Runtime with DirectML, on the video card or the processor): background removal, upscaling, object removal, face restoration. They run in a separate process, `pixelit-worker.exe`, so a failure inside a model or a video driver does not take the application down.
-- **Image generation** through a ComfyUI or Forge / AUTOMATIC1111 server, the built-in stable-diffusion.cpp with your model file, or an external service with an OpenAI-compatible API and your key.
+- **Image generation** through a ComfyUI or Forge / AUTOMATIC1111 server, the built-in stable-diffusion.cpp with your model file, or an external service with an OpenAI-compatible API and your key. In the Studio you choose the generator and the model, turn on styles, make one to four pictures, change a picture (the whole one, a painted area, or past its edges) and keep them in a history.
 - **Understanding images** through a model with an OpenAI-compatible API (Ollama, LM Studio or an external service): descriptions, alt text, keywords, file names, text recognition. The answer can be written into the metadata of the file.
 - **Assistant.** A chat that calls the tools of PixelIt and of the external MCP servers you connect.
 

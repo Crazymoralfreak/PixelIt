@@ -3,7 +3,7 @@
 
 use serde_json::{json, Value};
 
-use pixelit_ai::generate::png;
+use pixelit_ai::generate::{png, quiet};
 use pixelit_ai::{vision, GenerateRequest, Source, VisionTask};
 use pixelit_core::pipeline::{
     Conflict, Op, OutputFormat, Pipeline, RemoveBackground, RestoreFaces, Step, Upscale,
@@ -211,7 +211,8 @@ fn generate_image(context: &ToolContext, arguments: &Value) -> Result<Value> {
     let source = source.as_ref().map(|image| Source { image, mask: None });
     let images = context
         .ai
-        .generate(&request, source.as_ref(), &context.cancel)?;
+        .generate(&request, source.as_ref(), &context.cancel, &quiet)?
+        .images;
     let stem: String = naming::sanitize(&prompt).chars().take(48).collect();
     let mut files = Vec::with_capacity(images.len());
     for image in &images {

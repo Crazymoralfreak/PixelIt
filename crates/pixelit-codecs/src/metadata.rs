@@ -607,6 +607,66 @@ pub fn replace_xmp(bytes: &[u8], format: ImageFormat, xmp: &[u8]) -> Option<Vec<
     }
 }
 
+/// The text of a PNG `tEXt` or `iTXt` chunk with this keyword.
+pub fn png_text(bytes: &[u8], keyword: &str) -> Option<String> {
+    let png = Png::from_bytes(Bytes::copy_from_slice(bytes)).ok()?;
+    for chunk in png.chunks_by_type(*b"tEXt") {
+        if let Some(text) = keyword_text(chunk.contents(), keyword, false) {
+            return Some(String::from_utf8_lossy(text).into_owned());
+        }
+    }
+    for chunk in png.chunks_by_type(*b"iTXt") {
+        if let Some(text) = keyword_text(chunk.contents(), keyword, true) {
+            return Some(String::from_utf8_lossy(text).into_owned());
+        }
+    }
+    None
+}
+
+/// Writes a `tEXt` chunk, replacing one with the same keyword. The bytes come
+/// back unchanged when they are not a PNG.
+pub fn png_set_text(bytes: Vec<u8>, keyword: &str, text: &str) -> Vec<u8> {
+    let Ok(mut png) = Png::from_bytes(Bytes::from(bytes.clone())) else {
+        return bytes;
+    };
+    let chunks = png.chunks_mut();
+    chunks.retain(|chunk| match &chunk.kind() {
+        kind if *kind == *b"tEXt" => keyword_text(chunk.contents(), keyword, false).is_none(),
+        kind if *kind == *b"iTXt" => keyword_text(chunk.contents(), keyword, true).is_none(),
+        _ => true,
+    });
+    let mut contents = keyword.as_bytes().to_vec();
+    contents.push(0);
+    contents.extend(text.replace('\0', " ").bytes());
+    let at = chunks
+        .iter()
+        .position(|chunk| chunk.kind() == *b"IEND")
+        .unwrap_or(chunks.len());
+    chunks.insert(at, PngChunk::new(*b"tEXt", Bytes::from(contents)));
+    png.encoder().bytes().to_vec()
+}
+
+/// Text after the keyword. An `iTXt` chunk also has the compression and language fields.
+fn split_zero(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
+    let index = bytes.iter().position(|byte| *byte == 0)?;
+    Some((&bytes[..index], &bytes[index + 1..]))
+}
+
+fn keyword_text<'a>(contents: &'a [u8], keyword: &str, international: bool) -> Option<&'a [u8]> {
+    let (name, rest) = split_zero(contents)?;
+    if name != keyword.as_bytes() {
+        return None;
+    }
+    if !international {
+        return Some(rest);
+    }
+    // compression flag, method, language, 0, translated keyword, 0, text.
+    let rest = rest.get(2..)?;
+    let (_, rest) = split_zero(rest)?;
+    let (_, text) = split_zero(rest)?;
+    Some(text)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

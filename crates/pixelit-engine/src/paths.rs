@@ -108,6 +108,16 @@ impl Paths {
         self.root.join("generated")
     }
 
+    /// The record of pictures the studio has generated.
+    pub fn generated_index(&self) -> PathBuf {
+        self.root.join("generated.json")
+    }
+
+    /// Styles saved by the user. The built-in styles are not in this file.
+    pub fn styles(&self) -> PathBuf {
+        self.root.join("styles.json")
+    }
+
     /// Pictures downloaded from the web, unless the settings name a folder.
     pub fn downloads(&self) -> PathBuf {
         self.root.join("downloads")

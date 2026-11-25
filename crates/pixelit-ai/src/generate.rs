@@ -6,6 +6,7 @@ use std::fs;
 use std::os::windows::process::CommandExt as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -21,10 +22,13 @@ use pixelit_core::{ops, CancelToken, Error, Image, ImageFormat, Result};
 use pixelit_engine::Paths;
 
 use crate::catalog::Kind;
+use crate::checkpoints::chosen_model;
 use crate::config::{AiSettings, GenerationProvider};
 use crate::install;
-use crate::net::{self, Net, Part};
+use crate::net::{self, Net, Part, SocketMessage};
+use crate::progress::{self, comfy_preview, comfy_step, forge_progress, sampler_step};
 use crate::secrets;
+use crate::styles;
 
 /// Keeps stable-diffusion.cpp from opening a console window.
 #[cfg(windows)]
@@ -53,7 +57,35 @@ pub struct GenerateRequest {
     pub count: u32,
     /// How far the result may move from the source picture, from 0 to 1.
     pub strength: f32,
+    /// `None` uses the generator of the settings.
+    pub provider: GenerationProvider,
+    /// Empty uses the model of the settings.
+    pub model: String,
+    /// Styles to apply, in order. Empty applies none.
+    pub styles: Vec<String>,
 }
+
+/// What a generation used and the pictures it returned.
+#[derive(Debug)]
+pub struct Outcome {
+    pub images: Vec<Image>,
+    pub seeds: Vec<u64>,
+    pub provider: GenerationProvider,
+    pub model: String,
+    pub prompt: String,
+    pub negative: String,
+    pub width: u32,
+    pub height: u32,
+    pub steps: u32,
+    pub cfg: f32,
+}
+
+/// A moment of a generation: picture index, picture count, sampler step,
+/// sampler steps, and an encoded preview when the provider sent one.
+pub type Tick<'a> = dyn Fn(u32, u32, u32, u32, Option<&[u8]>) + Sync + 'a;
+
+/// A tick that ignores the progress.
+pub fn quiet(_index: u32, _count: u32, _step: u32, _steps: u32, _preview: Option<&[u8]>) {}
 
 impl Default for GenerateRequest {
     fn default() -> Self {
@@ -67,6 +99,9 @@ impl Default for GenerateRequest {
             seed: None,
             count: 1,
             strength: 0.6,
+            provider: GenerationProvider::None,
+            model: String::new(),
+            styles: Vec::new(),
         }
     }
 }
@@ -89,6 +124,7 @@ struct Job<'a> {
     seed: u64,
     count: u32,
     strength: f32,
+    checkpoint: &'a str,
 }
 
 pub fn decode_image(bytes: &[u8]) -> Result<Image> {
@@ -222,7 +258,8 @@ fn fill_workflow(template: &str, job: &Job<'_>, upload: Option<&str>) -> Result<
         .replace("%width%", &job.width.to_string())
         .replace("%height%", &job.height.to_string())
         .replace("%steps%", &job.steps.to_string())
-        .replace("%cfg%", &job.cfg.to_string());
+        .replace("%cfg%", &job.cfg.to_string())
+        .replace("%checkpoint%", &quoted(job.checkpoint));
     serde_json::from_str(&filled).map_err(|error| Error::new("badWorkflow").detail(error))
 }
 
@@ -241,12 +278,53 @@ fn comfy_checkpoint(net: &Net, base: &str, key: Option<&str>, wanted: &str) -> R
         .ok_or_else(|| Error::new("noCheckpoint"))
 }
 
+fn watch_comfy(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    client: &str,
+    picture: &AtomicU32,
+    count: u32,
+    stop: &AtomicBool,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+) {
+    let Ok(mut socket) = net.connect_socket(&net::websocket_of(base, client), key) else {
+        return;
+    };
+    while !stop.load(Ordering::Relaxed) && !cancel.is_cancelled() {
+        let message = match socket.recv() {
+            Ok(Some(message)) => message,
+            Ok(None) => continue,
+            Err(_) => break,
+        };
+        let index = picture.load(Ordering::Relaxed);
+        match message {
+            SocketMessage::Text(text) => {
+                let id = serde_json::from_str::<Value>(&text)
+                    .ok()
+                    .and_then(|value| value["data"]["prompt_id"].as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                if let Some((step, total)) = comfy_step(&text, &id) {
+                    tick(index, count, step, total, None);
+                }
+            }
+            SocketMessage::Binary(bytes) => {
+                if let Some(preview) = comfy_preview(&bytes) {
+                    tick(index, count, 0, 0, Some(preview));
+                }
+            }
+        }
+    }
+}
+
 fn comfy(
     net: &Net,
     settings: &AiSettings,
     job: &Job<'_>,
     source: Option<&Source<'_>>,
     cancel: &CancelToken,
+    tick: &Tick<'_>,
 ) -> Result<Vec<Image>> {
     let base = settings.generation.comfy_url.as_str();
     let key = access(settings, base)?;
@@ -279,82 +357,102 @@ fn comfy(
     } else {
         Some(fs::read_to_string(workflow)?)
     };
-    let checkpoint = if template.is_some() {
+    let checkpoint = if template
+        .as_ref()
+        .is_some_and(|text| !text.contains("%checkpoint%"))
+    {
         String::new()
     } else {
-        comfy_checkpoint(net, base, key, &settings.generation.comfy_checkpoint)?
+        comfy_checkpoint(net, base, key, job.checkpoint)?
     };
     let client = format!("pixelit-{:016x}", fastrand::u64(..));
+    let stop = AtomicBool::new(false);
+    let picture = AtomicU32::new(0);
     let mut images = Vec::new();
-    for index in 0..job.count {
-        cancel.check()?;
-        let job = Job {
-            seed: job.seed.wrapping_add(u64::from(index)),
-            ..*job
-        };
-        let graph = match &template {
-            Some(template) => fill_workflow(template, &job, upload.as_deref())?,
-            None => comfy_graph(&job, &checkpoint, upload.as_deref(), masked),
-        };
-        let queued = net.post_json(
-            &format!("{base}/prompt"),
-            key,
-            &json!({ "prompt": graph, "client_id": client }),
-            Some(SHORT_TIMEOUT),
-        )?;
-        let id = queued["prompt_id"]
-            .as_str()
-            .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
-            .to_owned();
-        let started = Instant::now();
-        let outputs = loop {
-            if cancel.is_cancelled() {
-                let _ = net.post(
-                    &format!("{base}/interrupt"),
-                    key,
-                    &json!({}),
-                    Some(SHORT_TIMEOUT),
-                );
-                return Err(Error::cancelled());
-            }
-            if started.elapsed() > GENERATION_TIMEOUT {
-                return Err(failed("timed out"));
-            }
-            thread::sleep(Duration::from_millis(700));
-            let history =
-                net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
-            let entry = &history[id.as_str()];
-            if entry.is_null() {
-                continue;
-            }
-            if entry["status"]["status_str"].as_str() == Some("error") {
-                return Err(failed(entry["status"]["messages"].to_string()));
-            }
-            break entry["outputs"].clone();
-        };
-        for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
-            for file in node["images"].as_array().into_iter().flatten() {
-                let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str()) else {
-                    continue;
+    let result = thread::scope(|scope| {
+        scope.spawn(|| {
+            watch_comfy(
+                net, base, key, &client, &picture, job.count, &stop, cancel, tick,
+            );
+        });
+        let result = (|| -> Result<Vec<Image>> {
+            for index in 0..job.count {
+                picture.store(index, Ordering::Relaxed);
+                tick(index, job.count, 0, job.steps, None);
+                cancel.check()?;
+                let job = Job {
+                    seed: job.seed.wrapping_add(u64::from(index)),
+                    ..*job
                 };
-                let url = format!(
-                    "{base}/view?filename={}&subfolder={}&type={}",
-                    percent_encode(name),
-                    percent_encode(file["subfolder"].as_str().unwrap_or_default()),
-                    percent_encode(kind.unwrap_or("output")),
-                );
-                images.push(decode_image(&net.get(
-                    &url,
+                let graph = match &template {
+                    Some(template) => fill_workflow(template, &job, upload.as_deref())?,
+                    None => comfy_graph(&job, &checkpoint, upload.as_deref(), masked),
+                };
+                let queued = net.post_json(
+                    &format!("{base}/prompt"),
                     key,
-                    Some(Duration::from_secs(120)),
-                )?)?);
+                    &json!({ "prompt": graph, "client_id": client }),
+                    Some(SHORT_TIMEOUT),
+                )?;
+                let id = queued["prompt_id"]
+                    .as_str()
+                    .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
+                    .to_owned();
+                let started = Instant::now();
+                let outputs = loop {
+                    if cancel.is_cancelled() {
+                        let _ = net.post(
+                            &format!("{base}/interrupt"),
+                            key,
+                            &json!({}),
+                            Some(SHORT_TIMEOUT),
+                        );
+                        return Err(Error::cancelled());
+                    }
+                    if started.elapsed() > GENERATION_TIMEOUT {
+                        return Err(failed("timed out"));
+                    }
+                    thread::sleep(Duration::from_millis(700));
+                    let history =
+                        net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
+                    let entry = &history[id.as_str()];
+                    if entry.is_null() {
+                        continue;
+                    }
+                    if entry["status"]["status_str"].as_str() == Some("error") {
+                        return Err(failed(entry["status"]["messages"].to_string()));
+                    }
+                    break entry["outputs"].clone();
+                };
+                for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
+                    for file in node["images"].as_array().into_iter().flatten() {
+                        let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str())
+                        else {
+                            continue;
+                        };
+                        let url = format!(
+                            "{base}/view?filename={}&subfolder={}&type={}",
+                            percent_encode(name),
+                            percent_encode(file["subfolder"].as_str().unwrap_or_default()),
+                            percent_encode(kind.unwrap_or("output")),
+                        );
+                        images.push(decode_image(&net.get(
+                            &url,
+                            key,
+                            Some(Duration::from_secs(120)),
+                        )?)?);
+                    }
+                }
             }
-        }
-    }
-    if images.is_empty() {
-        return Err(failed("the workflow saved no pictures"));
-    }
-    Ok(images)
+            if images.is_empty() {
+                return Err(failed("the workflow saved no pictures"));
+            }
+            Ok(images)
+        })();
+        stop.store(true, Ordering::Relaxed);
+        result
+    })?;
+    Ok(result)
 }
 
 // ----------------------------------------------------- Forge / AUTOMATIC1111
@@ -365,6 +463,7 @@ fn forge(
     job: &Job<'_>,
     source: Option<&Source<'_>>,
     cancel: &CancelToken,
+    tick: &Tick<'_>,
 ) -> Result<Vec<Image>> {
     let base = settings.generation.forge_url.as_str();
     let key = access(settings, base)?;
@@ -395,7 +494,9 @@ fn forge(
         }
         None => "txt2img",
     };
+    apply_forge_model(&mut body, job.checkpoint);
     let url = format!("{base}/sdapi/v1/{route}");
+    tick(0, job.count, 0, job.steps, None);
     let (sender, receiver) = mpsc::channel();
     let answer = thread::scope(|scope| {
         scope.spawn(|| {
@@ -406,6 +507,19 @@ fn forge(
             match receiver.recv_timeout(Duration::from_millis(300)) {
                 Ok(answer) => break answer,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if let Ok(progress) = net.get_json(
+                        &format!("{base}/sdapi/v1/progress"),
+                        key.as_deref(),
+                        Some(SHORT_TIMEOUT),
+                    ) {
+                        if let Some((step, total, preview)) = forge_progress(&progress) {
+                            let bytes = preview.and_then(|text| {
+                                let text = text.rsplit(',').next().unwrap_or(text);
+                                STANDARD.decode(text).ok()
+                            });
+                            tick(0, job.count, step, total, bytes.as_deref());
+                        }
+                    }
                     if cancel.is_cancelled() {
                         let _ = net.post(
                             &format!("{base}/sdapi/v1/interrupt"),
@@ -463,9 +577,10 @@ fn sdcpp(
     job: &Job<'_>,
     source: Option<&Source<'_>>,
     cancel: &CancelToken,
+    tick: &Tick<'_>,
 ) -> Result<Vec<Image>> {
     let program = sdcpp_program(paths)?;
-    let model = settings.generation.sdcpp_model.trim();
+    let model = job.checkpoint.trim();
     if model.is_empty() || !Path::new(model).is_file() {
         return Err(Error::new("noCheckpoint"));
     }
@@ -528,6 +643,9 @@ fn sdcpp(
             let status = loop {
                 if let Some(status) = child.try_wait().map_err(failed)? {
                     break status;
+                }
+                if let Some((step, total)) = sampler_step(&tail(&log)) {
+                    tick(index, job.count, step, total, None);
                 }
                 if cancel.is_cancelled() || started.elapsed() > GENERATION_TIMEOUT {
                     let _ = child.kill();
@@ -712,22 +830,29 @@ fn cloud(
     settings: &AiSettings,
     job: &Job<'_>,
     source: Option<&Source<'_>>,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
 ) -> Result<Vec<Image>> {
     let endpoint = &settings.generation.cloud;
-    if !endpoint.is_set() {
+    let model = if job.checkpoint.is_empty() {
+        endpoint.model.as_str()
+    } else {
+        job.checkpoint
+    };
+    if endpoint.url.trim().is_empty() || model.is_empty() {
         return Err(Error::new("providerNotSet"));
     }
     let base = endpoint.url.as_str();
     let key = access(settings, base)?;
-    let count = job.count.to_string();
     let upload = source.map(Upload::of).transpose()?;
-    let ask = |size: Option<(u32, u32)>| -> Result<Value> {
+    let ask = |size: Option<(u32, u32)>, count: u32| -> Result<Value> {
+        let count_text = count.to_string();
         let size = size.map(|(width, height)| format!("{width}x{height}"));
         if let Some(upload) = &upload {
             let mut parts = vec![
-                Part::field("model", &endpoint.model),
+                Part::field("model", model),
                 Part::field("prompt", job.prompt),
-                Part::field("n", &count),
+                Part::field("n", &count_text),
             ];
             if let Some(size) = &size {
                 parts.push(Part::field("size", size));
@@ -748,7 +873,7 @@ fn cloud(
                 Some(GENERATION_TIMEOUT),
             )
         } else {
-            let mut body = json!({ "model": endpoint.model, "prompt": job.prompt, "n": job.count });
+            let mut body = json!({ "model": model, "prompt": job.prompt, "n": count });
             if let Some(size) = size {
                 body["size"] = json!(size);
             }
@@ -760,43 +885,77 @@ fn cloud(
             )
         }
     };
-    let mut refusal = None;
-    let mut answer = None;
-    for size in cloud_sizes(job.width, job.height, source.is_none()) {
-        match ask(size) {
-            Ok(value) => {
-                answer = Some(value);
+    let once = |count: u32| -> Result<Vec<Image>> {
+        let mut refusal = None;
+        let mut answer = None;
+        for size in cloud_sizes(job.width, job.height, source.is_none()) {
+            match ask(size, count) {
+                Ok(value) => {
+                    answer = Some(value);
+                    break;
+                }
+                Err(error) if refuses_size(&error) => refusal = Some(error),
+                Err(error) => return Err(error),
+            }
+        }
+        let Some(answer) = answer else {
+            return Err(refusal.unwrap_or_else(|| failed("the service accepted no size")));
+        };
+        let mut images = Vec::new();
+        for item in answer["data"].as_array().into_iter().flatten() {
+            if let Some(encoded) = item["b64_json"].as_str() {
+                images.push(decode_image(&STANDARD.decode(encoded).map_err(failed)?)?);
+            } else if let Some(url) = item["url"].as_str() {
+                images.push(decode_image(&net.get(
+                    url,
+                    None,
+                    Some(Duration::from_secs(120)),
+                )?)?);
+            }
+        }
+        Ok(images)
+    };
+    let mut images = Vec::new();
+    let mut single = false;
+    while (images.len() as u32) < job.count {
+        cancel.check()?;
+        let left = job.count - images.len() as u32;
+        let count = if single { 1 } else { left };
+        tick(images.len() as u32, job.count, 0, 0, None);
+        match once(count) {
+            Ok(batch) if batch.is_empty() => {
+                if images.is_empty() {
+                    return Err(failed("the service returned no pictures"));
+                }
                 break;
             }
-            Err(error) if refuses_size(&error) => refusal = Some(error),
+            Ok(batch) => {
+                if (batch.len() as u32) < count {
+                    single = true;
+                }
+                images.extend(batch);
+            }
+            Err(error) if images.is_empty() && count > 1 && progress::refuses_count(&error) => {
+                single = true;
+            }
+            Err(_error) if !images.is_empty() => break,
             Err(error) => return Err(error),
         }
     }
-    let Some(answer) = answer else {
-        return Err(refusal.unwrap_or_else(|| failed("the service accepted no size")));
-    };
-    let mut images = Vec::new();
-    for item in answer["data"].as_array().into_iter().flatten() {
-        if let Some(encoded) = item["b64_json"].as_str() {
-            images.push(decode_image(&STANDARD.decode(encoded).map_err(failed)?)?);
-        } else if let Some(url) = item["url"].as_str() {
-            images.push(decode_image(&net.get(
-                url,
-                None,
-                Some(Duration::from_secs(120)),
-            )?)?);
-        }
-    }
-    if images.is_empty() {
-        return Err(failed("the service returned no pictures"));
-    }
+    images.truncate(job.count as usize);
     Ok(images)
 }
 
 /// Whether the chosen provider sends pictures and prompts off this computer.
 pub fn leaves_computer(settings: &AiSettings) -> bool {
+    leaves_with(settings, settings.generation.provider)
+}
+
+/// Whether this generator, rather than the one in the settings, sends work
+/// off this computer.
+pub fn leaves_with(settings: &AiSettings, provider: GenerationProvider) -> bool {
     let generation = &settings.generation;
-    match generation.provider {
+    match provider {
         GenerationProvider::None | GenerationProvider::SdCpp => false,
         GenerationProvider::Comfy => !net::is_local(&generation.comfy_url),
         GenerationProvider::Forge => !net::is_local(&generation.forge_url),
@@ -804,7 +963,16 @@ pub fn leaves_computer(settings: &AiSettings) -> bool {
     }
 }
 
-/// Generates pictures with the provider from the settings.
+fn apply_forge_model(body: &mut Value, checkpoint: &str) {
+    if checkpoint.is_empty() {
+        return;
+    }
+    body["override_settings"] = json!({ "sd_model_checkpoint": checkpoint });
+    body["override_settings_restore_afterwards"] = json!(false);
+}
+
+/// Generates pictures. `tick` is told the sampler step and, when the provider
+/// sends one, a preview. A provider of `None` and an empty model use the settings.
 pub fn generate(
     net: &Net,
     paths: &Paths,
@@ -812,11 +980,16 @@ pub fn generate(
     request: &GenerateRequest,
     source: Option<&Source<'_>>,
     cancel: &CancelToken,
-) -> Result<Vec<Image>> {
+    tick: &Tick<'_>,
+) -> Result<Outcome> {
     if request.prompt.trim().is_empty() {
         return Err(Error::new("emptyPrompt"));
     }
     let defaults = &settings.generation;
+    let provider = match request.provider {
+        GenerationProvider::None => defaults.provider,
+        chosen => chosen,
+    };
     let pick = |value: u32, fallback: u32| if value == 0 { fallback } else { value };
     let (width, height) = match source {
         Some(source) => (source.image.width(), source.image.height()),
@@ -826,38 +999,64 @@ pub fn generate(
         ),
     };
     let negative = if request.negative.is_empty() {
-        defaults.negative.as_str()
+        defaults.negative.clone()
     } else {
-        request.negative.as_str()
+        request.negative.clone()
+    };
+    let styles = styles::selected(paths, &request.styles);
+    let (prompt, negative) = styles::apply(request.prompt.trim(), &negative, &styles);
+    let model = chosen_model(settings, provider, &request.model).to_owned();
+    let steps = pick(request.steps, defaults.steps).clamp(1, 150);
+    let cfg = if request.cfg > 0.0 {
+        request.cfg
+    } else {
+        defaults.cfg
     };
     let job = Job {
-        prompt: request.prompt.trim(),
-        negative,
+        prompt: &prompt,
+        negative: &negative,
         width,
         height,
-        steps: pick(request.steps, defaults.steps).clamp(1, 150),
-        cfg: if request.cfg > 0.0 {
-            request.cfg
-        } else {
-            defaults.cfg
-        },
+        steps,
+        cfg,
         seed: request.seed.unwrap_or_else(|| u64::from(fastrand::u32(..))),
         count: request.count.clamp(1, MAX_COUNT),
         strength: request.strength.clamp(0.05, 1.0),
+        checkpoint: &model,
     };
     cancel.check()?;
-    match defaults.provider {
+    let images = match provider {
         GenerationProvider::None => Err(Error::new("providerNotSet")),
-        GenerationProvider::Comfy => comfy(net, settings, &job, source, cancel),
-        GenerationProvider::Forge => forge(net, settings, &job, source, cancel),
-        GenerationProvider::SdCpp => sdcpp(paths, settings, &job, source, cancel),
-        GenerationProvider::Cloud => cloud(net, settings, &job, source),
-    }
+        GenerationProvider::Comfy => comfy(net, settings, &job, source, cancel, tick),
+        GenerationProvider::Forge => forge(net, settings, &job, source, cancel, tick),
+        GenerationProvider::SdCpp => sdcpp(paths, settings, &job, source, cancel, tick),
+        GenerationProvider::Cloud => cloud(net, settings, &job, source, cancel, tick),
+    }?;
+    let seeds = (0..images.len())
+        .map(|index| job.seed.wrapping_add(index as u64))
+        .collect();
+    Ok(Outcome {
+        images,
+        seeds,
+        provider,
+        model,
+        prompt,
+        negative,
+        width,
+        height,
+        steps,
+        cfg,
+    })
 }
 
 /// Saves generated pictures as PNG files in the application's folder and
-/// returns their paths.
-pub fn save_generated(paths: &Paths, images: &[Image]) -> Result<Vec<PathBuf>> {
+/// returns their paths. `notes` are the `parameters` blocks, one per picture;
+/// a missing or empty note writes a plain PNG.
+pub fn save_generated(
+    paths: &Paths,
+    images: &[Image],
+    notes: Option<&[String]>,
+) -> Result<Vec<PathBuf>> {
     let folder = paths.generated();
     fs::create_dir_all(&folder)?;
     let stamp = SystemTime::now()
@@ -873,7 +1072,14 @@ pub fn save_generated(paths: &Paths, images: &[Image]) -> Result<Vec<PathBuf>> {
             }
             number += images.len();
         };
-        fs::write(&path, png(image)?)?;
+        let mut bytes = png(image)?;
+        if let Some(note) = notes
+            .and_then(|notes| notes.get(index))
+            .filter(|note| !note.is_empty())
+        {
+            bytes = pixelit_codecs::png_set_text(bytes, "parameters", note);
+        }
+        fs::write(&path, bytes)?;
         saved.push(path);
     }
     Ok(saved)
@@ -896,6 +1102,7 @@ mod tests {
             seed: 42,
             count: 1,
             strength: 0.5,
+            checkpoint: "model.safetensors",
         }
     }
 
@@ -926,6 +1133,8 @@ mod tests {
         assert_eq!(filled["1"]["inputs"]["text"], "a \"red\" fox");
         assert_eq!(filled["1"]["inputs"]["seed"], 42);
         assert_eq!(filled["1"]["inputs"]["w"], 512);
+        let with_model = fill_workflow(r#"{"ckpt":"%checkpoint%"}"#, &job(), None).unwrap();
+        assert_eq!(with_model["ckpt"], "model.safetensors");
         assert_eq!(
             fill_workflow("{", &job(), None).unwrap_err().code,
             "badWorkflow"
@@ -956,12 +1165,24 @@ mod tests {
         let cancel = CancelToken::new();
         let mut request = GenerateRequest::default();
         let net = Net::new();
-        let empty = generate(&net, &paths, &settings, &request, None, &cancel).unwrap_err();
+        let empty = generate(&net, &paths, &settings, &request, None, &cancel, &quiet).unwrap_err();
         assert_eq!(empty.code, "emptyPrompt");
         request.prompt = String::from("a fox");
-        let unset = generate(&net, &paths, &settings, &request, None, &cancel).unwrap_err();
+        let unset = generate(&net, &paths, &settings, &request, None, &cancel, &quiet).unwrap_err();
         assert_eq!(unset.code, "providerNotSet");
         assert!(!leaves_computer(&settings));
+        let mut body = json!({ "prompt": "a fox" });
+        apply_forge_model(&mut body, "dream.safetensors");
+        assert_eq!(
+            body["override_settings"]["sd_model_checkpoint"],
+            "dream.safetensors"
+        );
+        assert_eq!(body["override_settings_restore_afterwards"], false);
+        apply_forge_model(&mut body, "");
+        assert_eq!(
+            body["override_settings"]["sd_model_checkpoint"],
+            "dream.safetensors"
+        );
     }
 
     #[test]
@@ -1064,8 +1285,8 @@ mod tests {
         let folder = tempfile::tempdir().unwrap();
         let paths = Paths::at(folder.path());
         let image = Image::new(4, 4, Depth::Eight, Color::WHITE).unwrap();
-        let first = save_generated(&paths, &[image.clone(), image.clone()]).unwrap();
-        let second = save_generated(&paths, &[image]).unwrap();
+        let first = save_generated(&paths, &[image.clone(), image.clone()], None).unwrap();
+        let second = save_generated(&paths, &[image], None).unwrap();
         assert_eq!(first.len(), 2);
         assert!(first.iter().chain(&second).all(|path| path.is_file()));
         assert_ne!(first[0], second[0]);

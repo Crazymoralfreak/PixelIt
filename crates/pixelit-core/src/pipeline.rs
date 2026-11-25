@@ -566,6 +566,11 @@ pub struct AiEdit {
     pub strength: f32,
     /// Number of the attempt: another number asks for another result.
     pub variant: u32,
+    /// Generator to use: `comfy`, `forge`, `sdCpp` or `cloud`. Empty uses the
+    /// generator of the settings.
+    pub provider: String,
+    /// Model of that generator. Empty uses the model of the settings.
+    pub model: String,
 }
 
 impl Default for AiEdit {
@@ -575,6 +580,8 @@ impl Default for AiEdit {
             strokes: Vec::new(),
             strength: 75.0,
             variant: 0,
+            provider: String::new(),
+            model: String::new(),
         }
     }
 }

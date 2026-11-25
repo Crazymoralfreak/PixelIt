@@ -12,6 +12,7 @@ import {
   type AskNameOptions,
   type ConfirmOptions,
   type Incoming,
+  type IncomingFile,
   type IncomingLink,
   type Page,
 } from "./app/context";
@@ -201,6 +202,7 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
   const [incoming, setIncoming] = useState<Incoming | null>(null);
   const [editorPath, setEditorPath] = useState<string | null>(null);
   const [webLink, setWebLink] = useState<IncomingLink | null>(null);
+  const [studioDrop, setStudioDrop] = useState<IncomingFile | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirming, setConfirming] = useState<{ options: ConfirmOptions; done: (ok: boolean) => void } | null>(
     null,
@@ -216,6 +218,8 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
 
   const nextToast = useRef(1);
   const nextIncoming = useRef(1);
+  const pageNow = useRef(page);
+  pageNow.current = page;
   const latestJobs = useRef(new Map(boot.jobs.map((job) => [job.id, job])));
   const waiters = useRef(new Map<number, Array<(job: JobInfo) => void>>());
 
@@ -450,6 +454,10 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
             break;
           case "drop":
             setDropping(false);
+            if (pageNow.current === "studio" && payload.paths.length === 1) {
+              setStudioDrop({ path: payload.paths[0] ?? "", token: nextIncoming.current++ });
+              break;
+            }
             openPaths(payload.paths);
             break;
           default: {
@@ -528,6 +536,7 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
       openInEditor,
       webLink,
       openLink,
+      studioDrop,
       confirm,
       askName,
       notify,
@@ -557,6 +566,7 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
       openInEditor,
       webLink,
       openLink,
+      studioDrop,
       confirm,
       askName,
       notify,

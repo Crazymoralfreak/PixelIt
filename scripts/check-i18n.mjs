@@ -44,7 +44,7 @@ function placeholders(text) {
 }
 
 // Texts that show braces as they are; the code passes no values for them.
-const LITERAL_BRACES = new Set(["output.namingHint"]);
+const LITERAL_BRACES = new Set(["output.namingHint", "studio.stylePromptHint"]);
 
 // What the code asks for.
 const exact = new Set();

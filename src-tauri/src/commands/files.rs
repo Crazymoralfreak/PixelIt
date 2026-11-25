@@ -208,8 +208,14 @@ pub fn editor_render(
     steps: Vec<Step>,
     confirmed: bool,
 ) -> Result<RenderInfo> {
-    confirm_steps(&core, &steps, confirmed)?;
     let editor = core.editor(id)?;
+    let cached = {
+        let session = lock(&editor.session);
+        session
+            .generator_inputs(&steps)
+            .is_some_and(|inputs| core.ai.generator_steps_cached(&inputs, &steps))
+    };
+    confirm_steps(&core, &steps, cached, confirmed)?;
     let cancel = {
         let mut current = lock(&editor.cancel);
         current.cancel();

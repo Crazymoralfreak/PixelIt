@@ -61,6 +61,12 @@ export interface IncomingLink {
   token: number;
 }
 
+/** One file dropped onto the studio. */
+export interface IncomingFile {
+  path: string;
+  token: number;
+}
+
 export interface AppContextValue {
   info: AppInfo;
   settings: Settings;
@@ -100,6 +106,8 @@ export interface AppContextValue {
   webLink: IncomingLink | null;
   /** Opens the "From the web" page with the address filled in; nothing is requested yet. */
   openLink: (url: string) => void;
+  /** A file dropped on the window while the studio is open. */
+  studioDrop: IncomingFile | null;
 
   confirm: (options: ConfirmOptions) => Promise<boolean>;
   /** Asks for a name; resolves to `null` when the dialog is dismissed. */

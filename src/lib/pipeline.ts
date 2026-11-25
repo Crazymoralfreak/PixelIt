@@ -118,7 +118,7 @@ export function defaultOp(kind: OpKind): Op {
     case "inpaint":
       return { type: "inpaint", model: "", strokes: [], prompt: "" };
     case "aiEdit":
-      return { type: "aiEdit", prompt: "", strokes: [], strength: 75, variant: 0 };
+      return { type: "aiEdit", prompt: "", strokes: [], strength: 75, variant: 0, provider: "", model: "" };
     default: {
       const unreachable: never = kind;
       throw new Error(`Unknown step: ${String(unreachable)}`);

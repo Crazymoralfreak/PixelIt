@@ -16,4 +16,4 @@ pub mod metadata;
 pub use decode::{decode_bytes, decode_file, probe_bytes, probe_file};
 pub use encode::{encode, encode_animation, encode_media, EncodeOptions};
 pub use info::{DecodeOptions, Decoded, SourceInfo};
-pub use metadata::Metadata;
+pub use metadata::{png_set_text, png_text, Metadata};

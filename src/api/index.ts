@@ -18,7 +18,13 @@ import type {
   FileInfo,
   FolderListing,
   FoundServer,
+  Expand,
   GenerateRequest,
+  GeneratedRecord,
+  ModelList,
+  PictureParameters,
+  Stroke,
+  Style,
   Generated,
   IconRequest,
   ImageFormat,
@@ -154,9 +160,28 @@ export const api = {
   aiKeyDelete: (host: string) => invoke<void>("ai_key_delete", { host }),
   aiDiscover: () => invoke<FoundServer[]>("ai_discover"),
   aiModels: (url: string) => invoke<string[]>("ai_models", { url }),
-  /** The saved files are the result of the returned job. */
-  generateStart: (request: GenerateRequest, source: string | null, confirmed: boolean) =>
-    invoke<number>("generate_start", { start: { request, source, confirmed } }),
+  /** The history entry is the result of the returned job. */
+  generateStart: (
+    request: GenerateRequest,
+    source: string | null,
+    strokes: Stroke[],
+    expand: Expand,
+    confirmed: boolean,
+  ) => invoke<number>("generate_start", { start: { request, source, strokes, expand, confirmed } }),
+  generationModels: (provider: string) => invoke<ModelList>("generation_models", { provider }),
+  promptImprove: (text: string, confirmed: boolean) => invoke<string>("prompt_improve", { text, confirmed }),
+  pictureParameters: (path: string) => invoke<PictureParameters | null>("picture_parameters", { path }),
+  generatedList: () => invoke<GeneratedRecord[]>("generated_list"),
+  generatedDelete: (files: string[]) => invoke<number>("generated_delete", { files }),
+  generatedFavorite: (file: string, on: boolean) => invoke<boolean>("generated_favorite", { file, on }),
+  generatedExport: (files: string[], folder: string) => invoke<string[]>("generated_export", { files, folder }),
+  /** The history entry is the result of the returned job. */
+  generatedUpscale: (file: string, factor: number) => invoke<number>("generated_upscale", { file, factor }),
+  stylesList: () => invoke<Style[]>("styles_list"),
+  styleSave: (style: Style) => invoke<Style>("style_save", { style }),
+  styleRemove: (id: string) => invoke<boolean>("style_remove", { id }),
+  stylesImport: (path: string) => invoke<Style[]>("styles_import", { path }),
+  stylesExport: (path: string, ids: string[]) => invoke<void>("styles_export", { path, ids }),
   visionStart: (files: string[], task: VisionTask, apply: boolean, confirmed: boolean) =>
     invoke<number>("vision_start", { start: { files, task, apply, confirmed } }),
 
