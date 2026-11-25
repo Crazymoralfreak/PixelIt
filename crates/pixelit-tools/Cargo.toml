@@ -15,7 +15,6 @@ pixelit-engine.workspace = true
 pixelit-ai.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-chrono.workspace = true
 fastrand.workspace = true
 tracing.workspace = true
 

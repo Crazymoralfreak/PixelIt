@@ -12,6 +12,7 @@ use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use pixelit_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::clock;
 use crate::paths::Paths;
 use crate::scan::is_image;
 use crate::store;
@@ -74,7 +75,7 @@ impl WatchRules {
         if rule.id.is_empty() {
             rule.id = format!(
                 "w{:x}{:06x}",
-                chrono::Utc::now().timestamp(),
+                clock::unix_now(),
                 fastrand::u32(..0x00FF_FFFF)
             );
         }

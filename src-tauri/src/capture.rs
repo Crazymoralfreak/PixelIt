@@ -5,7 +5,6 @@ use std::fs;
 use std::mem::size_of;
 use std::path::PathBuf;
 
-use chrono::Local;
 use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CAPTUREBLT, DIB_RGB_COLORS,
@@ -17,6 +16,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use pixelit_codecs::{encode, EncodeOptions};
 use pixelit_core::{CancelToken, Error, Image, ImageFormat, Result};
+use pixelit_engine::clock::LocalTime;
 use pixelit_engine::Paths;
 
 /// The device contexts and the bitmap of one capture, released together.
@@ -149,7 +149,7 @@ pub fn save(paths: &Paths, image: &Image) -> Result<PathBuf> {
         &EncodeOptions::new(ImageFormat::Png),
         &CancelToken::new(),
     )?;
-    let stamp = Local::now().format("%Y-%m-%d %H-%M-%S");
+    let stamp = LocalTime::now().stamp();
     let mut path = folder.join(format!("PixelIt {stamp}.png"));
     let mut number = 2;
     while path.exists() {

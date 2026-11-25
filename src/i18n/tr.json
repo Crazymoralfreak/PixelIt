@@ -76,7 +76,13 @@
       "ready": "{version} sürümü indirildi; görevler bitince kurulacak",
       "installing": "{version} sürümü kuruluyor…",
       "failed": "Güncellemeler denetlenemedi"
-    }
+    },
+    "askTitle": "{version} sürümü kullanılabilir",
+    "askText": "Şu anda {current} sürümü kurulu. PixelIt {version} sürümüne güncellensin mi? Kurulum dosyası indirilip doğrulanır, çalışan işler biter, ardından uygulama yeniden başlar.",
+    "skip": "Bu sürümü atla",
+    "later": "Daha sonra",
+    "install": "Güncelle",
+    "installFailed": "{version} sürümü kurulamadı"
   },
   "about": {
     "text": "Görüntüleri görüntüleme, düzenleme, toplu işleme ve üretme. Her şey bilgisayarınızda çalışır; program ağa yalnızca siz istediğinizde bağlanır.",
@@ -222,7 +228,8 @@
     "removeBackground": "Arka planı kaldırma",
     "upscale": "Büyütme",
     "restoreFaces": "Yüzleri onarma",
-    "inpaint": "Nesne kaldırma"
+    "inpaint": "Nesne kaldırma",
+    "aiEdit": "Yapay zekâ ile düzenleme"
   },
   "op": {
     "mode": "Kip",
@@ -327,7 +334,16 @@
       "highlight": "Vurgulayıcı",
       "blur": "Bulanıklaştırma",
       "pixelate": "Pikselleştirme"
-    }
+    },
+    "keep": "Korunacak alanlar",
+    "keepHint": "Kalması gerekenleri fırçayla boyayın: arka plan kaldırma bu yerlere dokunmaz.",
+    "editPrompt": "Ne değişsin",
+    "editPromptHint": "Görüntünün veya işaretli alanın nasıl olması gerektiğini anlatın.",
+    "editArea": "Alan",
+    "editAreaHint": "Değişecek yeri fırçayla boyayın. İşaret yoksa görüntünün tamamı değişir.",
+    "editStrength": "Değişim gücü",
+    "editStrengthHint": "Değer büyüdükçe sonuç özgün görüntüden o kadar uzaklaşır.",
+    "generatorMissing": "Bu adım bir görüntü üretici gerektirir."
   },
   "steps": {
     "empty": "Henüz adım yok",
@@ -368,7 +384,14 @@
     "tool": "Araç",
     "strokeWidth": "Kalınlık",
     "fill": "Dolgu",
-    "textHint": "Metni yazın ve görüntüye tıklayın."
+    "textHint": "Metni yazın ve görüntüye tıklayın.",
+    "run": "Çalıştır",
+    "editArea": "Alanı değiştir",
+    "markKeep": "Korunacakları işaretle",
+    "done": "Tamam",
+    "anotherVariant": "Başka bir seçenek",
+    "retry": "Yeniden dene",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "Dosya ekle",
@@ -588,7 +611,8 @@
     "data": "Veriler",
     "dataFolder": "Veri klasörü",
     "portable": "Taşınabilir sürüm",
-    "logs": "Günlük dosyaları"
+    "logs": "Günlük dosyaları",
+    "updateAsk": "PixelIt yeni sürümü bildirir ve kurulup kurulmayacağını sorar. Onayınız olmadan hiçbir şey indirilmez."
   },
   "studio": {
     "tabGenerate": "Üretim",
@@ -612,7 +636,8 @@
     "generate": "Üret",
     "slow": "Ekran kartı olmadan bu bilgisayarda üretim görüntü başına birkaç dakika sürer.",
     "emptyTitle": "Görüntüler burada görünecek",
-    "emptyText": "Bir istek yazın ve “Üret” düğmesine basın."
+    "emptyText": "Bir istek yazın ve “Üret” düğmesine basın.",
+    "cloudSizeHint": "Dış hizmet yalnızca bazı boyutları kabul eder. Verilen boyutu reddederse PixelIt aynı en-boy oranındaki en yakın izinli boyutu ister."
   },
   "vision": {
     "noModelTitle": "Model seçilmedi",
@@ -726,7 +751,11 @@
       "inpaint": "Boyanan alanı çevresine göre doldurur.",
       "faces": "Fotoğraflardaki yüzleri netleştirir.",
       "detector": "Onarılacak yüzleri bulur."
-    }
+    },
+    "keyPaste": "Anahtarı yapıştırın: hemen kaydedilir",
+    "allowCloudTitle": "Dış hizmetlere izin verilsin mi?",
+    "allowCloudText": "{host} sunucusu bu bilgisayarın dışında ve dış hizmetler şu anda kapalı. Bunlara erişime izin verilsin mi? Bu sayfadaki ayarlar kaydedilecek.",
+    "allowCloudYes": "İzin ver"
   },
   "assistant": {
     "newChat": "Yeni sohbet",
@@ -871,7 +900,9 @@
     "unknownTool": "Bilinmeyen araç: {name}",
     "unsupportedFormat": "Dosya biçimi desteklenmiyor",
     "updating": "Güncelleme zaten sürüyor",
-    "watchFailed": "Klasör izlenmeye başlanamadı"
+    "watchFailed": "Klasör izlenmeye başlanamadı",
+    "keyMissing": "{host} sunucusu erişim anahtarı istiyor. Anahtarı aşağıdaki alana girip yeniden deneyin.",
+    "updatePortable": "Taşınabilir sürüm elle güncellenir"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt güncelleniyor",
       "updateInstallingText": "{version} sürümü kuruluyor.",
       "batchDone": "İşleme tamamlandı",
-      "batchDoneText": "Tamamlanan: {done}, hata: {failed}"
+      "batchDoneText": "Tamamlanan: {done}, hata: {failed}",
+      "updateAskText": "{version} sürümü yayımlandı. Kurmak için PixelIt’i açın."
     },
     "dialog": {
       "openPictures": "Görüntü aç",

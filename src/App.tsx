@@ -85,6 +85,40 @@ function ConfirmDialog({
   );
 }
 
+type UpdateAnswer = "install" | "later" | "skip";
+
+/** A newer version was found: the user decides whether it is installed. */
+function UpdateDialog({
+  version,
+  current,
+  onDone,
+}: {
+  version: string;
+  current: string;
+  onDone: (answer: UpdateAnswer) => void;
+}) {
+  const { t } = useT();
+  return (
+    <Modal
+      title={t("update.askTitle", { version })}
+      onClose={() => onDone("later")}
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => onDone("skip")}>
+            {t("update.skip")}
+          </Button>
+          <Button onClick={() => onDone("later")}>{t("update.later")}</Button>
+          <Button variant="primary" autoFocus onClick={() => onDone("install")}>
+            {t("update.install")}
+          </Button>
+        </>
+      }
+    >
+      <div className="modal-text">{t("update.askText", { version, current })}</div>
+    </Modal>
+  );
+}
+
 function NameDialog({ options, onDone }: { options: AskNameOptions; onDone: (name: string | null) => void }) {
   const { t } = useT();
   const [name, setName] = useState(options.initial ?? "");
@@ -172,6 +206,8 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
   const [jobsOpen, setJobsOpen] = useState(false);
   const [dropping, setDropping] = useState(false);
   const [news, setNews] = useState<Release | null>(null);
+  /** The version the user put off until the next start. */
+  const [postponed, setPostponed] = useState<string | null>(null);
 
   const nextToast = useRef(1);
   const nextIncoming = useRef(1);
@@ -507,9 +543,53 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
   );
 
   const running = activeJobs(jobs);
+  // An installed copy can update itself, so it asks; a portable one only tells.
+  const offered = update.state === "available" && !update.portable ? update.version : null;
+  const asking =
+    offered !== null && offered !== postponed && offered !== settings.skippedVersion && news === null
+      ? offered
+      : null;
+
+  const answerUpdate = (answer: UpdateAnswer) => {
+    switch (answer) {
+      case "install":
+        // The question is answered; the progress shows in the sidebar from here on.
+        setPostponed(offered);
+        api.updateInstall().catch(showError);
+        break;
+      case "later":
+        setPostponed(offered);
+        break;
+      case "skip":
+        setPostponed(offered);
+        if (offered !== null) {
+          void saveSettings({ ...settings, skippedVersion: offered });
+        }
+        break;
+      default: {
+        const unreachable: never = answer;
+        throw new Error(`Unknown answer: ${String(unreachable)}`);
+      }
+    }
+  };
+
   const updateNote: ReactNode =
-    update.state === "available" || update.state === "downloading" || update.state === "installing" ? (
-      <button type="button" className="sidebar-note" onClick={() => navigate("settings")}>
+    update.state === "available" ||
+    update.state === "downloading" ||
+    update.state === "ready" ||
+    update.state === "installing" ? (
+      <button
+        type="button"
+        className="sidebar-note"
+        onClick={() => {
+          // The question that was put off is asked again; a skipped version waits in the settings.
+          if (offered !== null && offered !== settings.skippedVersion) {
+            setPostponed(null);
+          } else {
+            navigate("settings");
+          }
+        }}
+      >
         {td(`update.state.${update.state}`, { version: update.version ?? "" })}
       </button>
     ) : null;
@@ -561,6 +641,7 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
           <ReleaseNotes release={news} />
         </Modal>
       ) : null}
+      {asking !== null ? <UpdateDialog version={asking} current={boot.info.version} onDone={answerUpdate} /> : null}
       {confirming ? <ConfirmDialog options={confirming.options} onDone={confirming.done} /> : null}
       {naming ? <NameDialog options={naming.options} onDone={naming.done} /> : null}
 

@@ -112,6 +112,8 @@ pub struct Settings {
     pub update_channel: UpdateChannel,
     /// Version whose "What's new" page the user has seen.
     pub seen_version: String,
+    /// Newer version the user chose to skip; it is not offered again.
+    pub skipped_version: String,
     /// Global shortcut of the screen capture; empty switches it off.
     pub capture_hotkey: String,
     /// Folder of the PDFium library; empty looks next to the application.
@@ -139,6 +141,7 @@ impl Default for Settings {
             check_updates: true,
             update_channel: UpdateChannel::Stable,
             seen_version: String::new(),
+            skipped_version: String::new(),
             capture_hotkey: String::new(),
             pdfium_folder: String::new(),
             agents: AgentAccess::default(),

@@ -172,6 +172,8 @@ export interface RemoveBackgroundOp {
   type: "removeBackground";
   model: string;
   background: Color | null;
+  /** Areas painted by hand that stay as they are. */
+  keep: Stroke[];
 }
 
 export interface UpscaleOp {
@@ -198,6 +200,17 @@ export interface InpaintOp {
   prompt: string;
 }
 
+export interface AiEditOp {
+  type: "aiEdit";
+  prompt: string;
+  /** Area to change; without strokes the whole picture is changed. */
+  strokes: Stroke[];
+  /** From 0 to 100. */
+  strength: number;
+  /** Number of the attempt: another number asks for another result. */
+  variant: number;
+}
+
 export type Op =
   | ResizeOp
   | CropOp
@@ -210,7 +223,8 @@ export type Op =
   | RemoveBackgroundOp
   | UpscaleOp
   | RestoreFacesOp
-  | InpaintOp;
+  | InpaintOp
+  | AiEditOp;
 
 export type OpKind = Op["type"];
 
@@ -294,6 +308,8 @@ export interface Settings {
   checkUpdates: boolean;
   updateChannel: "stable" | "beta";
   seenVersion: string;
+  /** Newer version the user chose to skip. */
+  skippedVersion: string;
   captureHotkey: string;
   pdfiumFolder: string;
   agents: AgentAccess;

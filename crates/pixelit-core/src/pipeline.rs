@@ -12,7 +12,7 @@ use crate::cancel::CancelToken;
 use crate::color::Color;
 use crate::error::{Error, Result};
 use crate::format::ImageFormat;
-use crate::image::Image;
+use crate::image::{Image, Pixels};
 use crate::ops;
 use crate::text::Font;
 
@@ -76,6 +76,7 @@ pub enum Op {
     Upscale(Upscale),
     RestoreFaces(RestoreFaces),
     Inpaint(Inpaint),
+    AiEdit(AiEdit),
 }
 
 impl Op {
@@ -94,6 +95,7 @@ impl Op {
             Self::Upscale(_) => "upscale",
             Self::RestoreFaces(_) => "restoreFaces",
             Self::Inpaint(_) => "inpaint",
+            Self::AiEdit(_) => "aiEdit",
         }
     }
 
@@ -101,8 +103,32 @@ impl Op {
     pub fn is_ai(&self) -> bool {
         matches!(
             self,
-            Self::RemoveBackground(_) | Self::Upscale(_) | Self::RestoreFaces(_) | Self::Inpaint(_)
+            Self::RemoveBackground(_)
+                | Self::Upscale(_)
+                | Self::RestoreFaces(_)
+                | Self::Inpaint(_)
+                | Self::AiEdit(_)
         )
+    }
+
+    /// Whether the operation asks the image generator of the settings, which
+    /// may be a service outside this computer.
+    pub fn uses_generator(&self) -> bool {
+        match self {
+            Self::Inpaint(spec) => !spec.prompt.trim().is_empty(),
+            Self::AiEdit(spec) => !spec.prompt.trim().is_empty(),
+            Self::Resize(_)
+            | Self::Crop(_)
+            | Self::Rotate(_)
+            | Self::Flip(_)
+            | Self::Adjust(_)
+            | Self::Filter(_)
+            | Self::Watermark(_)
+            | Self::Annotate(_)
+            | Self::RemoveBackground(_)
+            | Self::Upscale(_)
+            | Self::RestoreFaces(_) => false,
+        }
     }
 }
 
@@ -470,6 +496,8 @@ pub struct RemoveBackground {
     pub model: String,
     /// Solid colour placed behind the subject; `None` keeps transparency.
     pub background: Option<Color>,
+    /// Areas painted by hand that stay as they are, whatever the model decides.
+    pub keep: Vec<Stroke>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -523,6 +551,32 @@ pub struct Inpaint {
     pub strokes: Vec<Stroke>,
     /// Text prompt for generative providers; empty removes the object.
     pub prompt: String,
+}
+
+/// A change described in words and drawn by the image generator of the
+/// settings.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AiEdit {
+    /// What to change; an empty prompt leaves the picture as it is.
+    pub prompt: String,
+    /// Area to change; without strokes the whole picture is changed.
+    pub strokes: Vec<Stroke>,
+    /// How far the result may move from the picture, from `0` to `100`.
+    pub strength: f32,
+    /// Number of the attempt: another number asks for another result.
+    pub variant: u32,
+}
+
+impl Default for AiEdit {
+    fn default() -> Self {
+        Self {
+            prompt: String::new(),
+            strokes: Vec::new(),
+            strength: 75.0,
+            variant: 0,
+        }
+    }
 }
 
 // ---------------------------------------------------------------- output
@@ -801,6 +855,18 @@ pub trait AiBackend: Sync {
         prompt: &str,
         cancel: &CancelToken,
     ) -> Result<Image>;
+
+    /// Changes the picture following the prompt of `spec`: inside `mask`, or
+    /// everywhere without one. `preview` tells that the picture is the
+    /// reduced copy of the editor, whose result the real run should repeat.
+    fn edit(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        spec: &AiEdit,
+        preview: bool,
+        cancel: &CancelToken,
+    ) -> Result<Image>;
 }
 
 /// Everything a step needs besides the image.
@@ -813,6 +879,8 @@ pub struct ApplyContext<'a> {
     /// real run, below `1.0` for a preview on a reduced copy. Pixel-based
     /// parameters are multiplied by it.
     pub scale: f32,
+    /// Whether this is the preview of the editor rather than the real run.
+    pub preview: bool,
 }
 
 impl<'a> ApplyContext<'a> {
@@ -822,7 +890,32 @@ impl<'a> ApplyContext<'a> {
             ai: None,
             cancel,
             scale: 1.0,
+            preview: false,
         }
+    }
+}
+
+fn copy_masked<T: Copy>(target: &mut [T], source: &[T], mask: &[u8]) {
+    for ((new, old), cover) in target
+        .chunks_exact_mut(4)
+        .zip(source.chunks_exact(4))
+        .zip(mask)
+    {
+        if *cover > 127 {
+            new.copy_from_slice(old);
+        }
+    }
+}
+
+/// Puts the pixels of `original` back inside the mask.
+fn keep_original(result: &mut Image, original: &Image, mask: &Mask) {
+    if result.width() != original.width() || result.height() != original.height() {
+        return;
+    }
+    match (result.pixels_mut(), original.pixels()) {
+        (Pixels::U8(new), Pixels::U8(old)) => copy_masked(new, old, &mask.data),
+        (Pixels::U16(new), Pixels::U16(old)) => copy_masked(new, old, &mask.data),
+        (Pixels::U8(_), Pixels::U16(_)) | (Pixels::U16(_), Pixels::U8(_)) => {}
     }
 }
 
@@ -857,6 +950,10 @@ pub fn apply_op(image: Image, op: &Op, context: &ApplyContext<'_>) -> Result<Ima
         Op::RemoveBackground(spec) => {
             let ai = context.ai.ok_or_else(|| Error::new("aiUnavailable"))?;
             let mut result = ai.remove_background(&image, &spec.model, context.cancel)?;
+            if !spec.keep.is_empty() {
+                let mask = ops::annotate::stroke_mask(image.width(), image.height(), &spec.keep);
+                keep_original(&mut result, &image, &mask);
+            }
             if let Some(background) = spec.background {
                 result.flatten(background);
             }
@@ -875,6 +972,15 @@ pub fn apply_op(image: Image, op: &Op, context: &ApplyContext<'_>) -> Result<Ima
             let ai = context.ai.ok_or_else(|| Error::new("aiUnavailable"))?;
             let mask = ops::annotate::stroke_mask(image.width(), image.height(), &spec.strokes);
             ai.inpaint(&image, &mask, &spec.model, &spec.prompt, context.cancel)
+        }
+        Op::AiEdit(spec) => {
+            if spec.prompt.trim().is_empty() {
+                return Ok(image);
+            }
+            let ai = context.ai.ok_or_else(|| Error::new("aiUnavailable"))?;
+            let mask = (!spec.strokes.is_empty())
+                .then(|| ops::annotate::stroke_mask(image.width(), image.height(), &spec.strokes));
+            ai.edit(&image, mask.as_ref(), spec, context.preview, context.cancel)
         }
     }
 }
@@ -950,6 +1056,7 @@ mod tests {
             Op::Upscale(Upscale::default()),
             Op::RestoreFaces(RestoreFaces::default()),
             Op::Inpaint(Inpaint::default()),
+            Op::AiEdit(AiEdit::default()),
         ];
         for op in ops {
             let json = serde_json::to_value(&op).unwrap();
@@ -1019,6 +1126,49 @@ mod tests {
         step.enabled = false;
         let result = apply_steps(image.clone(), &[step], &context).unwrap();
         assert_eq!(result, image);
+    }
+
+    #[test]
+    fn kept_areas_take_the_original_pixels() {
+        let original = Image::new(40, 20, crate::image::Depth::Eight, Color::WHITE).unwrap();
+        let mut result = Image::from_rgba8(40, 20, vec![0; 40 * 20 * 4]).unwrap();
+        let mask = ops::annotate::stroke_mask(
+            40,
+            20,
+            &[Stroke {
+                points: vec![[0.2, 0.5], [0.4, 0.5]],
+                width: 20.0,
+            }],
+        );
+        keep_original(&mut result, &original, &mask);
+        assert_eq!(result.pixel8(12, 10), [255, 255, 255, 255]);
+        assert_eq!(result.pixel8(35, 10), [0, 0, 0, 0]);
+
+        let other = Image::new(8, 8, crate::image::Depth::Eight, Color::WHITE).unwrap();
+        let before = result.clone();
+        keep_original(&mut result, &other, &mask);
+        assert_eq!(result, before);
+    }
+
+    #[test]
+    fn an_edit_without_a_prompt_changes_nothing() {
+        let cancel = CancelToken::new();
+        let context = ApplyContext::new(&NoResources, &cancel);
+        let image = Image::new(4, 4, crate::image::Depth::Eight, Color::WHITE).unwrap();
+        let mut edit = AiEdit::default();
+        let untouched = apply_op(image.clone(), &Op::AiEdit(edit.clone()), &context).unwrap();
+        assert_eq!(untouched, image);
+        assert!(!Op::AiEdit(edit.clone()).uses_generator());
+
+        edit.prompt = String::from("make it night");
+        let op = Op::AiEdit(edit);
+        assert!(op.uses_generator());
+        assert!(op.is_ai());
+        assert_eq!(
+            apply_op(image, &op, &context).unwrap_err().code,
+            "aiUnavailable"
+        );
+        assert!(!Op::Inpaint(Inpaint::default()).uses_generator());
     }
 
     #[test]

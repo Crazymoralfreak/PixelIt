@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use pixelit_ai::{Ai, Message, Reply, Role, ToolCall, ToolSpec};
 use pixelit_core::{CancelToken, Error, Result};
 use pixelit_engine::settings::AgentAccess;
-use pixelit_engine::{store, Paths};
+use pixelit_engine::{clock, store, Paths};
 
 use crate::ToolContext;
 
@@ -281,7 +281,7 @@ pub struct Chat {
 
 impl Chat {
     pub fn new() -> Self {
-        let updated = chrono::Utc::now().timestamp();
+        let updated = clock::unix_now();
         Self {
             id: format!("{updated:x}-{:08x}", fastrand::u32(..)),
             updated,
@@ -328,7 +328,7 @@ impl Chats {
     /// Stores a conversation and moves it to the top.
     pub fn upsert(&mut self, mut chat: Chat) -> Chat {
         chat.retitle();
-        chat.updated = chrono::Utc::now().timestamp();
+        chat.updated = clock::unix_now();
         self.chats.retain(|known| known.id != chat.id);
         self.chats.insert(0, chat.clone());
         self.chats.truncate(MAX_CHATS);

@@ -71,6 +71,8 @@ export const api = {
   updateStatus: () => invoke<UpdateStatus>("update_status"),
   /** Starts a check for updates; the progress arrives as `update:status` events. */
   updateCheck: () => invoke<void>("update_check"),
+  /** Downloads and installs the version found, after the user agreed to it. */
+  updateInstall: () => invoke<void>("update_install"),
 
   jobsList: () => invoke<JobInfo[]>("jobs_list"),
   jobCancel: (id: number) => invoke<void>("job_cancel", { id }),

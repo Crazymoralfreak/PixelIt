@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.0.2] - 2026-11-25
+
+### Editor
+
+- A new step, "AI edit": the connected generator changes the whole picture or the area painted with the brush by your description. It has a strength setting and an "Another variant" button; the export uses the same result the editor shows.
+- Background removal: the brush marks the areas to keep.
+- Steps with a brush have "Run" and "Change the area" buttons: the step starts once the area is marked.
+- An indicator over the picture shows that it is being processed; the error of a step stays on screen with a "Try again" button.
+- Object removal: a model that does not start on the graphics card moves to the processor by itself.
+
+### Models and AI
+
+- The key of a server is saved as soon as it is pasted and before the list of models is asked for.
+- When outside services are switched off, PixelIt offers to allow them right from the request; without a key it tells where to enter one.
+- Studio: for an outside service the sizes are chosen by shape (1:1, 3:2, 2:3, 16:9, 9:16). When the service refuses a size, the nearest allowed one is asked for.
+
+### Updates
+
+- PixelIt asks whether to install a new version: "Update", "Later" or "Skip this version". Nothing is downloaded without consent.
+
+### Dependencies
+
+- The `zip` library is updated to a version without known vulnerabilities; the unmaintained `chrono` is no longer a direct dependency.
+
 ## [0.0.1] - 2026-11-24
 
 ### Viewer and import

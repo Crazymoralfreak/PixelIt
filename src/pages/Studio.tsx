@@ -28,12 +28,28 @@ import {
   TextInput,
 } from "../ui";
 
-const SIZES: ReadonlyArray<[number, number]> = [
-  [512, 512],
-  [768, 768],
-  [1024, 1024],
-  [1216, 832],
-  [832, 1216],
+interface SizePreset {
+  label: string;
+  width: number;
+  height: number;
+}
+
+/** Sizes generators on this computer are usually trained for. */
+const LOCAL_SIZES: readonly SizePreset[] = [
+  { label: "512×512", width: 512, height: 512 },
+  { label: "768×768", width: 768, height: 768 },
+  { label: "1024×1024", width: 1024, height: 1024 },
+  { label: "1216×832", width: 1216, height: 832 },
+  { label: "832×1216", width: 832, height: 1216 },
+];
+
+/** Outside services think in shapes; these are the sizes they accept for each. */
+const CLOUD_SIZES: readonly SizePreset[] = [
+  { label: "1:1", width: 1024, height: 1024 },
+  { label: "3:2", width: 1536, height: 1024 },
+  { label: "2:3", width: 1024, height: 1536 },
+  { label: "16:9", width: 1792, height: 1024 },
+  { label: "9:16", width: 1024, height: 1792 },
 ];
 const TASKS: readonly VisionTask[] = ["describe", "altText", "tags", "name", "ocr"];
 
@@ -75,14 +91,19 @@ function GenerateTab() {
   }
 
   const set = (patch: Partial<GenerateRequest>) => setRequest({ ...request, ...patch });
-  const width = request.width || defaults.width;
-  const height = request.height || defaults.height;
+  const cloud = defaults.provider === "cloud";
+  const presets = cloud ? CLOUD_SIZES : LOCAL_SIZES;
+  // An outside service refuses the small sizes local models start from.
+  const width = request.width || (cloud ? Math.max(defaults.width, 1024) : defaults.width);
+  const height = request.height || (cloud ? Math.max(defaults.height, 1024) : defaults.height);
   const job = jobId === null ? undefined : jobs.find((item) => item.id === jobId);
 
   const generate = async () => {
     setBusy(true);
     try {
-      const id = await withCloud((confirmed) => api.generateStart(request, source || null, confirmed));
+      const id = await withCloud((confirmed) =>
+        api.generateStart({ ...request, width, height }, source || null, confirmed),
+      );
       setJobId(id);
       const { files } = await jobResult<{ files: string[] }>(id);
       setResults((current) => [...files, ...current]);
@@ -113,14 +134,15 @@ function GenerateTab() {
             <NumberInput value={width} onChange={(value) => set({ width: value })} min={64} max={4096} step={8} suffix="×" wide />
             <NumberInput value={height} onChange={(value) => set({ height: value })} min={64} max={4096} step={8} suffix="px" wide />
           </Field>
-          <Field label="">
-            {SIZES.map(([presetWidth, presetHeight]) => (
+          <Field label="" hint={cloud ? t("studio.cloudSizeHint") : undefined}>
+            {presets.map((preset) => (
               <Button
-                key={`${presetWidth}x${presetHeight}`}
+                key={preset.label}
                 small
-                onClick={() => set({ width: presetWidth, height: presetHeight })}
+                variant={preset.width === width && preset.height === height ? "primary" : "default"}
+                onClick={() => set({ width: preset.width, height: preset.height })}
               >
-                {presetWidth}×{presetHeight}
+                {preset.label}
               </Button>
             ))}
           </Field>

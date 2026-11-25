@@ -1,11 +1,21 @@
 // What is drawn over the picture of the editor while a step is being shaped
-// by hand: the crop box, annotations, the mask of an object to remove.
+// by hand: the crop box, annotations, the areas painted with the brush.
 // Coordinates of the steps are fractions of the picture, so the overlay works
 // in the pixels of the shown picture and converts on the way.
 
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { defaultShape } from "../../lib/pipeline";
-import type { AnnotateOp, CropOp, InpaintOp, Op, Shape, ShapeKind, Stroke } from "../../types";
+import type {
+  AiEditOp,
+  AnnotateOp,
+  CropOp,
+  InpaintOp,
+  Op,
+  RemoveBackgroundOp,
+  Shape,
+  ShapeKind,
+  Stroke,
+} from "../../types";
 
 export interface ToolState {
   shape: ShapeKind;
@@ -32,13 +42,19 @@ export const DEFAULT_TOOL: ToolState = {
   brush: 4,
 };
 
+/** Steps painted with the brush: the area to remove, to redraw or to keep. */
+export type BrushedOp = InpaintOp | AiEditOp | RemoveBackgroundOp;
+
+/** Steps the overlay can shape. */
+export type ShapedOp = CropOp | AnnotateOp | BrushedOp;
+
 interface OverlayProps {
   /** Size of the picture under the overlay, in its own pixels. */
   width: number;
   height: number;
   /** Screen pixels per picture pixel, to keep handles the same size on screen. */
   zoom: number;
-  op: CropOp | AnnotateOp | InpaintOp;
+  op: ShapedOp;
   tool: ToolState;
   onChange: (op: Op) => void;
 }
@@ -355,14 +371,30 @@ function AnnotateOverlay({ width, height, op, tool, onChange }: OverlayProps & {
   );
 }
 
-function InpaintOverlay({ width, height, op, tool, onChange }: OverlayProps & { op: InpaintOp }) {
+/** Colours of the brush: what is removed, what is redrawn and what is kept. */
+const BRUSH_REMOVE = "rgba(255, 45, 85, 0.55)";
+const BRUSH_EDIT = "rgba(124, 77, 255, 0.55)";
+const BRUSH_KEEP = "rgba(46, 204, 113, 0.55)";
+
+interface BrushOverlayProps {
+  width: number;
+  height: number;
+  /** Thickness of a new stroke, in percent of the short side. */
+  brush: number;
+  color: string;
+  strokes: Stroke[];
+  onStrokes: (strokes: Stroke[]) => void;
+}
+
+/** An area painted with a brush, stroke by stroke. */
+function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes }: BrushOverlayProps) {
   const [draft, setDraft] = useState<Stroke | null>(null);
   const short = Math.min(width, height);
 
   const begin = (event: ReactPointerEvent<SVGSVGElement>) => {
     const point = fraction(event);
     // Two equal points make a dot, which a single click should leave.
-    setDraft({ points: [point, point], width: tool.brush });
+    setDraft({ points: [point, point], width: brush });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -374,12 +406,12 @@ function InpaintOverlay({ width, height, op, tool, onChange }: OverlayProps & { 
 
   const end = () => {
     if (draft) {
-      onChange({ ...op, strokes: [...op.strokes, draft] });
+      onStrokes([...painted, draft]);
       setDraft(null);
     }
   };
 
-  const strokes = draft ? [...op.strokes, draft] : op.strokes;
+  const strokes = draft ? [...painted, draft] : painted;
   return (
     <svg
       className="overlay overlay-draw"
@@ -394,7 +426,7 @@ function InpaintOverlay({ width, height, op, tool, onChange }: OverlayProps & { 
           key={index}
           points={pathOf(stroke.points, width, height)}
           fill="none"
-          stroke="rgba(255, 45, 85, 0.55)"
+          stroke={color}
           strokeWidth={Math.max(1, (stroke.width / 100) * short)}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -405,14 +437,35 @@ function InpaintOverlay({ width, height, op, tool, onChange }: OverlayProps & { 
 }
 
 export function Overlay(props: OverlayProps) {
-  const { op } = props;
+  const { op, width, height, tool, onChange } = props;
+  const brush = { width, height, brush: tool.brush };
   switch (op.type) {
     case "crop":
       return <CropOverlay {...props} op={op} />;
     case "annotate":
       return <AnnotateOverlay {...props} op={op} />;
     case "inpaint":
-      return <InpaintOverlay {...props} op={op} />;
+      return (
+        <BrushOverlay
+          {...brush}
+          color={BRUSH_REMOVE}
+          strokes={op.strokes}
+          onStrokes={(strokes) => onChange({ ...op, strokes })}
+        />
+      );
+    case "aiEdit":
+      return (
+        <BrushOverlay
+          {...brush}
+          color={BRUSH_EDIT}
+          strokes={op.strokes}
+          onStrokes={(strokes) => onChange({ ...op, strokes })}
+        />
+      );
+    case "removeBackground":
+      return (
+        <BrushOverlay {...brush} color={BRUSH_KEEP} strokes={op.keep} onStrokes={(keep) => onChange({ ...op, keep })} />
+      );
     default: {
       const unreachable: never = op;
       return unreachable;

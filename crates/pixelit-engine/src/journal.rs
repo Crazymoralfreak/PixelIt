@@ -3,6 +3,7 @@
 use pixelit_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::clock;
 use crate::paths::Paths;
 use crate::store;
 
@@ -47,7 +48,7 @@ pub struct JournalEntry {
 
 impl JournalEntry {
     pub fn new(kind: &str, title: &str) -> Self {
-        let time = chrono::Utc::now().timestamp();
+        let time = clock::unix_now();
         Self {
             id: format!("{time:x}-{:08x}", fastrand::u32(..)),
             time,

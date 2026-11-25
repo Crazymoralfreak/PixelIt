@@ -76,7 +76,13 @@
       "ready": "버전 {version}을(를) 다운로드했습니다. 작업이 끝나면 설치됩니다",
       "installing": "버전 {version} 설치 중…",
       "failed": "업데이트를 확인하지 못했습니다"
-    }
+    },
+    "askTitle": "버전 {version}을(를) 사용할 수 있습니다",
+    "askText": "현재 설치된 버전은 {current}입니다. PixelIt을 버전 {version}(으)로 업데이트할까요? 설치 프로그램을 내려받아 검증하고, 실행 중인 작업이 끝난 뒤 앱이 다시 시작됩니다.",
+    "skip": "이 버전 건너뛰기",
+    "later": "나중에",
+    "install": "업데이트",
+    "installFailed": "버전 {version}을(를) 설치하지 못했습니다"
   },
   "about": {
     "text": "이미지 보기, 편집, 일괄 처리, 생성. 모든 작업은 사용자의 컴퓨터에서 이루어지며, 프로그램은 사용자가 요청할 때만 네트워크에 연결합니다.",
@@ -222,7 +228,8 @@
     "removeBackground": "배경 제거",
     "upscale": "확대",
     "restoreFaces": "얼굴 복원",
-    "inpaint": "개체 제거"
+    "inpaint": "개체 제거",
+    "aiEdit": "AI 편집"
   },
   "op": {
     "mode": "모드",
@@ -327,7 +334,16 @@
       "highlight": "형광펜",
       "blur": "흐리게",
       "pixelate": "모자이크"
-    }
+    },
+    "keep": "유지할 영역",
+    "keepHint": "남겨야 할 부분을 브러시로 칠하세요. 배경 제거가 그 부분을 건드리지 않습니다.",
+    "editPrompt": "변경할 내용",
+    "editPromptHint": "이미지나 표시한 영역이 어떻게 바뀌어야 하는지 설명하세요.",
+    "editArea": "영역",
+    "editAreaHint": "바꿀 부분을 브러시로 칠하세요. 표시가 없으면 이미지 전체가 바뀝니다.",
+    "editStrength": "변경 강도",
+    "editStrengthHint": "값이 클수록 결과가 원본 이미지와 더 많이 달라집니다.",
+    "generatorMissing": "이 단계에는 이미지 생성기가 필요합니다."
   },
   "steps": {
     "empty": "아직 단계가 없습니다",
@@ -368,7 +384,14 @@
     "tool": "도구",
     "strokeWidth": "두께",
     "fill": "채우기",
-    "textHint": "텍스트를 입력한 다음 이미지를 클릭하세요."
+    "textHint": "텍스트를 입력한 다음 이미지를 클릭하세요.",
+    "run": "실행",
+    "editArea": "영역 변경",
+    "markKeep": "유지할 영역 표시",
+    "done": "완료",
+    "anotherVariant": "다른 결과",
+    "retry": "다시 시도",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "파일 추가",
@@ -588,7 +611,8 @@
     "data": "데이터",
     "dataFolder": "데이터 폴더",
     "portable": "포터블 버전",
-    "logs": "로그 파일"
+    "logs": "로그 파일",
+    "updateAsk": "PixelIt이 새 버전을 알리고 설치할지 묻습니다. 동의 없이는 아무것도 내려받지 않습니다."
   },
   "studio": {
     "tabGenerate": "생성",
@@ -612,7 +636,8 @@
     "generate": "생성",
     "slow": "그래픽 카드가 없으면 이 컴퓨터에서는 이미지 한 장을 생성하는 데 몇 분이 걸립니다.",
     "emptyTitle": "이미지가 여기에 표시됩니다",
-    "emptyText": "프롬프트를 입력하고 “생성”을 누르세요."
+    "emptyText": "프롬프트를 입력하고 “생성”을 누르세요.",
+    "cloudSizeHint": "외부 서비스는 일부 크기만 받습니다. 지정한 크기를 거부하면 PixelIt이 같은 비율의 가장 가까운 허용 크기를 요청합니다."
   },
   "vision": {
     "noModelTitle": "모델을 선택하지 않았습니다",
@@ -726,7 +751,11 @@
       "inpaint": "칠한 영역을 주변에 맞춰 채웁니다.",
       "faces": "사진 속 얼굴을 더 선명하게 만듭니다.",
       "detector": "복원할 얼굴을 찾습니다."
-    }
+    },
+    "keyPaste": "키를 붙여 넣으면 바로 저장됩니다",
+    "allowCloudTitle": "외부 서비스를 허용할까요?",
+    "allowCloudText": "서버 {host}은(는) 이 컴퓨터 밖에 있으며 외부 서비스는 현재 꺼져 있습니다. 사용을 허용할까요? 이 페이지의 설정이 저장됩니다.",
+    "allowCloudYes": "허용"
   },
   "assistant": {
     "newChat": "새 대화",
@@ -871,7 +900,9 @@
     "unknownTool": "알 수 없는 도구: {name}",
     "unsupportedFormat": "지원하지 않는 파일 형식입니다",
     "updating": "업데이트가 이미 진행 중입니다",
-    "watchFailed": "폴더 감시를 시작하지 못했습니다"
+    "watchFailed": "폴더 감시를 시작하지 못했습니다",
+    "keyMissing": "서버 {host}에 액세스 키가 필요합니다. 아래 입력란에 키를 입력한 뒤 다시 시도하세요.",
+    "updatePortable": "포터블 버전은 직접 업데이트해야 합니다"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt을 업데이트하는 중입니다",
       "updateInstallingText": "버전 {version}을(를) 설치하고 있습니다.",
       "batchDone": "처리가 끝났습니다",
-      "batchDoneText": "완료: {done}, 오류: {failed}"
+      "batchDoneText": "완료: {done}, 오류: {failed}",
+      "updateAskText": "버전 {version}이(가) 나왔습니다. PixelIt을 열어 설치하세요."
     },
     "dialog": {
       "openPictures": "이미지 열기",

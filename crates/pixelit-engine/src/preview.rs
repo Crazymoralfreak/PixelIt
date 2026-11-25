@@ -100,6 +100,7 @@ impl PreviewSession {
         };
         let mut context = runner.context(cancel);
         context.scale = self.scale;
+        context.preview = true;
         for (position, (op, key)) in ops.zip(keys).enumerate().skip(reused) {
             image = apply_op(image, op, &context).map_err(|error| error.with("step", op.kind()))?;
             if position < CACHED_STEPS {

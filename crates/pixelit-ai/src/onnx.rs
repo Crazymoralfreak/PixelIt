@@ -1,6 +1,7 @@
 //! Local models: background removal, upscaling, object removal and face
 //! restoration. All of them run in the worker process through ONNX Runtime.
 
+use std::collections::HashSet;
 use std::sync::{Mutex, PoisonError};
 
 use pixelit_core::pipeline::{Mask, ResizeFilter};
@@ -33,6 +34,9 @@ pub struct Onnx {
     paths: Paths,
     device: Mutex<Device>,
     worker: Mutex<Option<Worker>>,
+    /// Models the video card opened and then failed to run. They go straight
+    /// to the processor until the application is closed.
+    cpu_only: Mutex<HashSet<String>>,
 }
 
 fn wrong_model(entry: &Entry) -> Error {
@@ -169,6 +173,7 @@ impl Onnx {
             paths,
             device: Mutex::new(Device::default()),
             worker: Mutex::new(None),
+            cpu_only: Mutex::new(HashSet::new()),
         }
     }
 
@@ -217,16 +222,20 @@ impl Onnx {
             let mut infos = Vec::with_capacity(keep.len());
             for entry in keep {
                 let path = install::main_path(&self.paths, entry.id)?;
-                infos.push(worker.load(
-                    entry.id,
-                    &path,
-                    device.gpu,
-                    device.gpu_index,
-                    device.threads,
-                )?);
+                let gpu = device.gpu
+                    && !self
+                        .cpu_only
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .contains(entry.id);
+                infos.push(worker.load(entry.id, &path, gpu, device.gpu_index, device.threads)?);
             }
             task(worker, &infos)
         })();
+        self.cpu_only
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend(worker.take_moved_to_cpu());
         if result
             .as_ref()
             .is_err_and(|error| error.code == "aiWorkerFailed")

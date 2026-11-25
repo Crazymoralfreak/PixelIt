@@ -9,12 +9,12 @@ use std::time::UNIX_EPOCH;
 
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use chrono::Local;
 use serde::Serialize;
 
 use pixelit_codecs::{probe_file, SourceInfo};
 use pixelit_core::pipeline::{Conflict, Step};
 use pixelit_core::{CancelToken, Error, ImageFormat, Result};
+use pixelit_engine::clock::LocalTime;
 use pixelit_engine::preview::{histogram, Histogram, PreviewSession};
 use pixelit_engine::{fsops, scan, thumbs};
 
@@ -248,7 +248,7 @@ pub fn paste_image(core: CoreState<'_>, data: String) -> Result<String> {
         .map_err(|_| Error::new("badImage"))?;
     let format = ImageFormat::sniff(&bytes).ok_or_else(|| Error::new("badImage"))?;
     let folder = core.paths().root.join("captures");
-    let stamp = Local::now().format("%Y-%m-%d %H-%M-%S");
+    let stamp = LocalTime::now().stamp();
     let path = folder.join(format!("PixelIt {stamp}.{}", format.extension()));
     let written = fsops::write_file(&path, &bytes, Conflict::Rename)?;
     Ok(display(written.path()))

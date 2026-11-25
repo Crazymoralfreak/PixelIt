@@ -20,7 +20,7 @@ tracing.workspace = true
 ureq.workspace = true
 fastrand.workspace = true
 native-tls = "0.2"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies.windows]
 workspace = true

@@ -35,9 +35,15 @@ export const OP_KINDS: readonly OpKind[] = [
   "upscale",
   "restoreFaces",
   "inpaint",
+  "aiEdit",
 ];
 
-export const AI_KINDS: readonly OpKind[] = ["removeBackground", "upscale", "restoreFaces", "inpaint"];
+export const AI_KINDS: readonly OpKind[] = ["removeBackground", "upscale", "restoreFaces", "inpaint", "aiEdit"];
+
+/** Whether a step asks the image generator of the settings, which may be an outside service. */
+export function usesGenerator(op: Op): boolean {
+  return (op.type === "inpaint" || op.type === "aiEdit") && op.prompt.trim() !== "";
+}
 
 export function defaultOp(kind: OpKind): Op {
   switch (kind) {
@@ -104,13 +110,15 @@ export function defaultOp(kind: OpKind): Op {
     case "annotate":
       return { type: "annotate", shapes: [] };
     case "removeBackground":
-      return { type: "removeBackground", model: "", background: null };
+      return { type: "removeBackground", model: "", background: null, keep: [] };
     case "upscale":
       return { type: "upscale", model: "", factor: 2 };
     case "restoreFaces":
       return { type: "restoreFaces", model: "", strength: 80 };
     case "inpaint":
       return { type: "inpaint", model: "", strokes: [], prompt: "" };
+    case "aiEdit":
+      return { type: "aiEdit", prompt: "", strokes: [], strength: 75, variant: 0 };
     default: {
       const unreachable: never = kind;
       throw new Error(`Unknown step: ${String(unreachable)}`);

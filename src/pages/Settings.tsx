@@ -81,7 +81,14 @@ export default function SettingsPage() {
       .catch(() => undefined);
   }, []);
 
-  const busyUpdate = update.state === "checking" || update.state === "downloading" || update.state === "installing";
+  const busyUpdate =
+    update.state === "checking" ||
+    update.state === "downloading" ||
+    update.state === "ready" ||
+    update.state === "installing";
+  // A download or an installer that failed leaves the version known, so it can be asked for again.
+  const installFailed = update.state === "failed" && update.version !== null;
+  const canInstall = !update.portable && (update.state === "available" || installFailed);
   // A closed group still tells what matters: the language in use, and an update that is waiting or on its way.
   const languageName =
     LANGUAGES.find((language) => language.code === settings.language)?.name ?? t("settings.languageSystem");
@@ -238,9 +245,18 @@ export default function SettingsPage() {
         </Field>
         <Field
           label={t("settings.version", { version: info.version })}
-          hint={update.portable ? t("settings.updatePortable") : undefined}
+          hint={update.portable ? t("settings.updatePortable") : t("settings.updateAsk")}
         >
-          <span>{td(`update.state.${update.state}`, { version: update.version ?? "" })}</span>
+          <span>
+            {installFailed
+              ? t("update.installFailed", { version: update.version ?? "" })
+              : td(`update.state.${update.state}`, { version: update.version ?? "" })}
+          </span>
+          {canInstall ? (
+            <Button small variant="primary" onClick={() => api.updateInstall().catch(showError)}>
+              {t("update.install")}
+            </Button>
+          ) : null}
           <Button small disabled={busyUpdate} onClick={() => api.updateCheck().catch(showError)}>
             {t("settings.checkNow")}
           </Button>

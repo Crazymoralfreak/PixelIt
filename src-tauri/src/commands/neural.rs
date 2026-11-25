@@ -18,7 +18,7 @@ use pixelit_ai::{
     Source, Status, VisionTask,
 };
 use pixelit_core::pipeline::Step;
-use pixelit_core::{Error, Op, Result};
+use pixelit_core::{Error, Result};
 use pixelit_engine::{thumbs, JobContext, Lane};
 
 use super::{display, CoreState};
@@ -37,12 +37,11 @@ fn confirm_cloud(core: &Core, leaves_computer: bool, confirmed: bool) -> Result<
     }
 }
 
-/// The same check for editor steps: only a repaint by prompt uses a provider.
+/// The same check for editor steps: only changes by a prompt use a provider.
 pub fn confirm_steps(core: &Core, steps: &[Step], confirmed: bool) -> Result<()> {
-    let prompted = steps.iter().any(|step| {
-        step.enabled
-            && matches!(&step.op, Op::Inpaint(inpaint) if !inpaint.prompt.trim().is_empty())
-    });
+    let prompted = steps
+        .iter()
+        .any(|step| step.enabled && step.op.uses_generator());
     confirm_cloud(
         core,
         prompted && core.ai.generation_leaves_computer(),

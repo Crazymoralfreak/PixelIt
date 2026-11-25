@@ -1377,6 +1377,100 @@ p {
   pointer-events: none;
 }
 
+/* Shown while the steps are being applied. It waits a moment before it
+   appears, so the quick renders of a slider leave the picture alone. */
+.editor-busy {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 13px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: editor-busy-in 0.2s ease-out 0.35s both;
+}
+
+.editor-busy-mark {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: editor-busy-turn 0.8s linear infinite;
+}
+
+@keyframes editor-busy-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes editor-busy-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-busy-mark {
+    animation-duration: 2.4s;
+  }
+}
+
+/* What went wrong with the last render; it stays until the next one. */
+.editor-failure {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-height: 40%;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  box-shadow: var(--shadow);
+  overflow: auto;
+}
+
+.editor-failure-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.editor-failure .btn {
+  flex-shrink: 0;
+}
+
+.step-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* The state stands on the left, so the buttons keep their place when it appears. */
+.step-run-state {
+  order: -1;
+  margin-right: auto;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
 .editor-panel {
   width: 360px;
   flex-shrink: 0;

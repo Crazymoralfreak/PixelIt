@@ -76,7 +76,13 @@
       "ready": "Wersja {version} jest pobrana i zainstaluje się po zakończeniu zadań",
       "installing": "Instalowanie wersji {version}…",
       "failed": "Nie udało się sprawdzić aktualizacji"
-    }
+    },
+    "askTitle": "Dostępna jest wersja {version}",
+    "askText": "Teraz zainstalowana jest wersja {current}. Zaktualizować PixelIt do wersji {version}? Instalator zostanie pobrany i sprawdzony, trwające zadania się zakończą, a potem aplikacja uruchomi się ponownie.",
+    "skip": "Pomiń tę wersję",
+    "later": "Później",
+    "install": "Zaktualizuj",
+    "installFailed": "Nie udało się zainstalować wersji {version}"
   },
   "about": {
     "text": "Przeglądanie, edycja, przetwarzanie wsadowe i generowanie obrazów. Wszystko działa na Twoim komputerze; program łączy się z siecią tylko na Twoje polecenie.",
@@ -222,7 +228,8 @@
     "removeBackground": "Usuwanie tła",
     "upscale": "Powiększanie",
     "restoreFaces": "Odtwarzanie twarzy",
-    "inpaint": "Usuwanie obiektów"
+    "inpaint": "Usuwanie obiektów",
+    "aiEdit": "Edycja AI"
   },
   "op": {
     "mode": "Tryb",
@@ -327,7 +334,16 @@
       "highlight": "Zakreślacz",
       "blur": "Rozmycie",
       "pixelate": "Pikselizacja"
-    }
+    },
+    "keep": "Co zachować",
+    "keepHint": "Zamaluj to, co ma zostać: usuwanie tła nie ruszy tych miejsc.",
+    "editPrompt": "Co zmienić",
+    "editPromptHint": "Opisz, jak ma wyglądać obraz lub zaznaczony obszar.",
+    "editArea": "Obszar",
+    "editAreaHint": "Zamaluj miejsce, które ma się zmienić. Bez zaznaczenia zmienia się cały obraz.",
+    "editStrength": "Siła zmiany",
+    "editStrengthHint": "Im większa wartość, tym bardziej wynik różni się od oryginalnego obrazu.",
+    "generatorMissing": "Ten krok wymaga generatora obrazów."
   },
   "steps": {
     "empty": "Nie ma jeszcze kroków",
@@ -368,7 +384,14 @@
     "tool": "Narzędzie",
     "strokeWidth": "Grubość",
     "fill": "Wypełnienie",
-    "textHint": "Wpisz tekst i kliknij obraz."
+    "textHint": "Wpisz tekst i kliknij obraz.",
+    "run": "Wykonaj",
+    "editArea": "Zmień obszar",
+    "markKeep": "Zaznacz, co zachować",
+    "done": "Gotowe",
+    "anotherVariant": "Inny wariant",
+    "retry": "Ponów",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "Dodaj pliki",
@@ -588,7 +611,8 @@
     "data": "Dane",
     "dataFolder": "Folder danych",
     "portable": "Wersja przenośna",
-    "logs": "Pliki dziennika"
+    "logs": "Pliki dziennika",
+    "updateAsk": "PixelIt informuje o nowej wersji i pyta, czy ją zainstalować. Bez Twojej zgody nic nie jest pobierane."
   },
   "studio": {
     "tabGenerate": "Generowanie",
@@ -612,7 +636,8 @@
     "generate": "Generuj",
     "slow": "Bez karty graficznej generowanie na tym komputerze trwa kilka minut na obraz.",
     "emptyTitle": "Tu pojawią się obrazy",
-    "emptyText": "Wpisz zapytanie i naciśnij „Generuj”."
+    "emptyText": "Wpisz zapytanie i naciśnij „Generuj”.",
+    "cloudSizeHint": "Usługa zewnętrzna przyjmuje tylko niektóre rozmiary. Jeśli odrzuci podany rozmiar, PixelIt poprosi o najbliższy dozwolony o tych samych proporcjach."
   },
   "vision": {
     "noModelTitle": "Nie wybrano modelu",
@@ -726,7 +751,11 @@
       "inpaint": "Wypełnia zamalowany obszar na podstawie otoczenia.",
       "faces": "Wyostrza twarze na zdjęciach.",
       "detector": "Znajduje twarze do odtworzenia."
-    }
+    },
+    "keyPaste": "Wklej klucz – zapisze się od razu",
+    "allowCloudTitle": "Zezwolić na usługi zewnętrzne?",
+    "allowCloudText": "Serwer {host} znajduje się poza tym komputerem, a usługi zewnętrzne są teraz wyłączone. Zezwolić na korzystanie z nich? Ustawienia na tej stronie zostaną zapisane.",
+    "allowCloudYes": "Zezwól"
   },
   "assistant": {
     "newChat": "Nowa rozmowa",
@@ -871,7 +900,9 @@
     "unknownTool": "Nieznane narzędzie: {name}",
     "unsupportedFormat": "Format pliku nie jest obsługiwany",
     "updating": "Aktualizacja już trwa",
-    "watchFailed": "Nie udało się rozpocząć obserwowania folderu"
+    "watchFailed": "Nie udało się rozpocząć obserwowania folderu",
+    "keyMissing": "Serwer {host} wymaga klucza dostępu. Wpisz klucz w polu poniżej i spróbuj ponownie.",
+    "updatePortable": "Wersja przenośna jest aktualizowana ręcznie"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt się aktualizuje",
       "updateInstallingText": "Instalowana jest wersja {version}.",
       "batchDone": "Przetwarzanie zakończone",
-      "batchDoneText": "Gotowe: {done}, błędy: {failed}"
+      "batchDoneText": "Gotowe: {done}, błędy: {failed}",
+      "updateAskText": "Wydano wersję {version}. Otwórz PixelIt, aby ją zainstalować."
     },
     "dialog": {
       "openPictures": "Otwórz obrazy",

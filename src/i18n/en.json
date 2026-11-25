@@ -76,7 +76,13 @@
       "ready": "Version {version} is downloaded and will be installed once the jobs finish",
       "installing": "Installing version {version}…",
       "failed": "Could not check for updates"
-    }
+    },
+    "askTitle": "Version {version} is available",
+    "askText": "Version {current} is installed now. Update PixelIt to version {version}? The installer is downloaded and verified, running jobs finish first, and then the application restarts.",
+    "skip": "Skip this version",
+    "later": "Later",
+    "install": "Update",
+    "installFailed": "Version {version} could not be installed"
   },
   "about": {
     "text": "Viewing, editing, batch processing and generation of images. Everything runs on your computer; the application goes online only when you ask it to.",
@@ -222,7 +228,8 @@
     "removeBackground": "Remove background",
     "upscale": "Upscale",
     "restoreFaces": "Restore faces",
-    "inpaint": "Remove objects"
+    "inpaint": "Remove objects",
+    "aiEdit": "AI edit"
   },
   "op": {
     "mode": "Mode",
@@ -327,7 +334,16 @@
       "highlight": "Highlighter",
       "blur": "Blur",
       "pixelate": "Pixelate"
-    }
+    },
+    "keep": "What to keep",
+    "keepHint": "Paint over what must stay: background removal leaves these places untouched.",
+    "editPrompt": "What to change",
+    "editPromptHint": "Describe what the picture or the marked area should become.",
+    "editArea": "Area",
+    "editAreaHint": "Paint over the place to change. With nothing marked the whole picture is changed.",
+    "editStrength": "Strength of the change",
+    "editStrengthHint": "The higher the value, the further the result is from the original picture.",
+    "generatorMissing": "This step needs an image generator."
   },
   "steps": {
     "empty": "No steps yet",
@@ -368,7 +384,14 @@
     "tool": "Tool",
     "strokeWidth": "Width",
     "fill": "Fill",
-    "textHint": "Type the text and click on the image."
+    "textHint": "Type the text and click on the image.",
+    "run": "Run",
+    "editArea": "Change the area",
+    "markKeep": "Mark what to keep",
+    "done": "Done",
+    "anotherVariant": "Another variant",
+    "retry": "Try again",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "Add files",
@@ -588,7 +611,8 @@
     "data": "Data",
     "dataFolder": "Data folder",
     "portable": "Portable version",
-    "logs": "Log files"
+    "logs": "Log files",
+    "updateAsk": "PixelIt tells about a new version and asks whether to install it. Nothing is downloaded without your consent."
   },
   "studio": {
     "tabGenerate": "Generation",
@@ -612,7 +636,8 @@
     "generate": "Generate",
     "slow": "Without a graphics card, generation on this computer takes several minutes per image.",
     "emptyTitle": "Images will appear here",
-    "emptyText": "Type a prompt and press “Generate”."
+    "emptyText": "Type a prompt and press “Generate”.",
+    "cloudSizeHint": "An outside service accepts only some sizes. When it refuses the size set here, PixelIt asks for the nearest allowed one of the same shape."
   },
   "vision": {
     "noModelTitle": "No model is chosen",
@@ -726,7 +751,11 @@
       "inpaint": "Fills the painted area from its surroundings.",
       "faces": "Makes faces in photos sharper.",
       "detector": "Finds faces for restoration."
-    }
+    },
+    "keyPaste": "Paste the key: it is saved at once",
+    "allowCloudTitle": "Allow outside services?",
+    "allowCloudText": "The server {host} is outside this computer, and outside services are switched off now. Allow PixelIt to reach them? The settings on this page will be saved.",
+    "allowCloudYes": "Allow"
   },
   "assistant": {
     "newChat": "New chat",
@@ -871,7 +900,9 @@
     "unknownTool": "Unknown tool: {name}",
     "unsupportedFormat": "The file format is not supported",
     "updating": "An update is already in progress",
-    "watchFailed": "Could not start watching the folder"
+    "watchFailed": "Could not start watching the folder",
+    "keyMissing": "The server {host} asks for an access key. Enter the key in the field below and try again.",
+    "updatePortable": "The portable version is updated by hand"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt is updating",
       "updateInstallingText": "Version {version} is being installed.",
       "batchDone": "Processing finished",
-      "batchDoneText": "Done: {done}, errors: {failed}"
+      "batchDoneText": "Done: {done}, errors: {failed}",
+      "updateAskText": "Version {version} is out. Open PixelIt to install it."
     },
     "dialog": {
       "openPictures": "Open images",

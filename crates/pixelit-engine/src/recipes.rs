@@ -10,6 +10,7 @@ use pixelit_core::pipeline::{
 use pixelit_core::{Error, ImageFormat, Pipeline, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::clock;
 use crate::paths::Paths;
 use crate::store;
 
@@ -156,7 +157,7 @@ impl Recipes {
     /// a new recipe. Returns the stored recipe.
     pub fn upsert(&mut self, mut recipe: Recipe) -> Recipe {
         recipe.builtin = false;
-        recipe.updated = chrono::Utc::now().timestamp();
+        recipe.updated = clock::unix_now();
         if recipe.id.is_empty() || recipe.id.starts_with("builtin.") {
             recipe.id = format!("r{:x}{:06x}", recipe.updated, fastrand::u32(..0x00FF_FFFF));
         }

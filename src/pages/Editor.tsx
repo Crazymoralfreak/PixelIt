@@ -18,8 +18,10 @@ import {
   isWritable,
   PIPELINE_VERSION,
   recipeName,
+  usesGenerator,
 } from "../lib/pipeline";
 import type {
+  AppError,
   BatchReport,
   Comparison,
   EditorInfo,
@@ -46,7 +48,7 @@ import {
   Tabs,
   TextInput,
 } from "../ui";
-import { DEFAULT_TOOL, Overlay, type ToolState } from "./editor/Overlay";
+import { DEFAULT_TOOL, Overlay, type BrushedOp, type ShapedOp, type ToolState } from "./editor/Overlay";
 
 /** Long side of the picture the editor works on, in pixels. */
 const PREVIEW_SIDE = 2048;
@@ -72,9 +74,51 @@ function isTyping(target: EventTarget | null): boolean {
   );
 }
 
-/** Whether a step is shaped on the picture, which then shows the state before it. */
-function shapedByHand(op: Op): op is Extract<Op, { type: "crop" | "annotate" | "inpaint" }> {
-  return (op.type === "crop" && op.mode === "rect") || op.type === "annotate" || op.type === "inpaint";
+/** Whether a step is shaped on the picture as long as it is selected. */
+function shapedByHand(op: Op): boolean {
+  return (op.type === "crop" && op.mode === "rect") || op.type === "annotate";
+}
+
+/** Whether a step has an area painted with the brush, which is done in a mode of its own. */
+function isBrushed(op: Op): op is BrushedOp {
+  return op.type === "inpaint" || op.type === "aiEdit" || op.type === "removeBackground";
+}
+
+/** Whether a brushed step has nothing to show yet, so it opens ready to be painted. */
+function awaitsBrush(op: BrushedOp): boolean {
+  switch (op.type) {
+    case "inpaint":
+      return op.strokes.length === 0;
+    case "aiEdit":
+      return op.prompt.trim() === "";
+    case "removeBackground":
+      return false;
+    default: {
+      const unreachable: never = op;
+      return unreachable;
+    }
+  }
+}
+
+/** Whether a brushed step has what it needs to run. */
+function canRun(op: BrushedOp): boolean {
+  switch (op.type) {
+    case "inpaint":
+      return op.strokes.length > 0;
+    case "aiEdit":
+      return op.prompt.trim() !== "";
+    case "removeBackground":
+      return true;
+    default: {
+      const unreachable: never = op;
+      return unreachable;
+    }
+  }
+}
+
+/** The step the overlay shapes, when the op is one it can shape. */
+function asShaped(op: Op): ShapedOp | null {
+  return op.type === "crop" || op.type === "annotate" || isBrushed(op) ? op : null;
 }
 
 function HistogramView({ histogram }: { histogram: Histogram }) {
@@ -94,19 +138,22 @@ function HistogramView({ histogram }: { histogram: Histogram }) {
 function ToolControls({
   step,
   tool,
+  painting,
   onTool,
 }: {
   step: Step;
   tool: ToolState;
+  /** The area of this step is being painted with the brush. */
+  painting: boolean;
   onTool: (patch: Partial<ToolState>) => void;
 }) {
   const { t, td } = useT();
-  if (step.op.type === "inpaint") {
-    return (
+  if (isBrushed(step.op)) {
+    return painting ? (
       <Field label={t("editor.brush")}>
         <Slider value={tool.brush} onChange={(brush) => onTool({ brush })} min={0.5} max={30} step={0.5} reset={4} />
       </Field>
-    );
+    ) : null;
   }
   if (step.op.type !== "annotate") {
     return null;
@@ -145,6 +192,69 @@ function ToolControls({
       ) : null}
     </>
   );
+}
+
+/** The buttons that run a brushed step or return to painting its area. */
+function RunControls({
+  op,
+  painting,
+  busy,
+  onPaint,
+  onAgain,
+}: {
+  op: BrushedOp;
+  painting: boolean;
+  busy: boolean;
+  onPaint: (painting: boolean) => void;
+  /** Asks the generator for another result. */
+  onAgain: () => void;
+}) {
+  const { t } = useT();
+  if (painting) {
+    return (
+      <div className="step-run">
+        <Button variant="primary" disabled={!canRun(op)} onClick={() => onPaint(false)}>
+          {op.type === "removeBackground" ? t("editor.done") : t("editor.run")}
+        </Button>
+      </div>
+    );
+  }
+  switch (op.type) {
+    case "inpaint":
+      return (
+        <div className="step-run">
+          <Button small onClick={() => onPaint(true)}>
+            {t("editor.editArea")}
+          </Button>
+          {busy ? <span className="step-run-state">{t("common.working")}</span> : null}
+        </div>
+      );
+    case "aiEdit":
+      return (
+        <div className="step-run">
+          <Button small onClick={() => onPaint(true)}>
+            {t("editor.editArea")}
+          </Button>
+          <Button small disabled={busy} onClick={onAgain}>
+            {t("editor.anotherVariant")}
+          </Button>
+          {busy ? <span className="step-run-state">{t("common.working")}</span> : null}
+        </div>
+      );
+    case "removeBackground":
+      return (
+        <div className="step-run">
+          <Button small onClick={() => onPaint(true)}>
+            {t("editor.markKeep")}
+          </Button>
+          {busy ? <span className="step-run-state">{t("common.working")}</span> : null}
+        </div>
+      );
+    default: {
+      const unreachable: never = op;
+      return unreachable;
+    }
+  }
 }
 
 function CompareDialog({
@@ -210,7 +320,7 @@ function CompareDialog({
 }
 
 export default function EditorPage({ active }: { active: boolean }) {
-  const { t, td } = useT();
+  const { t, td, error: errorText } = useT();
   const {
     settings,
     editorPath,
@@ -230,8 +340,12 @@ export default function EditorPage({ active }: { active: boolean }) {
   const [history, setHistory] = useState<Step[][]>([[]]);
   const [cursor, setCursor] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
+  /** The brushed step whose area is being painted; it runs when the painting ends. */
+  const [painting, setPainting] = useState<string | null>(null);
   const [render, setRender] = useState<RenderInfo | null>(null);
   const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<AppError | null>(null);
+  const [attempt, setAttempt] = useState(0);
   const [comparing, setComparing] = useState(false);
   const [actual, setActual] = useState(false);
   const [tool, setTool] = useState<ToolState>(DEFAULT_TOOL);
@@ -297,6 +411,8 @@ export default function EditorPage({ active }: { active: boolean }) {
         setHistory([[]]);
         setCursor(0);
         setSelected(null);
+        setPainting(null);
+        setRenderError(null);
         setRender(null);
         setEstimate(null);
         setDirty(false);
@@ -349,8 +465,45 @@ export default function EditorPage({ active }: { active: boolean }) {
     [],
   );
 
-  const focusIndex = steps.findIndex((step) => step.id === selected && step.enabled && shapedByHand(step.op));
+  /** Steps as the panel changes them: a brushed step that was changed waits for its "run". */
+  const changeSteps = useCallback(
+    (next: Step[]) => {
+      const added = next.find((step) => !steps.some((known) => known.id === step.id));
+      if (added) {
+        setPainting(isBrushed(added.op) && awaitsBrush(added.op) ? added.id : null);
+      } else {
+        const before = steps.find((step) => step.id === selected);
+        const after = next.find((step) => step.id === selected);
+        const reshaped =
+          before && after && (after.op.type === "inpaint" || after.op.type === "aiEdit") && before.op !== after.op;
+        if (reshaped) {
+          setPainting(after.id);
+        }
+      }
+      commit(next);
+    },
+    [commit, selected, steps],
+  );
+
+  const selectStep = useCallback((id: string | null) => {
+    setSelected(id);
+    const step = stepsRef.current.find((known) => known.id === id);
+    if (step) {
+      setPainting(isBrushed(step.op) && awaitsBrush(step.op) ? step.id : null);
+    } else if (id === null) {
+      setPainting(null);
+    }
+    // A step added a moment ago is not in the list yet; `changeSteps` has decided for it.
+  }, []);
+
+  const focusIndex = steps.findIndex(
+    (step) =>
+      step.id === selected &&
+      step.enabled &&
+      (shapedByHand(step.op) || (isBrushed(step.op) && painting === step.id)),
+  );
   const focused = focusIndex >= 0 ? steps[focusIndex] : null;
+  const focusedOp = focused ? asShaped(focused.op) : null;
   const renderSteps = useMemo(() => (focusIndex >= 0 ? steps.slice(0, focusIndex) : steps), [focusIndex, steps]);
   const renderKey = useMemo(() => JSON.stringify(renderSteps), [renderSteps]);
 
@@ -362,6 +515,7 @@ export default function EditorPage({ active }: { active: boolean }) {
     const handle = window.setTimeout(() => {
       const count = ++renderCount.current;
       setRendering(true);
+      setRenderError(null);
       const run = (confirmed: boolean) => api.editorRender(id, renderSteps, confirmed);
       const request = cloudAgreed.current
         ? run(true)
@@ -377,15 +531,17 @@ export default function EditorPage({ active }: { active: boolean }) {
           }
         })
         .catch((error: unknown) => {
-          const code = toAppError(error).code;
-          if (code !== "cancelled") {
-            showError(error);
+          const failure = toAppError(error);
+          if (failure.code !== "cancelled") {
+            // The failure stays beside the picture until the next render: a toast for
+            // every stroke of the brush would hide what went wrong.
+            if (count === renderCount.current) {
+              setRenderError(failure);
+            }
           } else if (count === renderCount.current && !cloudAgreed.current) {
             // The upload was declined: the step that needs it is switched off.
             const current = stepsRef.current;
-            const declined = current.map((step) =>
-              step.op.type === "inpaint" && step.op.prompt.trim() !== "" ? { ...step, enabled: false } : step,
-            );
+            const declined = current.map((step) => (usesGenerator(step.op) ? { ...step, enabled: false } : step));
             if (JSON.stringify(declined) !== JSON.stringify(current)) {
               commitRef.current(declined);
             }
@@ -398,8 +554,8 @@ export default function EditorPage({ active }: { active: boolean }) {
         });
     }, RENDER_DELAY_MS);
     return () => window.clearTimeout(handle);
-    // The key stands for the steps to render.
-  }, [session, renderKey]);
+    // The key stands for the steps to render; `attempt` repeats a failed render.
+  }, [session, renderKey, attempt]);
 
   useEffect(() => {
     const element = stageRef.current;
@@ -603,10 +759,12 @@ export default function EditorPage({ active }: { active: boolean }) {
         setActual(false);
       } else if (event.key === "Escape") {
         setSelected(null);
+        setPainting(null);
       } else if (event.key === "Delete" && selected) {
         lastCommit.current = 0;
         commit(steps.filter((step) => step.id !== selected));
         setSelected(null);
+        setPainting(null);
       }
     };
     const onUp = (event: KeyboardEvent) => {
@@ -647,6 +805,10 @@ export default function EditorPage({ active }: { active: boolean }) {
   const source = comparing || !render ? editorBaseUrl(session.id) : editorRenderUrl(session.id, render.version);
   const fullWidth = Math.round(shownWidth / session.scale);
   const fullHeight = Math.round(shownHeight / session.scale);
+  const failure = rendering ? null : renderError;
+  const failureText = failure ? errorText(failure) : "";
+  const failedKind = failure?.params?.step;
+  const failedStep = failedKind ? td(`ops.${failedKind}`) : "";
 
   return (
     <PageFrame
@@ -694,21 +856,36 @@ export default function EditorPage({ active }: { active: boolean }) {
               style={{ width: Math.round(shownWidth * zoom), height: Math.round(shownHeight * zoom) }}
             >
               <img className="editor-image" src={source} alt="" draggable={false} />
-              {focused && shapedByHand(focused.op) && render && !comparing ? (
+              {focused && focusedOp && render && !comparing ? (
                 <Overlay
                   width={render.width}
                   height={render.height}
                   zoom={zoom}
-                  op={focused.op}
+                  op={focusedOp}
                   tool={tool}
                   onChange={(op) => commit(steps.map((step) => (step.id === focused.id ? { ...step, op } : step)))}
                 />
               ) : null}
             </div>
           </div>
+          {rendering ? (
+            <div className="editor-busy" role="status">
+              <span className="editor-busy-mark" aria-hidden="true" />
+              {t("common.working")}
+            </div>
+          ) : null}
+          {failure ? (
+            <div className="editor-failure" role="alert">
+              <div className="editor-failure-text">
+                {failedStep ? t("editor.stepFailed", { step: failedStep, error: failureText }) : failureText}
+              </div>
+              <Button small onClick={() => setAttempt((current) => current + 1)}>
+                {t("editor.retry")}
+              </Button>
+            </div>
+          ) : null}
           <div className="editor-status">
             {fullWidth} × {fullHeight}
-            {rendering || loading ? ` · ${t("common.working")}` : ""}
             {comparing ? ` · ${t("editor.original")}` : ""}
           </div>
         </div>
@@ -727,17 +904,39 @@ export default function EditorPage({ active }: { active: boolean }) {
                 {render ? <HistogramView histogram={render.histogram} /> : null}
                 <StepsEditor
                   steps={steps}
-                  onChange={commit}
+                  onChange={changeSteps}
                   selected={selected}
-                  onSelect={setSelected}
+                  onSelect={selectStep}
                   interactive
                   extra={(step) => (
                     <ToolControls
                       step={step}
                       tool={tool}
+                      painting={painting === step.id}
                       onTool={(patch) => setTool((current) => ({ ...current, ...patch }))}
                     />
                   )}
+                  footer={(step) => {
+                    const op = step.op;
+                    return isBrushed(op) && step.enabled ? (
+                      <RunControls
+                        op={op}
+                        painting={painting === step.id}
+                        busy={rendering}
+                        onPaint={(on) => setPainting(on ? step.id : null)}
+                        onAgain={() => {
+                          if (op.type === "aiEdit") {
+                            lastCommit.current = 0;
+                            commit(
+                              steps.map((known) =>
+                                known.id === step.id ? { ...known, op: { ...op, variant: op.variant + 1 } } : known,
+                              ),
+                            );
+                          }
+                        }}
+                      />
+                    ) : null;
+                  }}
                 />
                 <div className="editor-recipes">
                   <Select

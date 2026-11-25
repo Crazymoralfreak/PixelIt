@@ -76,7 +76,13 @@
       "ready": "La versión {version} está descargada y se instalará cuando terminen las tareas",
       "installing": "Instalando la versión {version}…",
       "failed": "No se pudieron comprobar las actualizaciones"
-    }
+    },
+    "askTitle": "La versión {version} está disponible",
+    "askText": "Ahora está instalada la versión {current}. ¿Actualizar PixelIt a la versión {version}? El instalador se descarga y se verifica, las tareas en curso terminan y después la aplicación se reinicia.",
+    "skip": "Omitir esta versión",
+    "later": "Más tarde",
+    "install": "Actualizar",
+    "installFailed": "No se pudo instalar la versión {version}"
   },
   "about": {
     "text": "Visualización, edición, procesamiento por lotes y generación de imágenes. Todo funciona en su equipo; el programa se conecta a la red solo cuando usted lo pide.",
@@ -222,7 +228,8 @@
     "removeBackground": "Quitar el fondo",
     "upscale": "Ampliar",
     "restoreFaces": "Restaurar rostros",
-    "inpaint": "Quitar objetos"
+    "inpaint": "Quitar objetos",
+    "aiEdit": "Edición con IA"
   },
   "op": {
     "mode": "Modo",
@@ -327,7 +334,16 @@
       "highlight": "Resaltador",
       "blur": "Desenfoque",
       "pixelate": "Pixelar"
-    }
+    },
+    "keep": "Qué conservar",
+    "keepHint": "Pinte lo que debe quedarse: la eliminación del fondo deja esas zonas intactas.",
+    "editPrompt": "Qué cambiar",
+    "editPromptHint": "Describa cómo debe quedar la imagen o la zona marcada.",
+    "editArea": "Zona",
+    "editAreaHint": "Pinte la zona que quiere cambiar. Sin marca se cambia toda la imagen.",
+    "editStrength": "Intensidad del cambio",
+    "editStrengthHint": "Cuanto mayor es el valor, más se aleja el resultado de la imagen original.",
+    "generatorMissing": "Este paso necesita un generador de imágenes."
   },
   "steps": {
     "empty": "Aún no hay pasos",
@@ -368,7 +384,14 @@
     "tool": "Herramienta",
     "strokeWidth": "Grosor",
     "fill": "Relleno",
-    "textHint": "Escriba el texto y haga clic en la imagen."
+    "textHint": "Escriba el texto y haga clic en la imagen.",
+    "run": "Ejecutar",
+    "editArea": "Cambiar la zona",
+    "markKeep": "Marcar qué conservar",
+    "done": "Listo",
+    "anotherVariant": "Otra variante",
+    "retry": "Reintentar",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "Añadir archivos",
@@ -588,7 +611,8 @@
     "data": "Datos",
     "dataFolder": "Carpeta de datos",
     "portable": "Versión portátil",
-    "logs": "Archivos de registro"
+    "logs": "Archivos de registro",
+    "updateAsk": "PixelIt avisa de una versión nueva y pregunta si debe instalarla. Nada se descarga sin su consentimiento."
   },
   "studio": {
     "tabGenerate": "Generación",
@@ -612,7 +636,8 @@
     "generate": "Generar",
     "slow": "Sin tarjeta gráfica, la generación en este equipo tarda varios minutos por imagen.",
     "emptyTitle": "Aquí aparecerán las imágenes",
-    "emptyText": "Escriba una solicitud y pulse «Generar»."
+    "emptyText": "Escriba una solicitud y pulse «Generar».",
+    "cloudSizeHint": "Un servicio externo solo acepta algunos tamaños. Si rechaza el tamaño indicado, PixelIt pide el más cercano permitido con la misma proporción."
   },
   "vision": {
     "noModelTitle": "No se ha elegido un modelo",
@@ -726,7 +751,11 @@
       "inpaint": "Rellena la zona pintada a partir del entorno.",
       "faces": "Hace más nítidos los rostros de las fotos.",
       "detector": "Encuentra rostros para restaurarlos."
-    }
+    },
+    "keyPaste": "Pegue la clave: se guarda al instante",
+    "allowCloudTitle": "¿Permitir servicios externos?",
+    "allowCloudText": "El servidor {host} está fuera de este equipo y los servicios externos están desactivados. ¿Permitir el acceso a ellos? Los ajustes de esta página se guardarán.",
+    "allowCloudYes": "Permitir"
   },
   "assistant": {
     "newChat": "Nuevo chat",
@@ -871,7 +900,9 @@
     "unknownTool": "Herramienta desconocida: {name}",
     "unsupportedFormat": "El formato del archivo no es compatible",
     "updating": "Ya hay una actualización en curso",
-    "watchFailed": "No se pudo empezar a vigilar la carpeta"
+    "watchFailed": "No se pudo empezar a vigilar la carpeta",
+    "keyMissing": "El servidor {host} pide una clave de acceso. Introduzca la clave en el campo de abajo y vuelva a intentarlo.",
+    "updatePortable": "La versión portátil se actualiza a mano"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt se está actualizando",
       "updateInstallingText": "Se está instalando la versión {version}.",
       "batchDone": "Procesamiento terminado",
-      "batchDoneText": "Listas: {done}, errores: {failed}"
+      "batchDoneText": "Listas: {done}, errores: {failed}",
+      "updateAskText": "Ha salido la versión {version}. Abra PixelIt para instalarla."
     },
     "dialog": {
       "openPictures": "Abrir imágenes",

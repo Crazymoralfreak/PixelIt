@@ -43,7 +43,7 @@ Privacy rules:
 
 ## Updates
 
-On start, the installed version asks GitHub whether a new version is out. A found update is downloaded, its signature is checked, and it installs by itself when no job is running; after the installation PixelIt starts again. Recipes and settings are kept.
+On start, the installed version asks GitHub whether a new version is out. PixelIt tells about the version it found and asks whether to install it: "Update", "Later" or "Skip this version". Nothing is downloaded without consent. After you agree, the installer is downloaded, its signature is checked, and it runs when no job is running; after the installation PixelIt starts again. Recipes and settings are kept.
 
 - The check is turned off in the settings. Without it PixelIt does not contact GitHub on its own.
 - The "beta" channel in the settings offers pre-release versions too.

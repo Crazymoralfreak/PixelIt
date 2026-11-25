@@ -98,6 +98,13 @@ pub fn update_check(core: CoreState<'_>) {
     update::check_now(core.inner());
 }
 
+/// The user agreed to the version found: it is downloaded and installed in
+/// the background, with the progress in `update:status` events.
+#[tauri::command(async)]
+pub fn update_install(core: CoreState<'_>) -> Result<()> {
+    update::install_now(core.inner())
+}
+
 // Jobs
 
 #[tauri::command(async)]

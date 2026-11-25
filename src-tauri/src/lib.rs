@@ -115,6 +115,7 @@ fn run_window() -> i32 {
             commands::changelog,
             commands::update_status,
             commands::update_check,
+            commands::update_install,
             commands::jobs_list,
             commands::job_cancel,
             commands::job_pause,

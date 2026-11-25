@@ -30,7 +30,8 @@ rotate{angle,expand}; flip{horizontal,vertical}; \
 adjust{exposure,brightness,contrast,highlights,shadows,saturation,vibrance,temperature,tint (each -100..100)}; \
 filter{kind:sharpen|blur|denoise|grain|vignette|grayscale|sepia|invert,amount,radius}; \
 watermark{kind:text|image,text,image,size,scale,anchor,margin,opacity,tile}; \
-removeBackground{background:'#rrggbb' or null}; upscale{factor:2|4}; restoreFaces{strength:0..100}. \
+removeBackground{background:'#rrggbb' or null}; upscale{factor:2|4}; restoreFaces{strength:0..100}; \
+aiEdit{prompt,strength:0..100} (changes the whole picture with the image generator of the settings). \
 Output fields: format (same|auto|jpeg|png|webp|avif|jxl|tiff|gif|bmp), quality 1..100, lossless, \
 target {kind:'bytes',bytes} or {kind:'quality',score}, metadata {mode:keep|strip}, \
 naming (template such as '{name}-{width}'), conflict (rename|skip). Omitted fields take defaults.";

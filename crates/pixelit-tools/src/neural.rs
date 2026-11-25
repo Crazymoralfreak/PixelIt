@@ -106,6 +106,7 @@ fn remove_background(context: &ToolContext, arguments: &Value) -> Result<Value> 
         Op::RemoveBackground(RemoveBackground {
             model: String::new(),
             background,
+            keep: Vec::new(),
         }),
         OutputFormat::Png,
     )

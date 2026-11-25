@@ -4,7 +4,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use chrono::Local;
 use pixelit_codecs::{decode_file, DecodeOptions, Decoded};
 use pixelit_core::image::{Animation, Frame};
 use pixelit_core::naming::{self, NameParts};
@@ -14,6 +13,7 @@ use pixelit_core::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::clock::LocalTime;
 use crate::compress::{self, Encoded};
 use crate::fonts::FileResources;
 use crate::fsops::{self, UndoRecord, Written};
@@ -151,9 +151,7 @@ pub fn output_path(
     width: u32,
     height: u32,
 ) -> PathBuf {
-    let now = Local::now();
-    let date = now.format("%Y-%m-%d").to_string();
-    let time = now.format("%H-%M-%S").to_string();
+    let now = LocalTime::now();
     let name = text_of(item.source.file_stem());
     let ext = text_of(item.source.extension());
     let parent = text_of(item.source.parent().and_then(Path::file_name));
@@ -163,9 +161,9 @@ pub fn output_path(
         width,
         height,
         index: item.index,
-        date: &date,
-        time: &time,
-        timestamp: now.timestamp(),
+        date: &now.date,
+        time: &now.time,
+        timestamp: now.timestamp,
         format: format.name(),
         parent: &parent,
         ai_name: &item.ai_name,

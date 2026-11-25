@@ -8,6 +8,7 @@ import { useT } from "../i18n";
 import { AI_KINDS, newStep, OP_KINDS } from "../lib/pipeline";
 import type {
   AdjustOp,
+  AiEditOp,
   Anchor,
   ComponentKind,
   CropOp,
@@ -20,9 +21,22 @@ import type {
   ResizeOp,
   RotateOp,
   Step,
+  Stroke,
   WatermarkOp,
 } from "../types";
-import { Button, Checkbox, ColorInput, cx, Field, NumberInput, Segmented, Select, Slider, TextInput } from "../ui";
+import {
+  Button,
+  Checkbox,
+  ColorInput,
+  cx,
+  Field,
+  NumberInput,
+  Segmented,
+  Select,
+  Slider,
+  TextArea,
+  TextInput,
+} from "../ui";
 import { PathField } from "./PathField";
 
 const RESIZE_MODES: readonly ResizeMode[] = [
@@ -445,6 +459,63 @@ function WatermarkForm({ op, onChange }: { op: WatermarkOp; onChange: (op: Op) =
   );
 }
 
+/** An area painted with the brush: how many strokes it has, and the ways to take them back. */
+function StrokesField({
+  label,
+  hint,
+  strokes,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  strokes: Stroke[];
+  onChange: (strokes: Stroke[]) => void;
+}) {
+  const { t } = useT();
+  return (
+    <Field label={label} hint={hint}>
+      <span>{strokes.length}</span>
+      <Button small disabled={strokes.length === 0} onClick={() => onChange(strokes.slice(0, -1))}>
+        {t("op.removeLast")}
+      </Button>
+      <Button small disabled={strokes.length === 0} onClick={() => onChange([])}>
+        {t("common.clear")}
+      </Button>
+    </Field>
+  );
+}
+
+function AiEditForm({ op, onChange, interactive }: { op: AiEditOp; onChange: (op: Op) => void; interactive: boolean }) {
+  const { t } = useT();
+  const { ai, navigate } = useApp();
+  return (
+    <>
+      {ai && !ai.capabilities.generation ? (
+        <Field label="">
+          <span className="inline-note">
+            {t("op.generatorMissing")}
+            <Button small onClick={() => navigate("ai")}>
+              {t("op.openModels")}
+            </Button>
+          </span>
+        </Field>
+      ) : null}
+      <Field label={t("op.editPrompt")} hint={t("op.editPromptHint")}>
+        <TextArea value={op.prompt} onChange={(prompt) => onChange({ ...op, prompt })} rows={3} />
+      </Field>
+      <StrokesField
+        label={t("op.editArea")}
+        hint={interactive ? t("op.editAreaHint") : t("op.drawInEditor")}
+        strokes={op.strokes}
+        onChange={(strokes) => onChange({ ...op, strokes })}
+      />
+      <Field label={t("op.editStrength")} hint={t("op.editStrengthHint")}>
+        <Slider value={op.strength} onChange={(strength) => onChange({ ...op, strength })} min={5} max={100} reset={75} />
+      </Field>
+    </>
+  );
+}
+
 interface OpFormProps {
   op: Op;
   onChange: (op: Op) => void;
@@ -510,6 +581,14 @@ function OpForm({ op, onChange, interactive }: OpFormProps) {
               <ColorInput value={op.background} onChange={(background) => onChange({ ...op, background })} />
             )}
           </Field>
+          {interactive || op.keep.length > 0 ? (
+            <StrokesField
+              label={t("op.keep")}
+              hint={interactive ? t("op.keepHint") : t("op.drawInEditor")}
+              strokes={op.keep}
+              onChange={(keep) => onChange({ ...op, keep })}
+            />
+          ) : null}
         </>
       );
     case "upscale":
@@ -544,25 +623,26 @@ function OpForm({ op, onChange, interactive }: OpFormProps) {
     case "inpaint":
       return (
         <>
-          <Field label={t("op.mask")} hint={interactive ? t("op.maskHint") : t("op.drawInEditor")}>
-            <span>{op.strokes.length}</span>
-            <Button small disabled={op.strokes.length === 0} onClick={() => onChange({ ...op, strokes: op.strokes.slice(0, -1) })}>
-              {t("op.removeLast")}
-            </Button>
-            <Button small disabled={op.strokes.length === 0} onClick={() => onChange({ ...op, strokes: [] })}>
-              {t("common.clear")}
-            </Button>
-          </Field>
-          <Field label={t("op.prompt")} hint={t("op.promptHint")}>
-            <TextInput value={op.prompt} onChange={(prompt) => onChange({ ...op, prompt })} wide />
-          </Field>
-          {op.prompt.trim() === "" ? (
+          <StrokesField
+            label={t("op.mask")}
+            hint={interactive ? t("op.maskHint") : t("op.drawInEditor")}
+            strokes={op.strokes}
+            onChange={(strokes) => onChange({ ...op, strokes })}
+          />
+          {op.prompt === "" ? (
             <Field label={t("op.model")}>
               <ModelSelect kind="inpaint" value={op.model} onChange={(model) => onChange({ ...op, model })} />
             </Field>
-          ) : null}
+          ) : (
+            // Recipes made before the "AI edit" step keep their prompt; new ones use that step.
+            <Field label={t("op.prompt")} hint={t("op.promptHint")}>
+              <TextInput value={op.prompt} onChange={(prompt) => onChange({ ...op, prompt })} wide />
+            </Field>
+          )}
         </>
       );
+    case "aiEdit":
+      return <AiEditForm op={op} onChange={onChange} interactive={interactive} />;
     default: {
       const unreachable: never = op;
       return unreachable;
@@ -578,10 +658,20 @@ interface StepsEditorProps {
   onSelect?: (id: string | null) => void;
   /** Controls the host adds to the open step, such as the tools of a canvas. */
   extra?: (step: Step) => ReactNode;
+  /** What the host puts under the form of the open step, such as the button that runs it. */
+  footer?: (step: Step) => ReactNode;
   interactive?: boolean;
 }
 
-export function StepsEditor({ steps, onChange, selected, onSelect, extra, interactive = false }: StepsEditorProps) {
+export function StepsEditor({
+  steps,
+  onChange,
+  selected,
+  onSelect,
+  extra,
+  footer,
+  interactive = false,
+}: StepsEditorProps) {
   const { t, td } = useT();
   const [own, setOwn] = useState<string | null>(null);
   const open = selected === undefined ? own : selected;
@@ -657,6 +747,7 @@ export function StepsEditor({ steps, onChange, selected, onSelect, extra, intera
               <div className="step-body">
                 {extra?.(step)}
                 <OpForm op={step.op} onChange={(op) => replace(step.id, { op })} interactive={interactive} />
+                {footer?.(step)}
               </div>
             ) : null}
           </div>

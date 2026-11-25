@@ -76,7 +76,13 @@
       "ready": "版本 {version} 已下载，将在任务结束后安装",
       "installing": "正在安装版本 {version}…",
       "failed": "无法检查更新"
-    }
+    },
+    "askTitle": "版本 {version} 可用",
+    "askText": "当前安装的版本是 {current}。是否将 PixelIt 更新到版本 {version}？安装程序将被下载并校验，正在运行的任务完成后应用会重新启动。",
+    "skip": "跳过此版本",
+    "later": "稍后",
+    "install": "更新",
+    "installFailed": "无法安装版本 {version}"
   },
   "about": {
     "text": "查看、编辑、批量处理和生成图像。一切都在您的电脑上运行；只有在您要求时程序才会联网。",
@@ -222,7 +228,8 @@
     "removeBackground": "移除背景",
     "upscale": "放大",
     "restoreFaces": "修复人脸",
-    "inpaint": "移除物体"
+    "inpaint": "移除物体",
+    "aiEdit": "AI 编辑"
   },
   "op": {
     "mode": "模式",
@@ -327,7 +334,16 @@
       "highlight": "荧光笔",
       "blur": "模糊",
       "pixelate": "马赛克"
-    }
+    },
+    "keep": "保留区域",
+    "keepHint": "用画笔涂抹需要保留的部分：去除背景时不会改动这些位置。",
+    "editPrompt": "修改内容",
+    "editPromptHint": "描述图像或所选区域应变成什么样。",
+    "editArea": "区域",
+    "editAreaHint": "用画笔涂抹需要修改的位置。未涂抹时修改整幅图像。",
+    "editStrength": "修改强度",
+    "editStrengthHint": "数值越大，结果与原图的差别越大。",
+    "generatorMissing": "此步骤需要图像生成器。"
   },
   "steps": {
     "empty": "还没有步骤",
@@ -368,7 +384,14 @@
     "tool": "工具",
     "strokeWidth": "粗细",
     "fill": "填充",
-    "textHint": "输入文字，然后点击图像。"
+    "textHint": "输入文字，然后点击图像。",
+    "run": "执行",
+    "editArea": "修改区域",
+    "markKeep": "标记保留区域",
+    "done": "完成",
+    "anotherVariant": "换一个结果",
+    "retry": "重试",
+    "stepFailed": "{step}：{error}"
   },
   "batch": {
     "addFiles": "添加文件",
@@ -588,7 +611,8 @@
     "data": "数据",
     "dataFolder": "数据文件夹",
     "portable": "便携版",
-    "logs": "日志文件"
+    "logs": "日志文件",
+    "updateAsk": "PixelIt 会提示有新版本并询问是否安装。未经您同意不会下载任何内容。"
   },
   "studio": {
     "tabGenerate": "生成",
@@ -612,7 +636,8 @@
     "generate": "生成",
     "slow": "没有显卡时，这台电脑每生成一张图像需要几分钟。",
     "emptyTitle": "图像将显示在这里",
-    "emptyText": "输入提示词，然后点击“生成”。"
+    "emptyText": "输入提示词，然后点击“生成”。",
+    "cloudSizeHint": "外部服务只接受部分尺寸。如果它拒绝此处设置的尺寸，PixelIt 会请求宽高比相同的最接近的可用尺寸。"
   },
   "vision": {
     "noModelTitle": "尚未选择模型",
@@ -726,7 +751,11 @@
       "inpaint": "根据周围内容填充涂抹的区域。",
       "faces": "让照片中的人脸更清晰。",
       "detector": "找出需要修复的人脸。"
-    }
+    },
+    "keyPaste": "粘贴密钥后立即保存",
+    "allowCloudTitle": "允许外部服务？",
+    "allowCloudText": "服务器 {host} 不在这台电脑上，而外部服务目前处于关闭状态。是否允许访问？本页的设置将被保存。",
+    "allowCloudYes": "允许"
   },
   "assistant": {
     "newChat": "新对话",
@@ -871,7 +900,9 @@
     "unknownTool": "未知工具：{name}",
     "unsupportedFormat": "不支持该文件格式",
     "updating": "更新已在进行中",
-    "watchFailed": "无法开始监视文件夹"
+    "watchFailed": "无法开始监视文件夹",
+    "keyMissing": "服务器 {host} 需要访问密钥。请在下方的字段中输入密钥后重试。",
+    "updatePortable": "便携版需要手动更新"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt 正在更新",
       "updateInstallingText": "正在安装版本 {version}。",
       "batchDone": "处理完成",
-      "batchDoneText": "完成：{done}，出错：{failed}"
+      "batchDoneText": "完成：{done}，出错：{failed}",
+      "updateAskText": "版本 {version} 已发布。打开 PixelIt 即可安装。"
     },
     "dialog": {
       "openPictures": "打开图像",

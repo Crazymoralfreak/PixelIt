@@ -32,7 +32,7 @@ pixelit-mcp = { path = "crates/pixelit-mcp" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rayon = "1.12"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+time = { version = "0.3", default-features = false, features = ["std", "local-offset"] }
 fastrand = "2"
 base64 = "0.22"
 tracing = "0.1"

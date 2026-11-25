@@ -1,10 +1,11 @@
 //! Updates from the GitHub releases of PixelIt, asked for only when the
 //! setting allows it or the user presses "Check for updates".
 //!
-//! A copy put in place by the installer downloads the new installer, checks
-//! its signature and runs it once no job is running; the installer starts
-//! PixelIt again. A portable copy cannot replace itself, so it only tells
-//! that a newer version exists.
+//! A check only tells that a newer version exists; nothing is downloaded
+//! until the user agrees. A copy put in place by the installer then downloads
+//! the new installer, checks its signature and runs it once no job is
+//! running; the installer starts PixelIt again. A portable copy cannot
+//! replace itself, so it only tells that a newer version exists.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
@@ -15,6 +16,7 @@ use serde::Serialize;
 use tauri::{Emitter, Url};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
+use pixelit_core::{Error, Result};
 use pixelit_engine::settings::UpdateChannel;
 
 use crate::app::Core;
@@ -46,8 +48,10 @@ pub enum UpdateState {
     Idle,
     Checking,
     UpToDate,
+    /// A newer version exists; the user decides whether to install it.
     Available,
     Downloading,
+    /// Downloaded and checked; waits for the running jobs to finish.
     Ready,
     Installing,
     Failed,
@@ -80,8 +84,10 @@ pub fn installed_copy() -> bool {
 /// What is known about updates in this session.
 pub struct Tracker {
     status: Mutex<UpdateStatus>,
-    /// One check at a time, whoever asked for it.
+    /// One check or installation at a time, whoever asked for it.
     busy: AtomicBool,
+    /// The version the last check found, kept until the user decides about it.
+    found: Mutex<Option<Update>>,
 }
 
 impl Tracker {
@@ -96,6 +102,7 @@ impl Tracker {
                 portable: !installed_copy(),
             }),
             busy: AtomicBool::new(false),
+            found: Mutex::new(None),
         }
     }
 
@@ -111,6 +118,17 @@ impl Tracker {
         change(&mut status);
         status.clone()
     }
+
+    fn keep(&self, update: Option<Update>) {
+        *self.found.lock().unwrap_or_else(PoisonError::into_inner) = update;
+    }
+
+    fn found(&self) -> Option<Update> {
+        self.found
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
 }
 
 impl Default for Tracker {
@@ -125,7 +143,7 @@ pub fn check_at_startup(core: &Arc<Core>) {
     spawn(move || {
         thread::sleep(STARTUP_DELAY);
         if core.engine.settings().check_updates {
-            run(&core);
+            alone(&core, check);
         }
     });
 }
@@ -133,7 +151,18 @@ pub fn check_at_startup(core: &Arc<Core>) {
 /// The check asked for by the user. The result arrives as `update:status` events.
 pub fn check_now(core: &Arc<Core>) {
     let core = Arc::clone(core);
-    spawn(move || run(&core));
+    spawn(move || alone(&core, check));
+}
+
+/// The user agreed to the version the last check found: it is downloaded and
+/// installed in the background. The progress arrives as `update:status` events.
+pub fn install_now(core: &Arc<Core>) -> Result<()> {
+    if core.updates.status().portable {
+        return Err(Error::new("updatePortable"));
+    }
+    let core = Arc::clone(core);
+    spawn(move || alone(&core, install));
+    Ok(())
 }
 
 fn spawn(work: impl FnOnce() + Send + 'static) {
@@ -141,6 +170,15 @@ fn spawn(work: impl FnOnce() + Send + 'static) {
     let _ = thread::Builder::new()
         .name(String::from("pixelit-update"))
         .spawn(work);
+}
+
+/// Runs one piece of work with updates at a time; a second request is dropped.
+fn alone(core: &Arc<Core>, work: fn(&Arc<Core>)) {
+    if core.updates.busy.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    work(core);
+    core.updates.busy.store(false, Ordering::SeqCst);
 }
 
 fn set(core: &Core, state: UpdateState, version: Option<&str>) {
@@ -152,14 +190,6 @@ fn set(core: &Core, state: UpdateState, version: Option<&str>) {
         }
     });
     let _ = core.app().emit("update:status", &status);
-}
-
-fn run(core: &Arc<Core>) {
-    if core.updates.busy.swap(true, Ordering::SeqCst) {
-        return;
-    }
-    check_and_install(core);
-    core.updates.busy.store(false, Ordering::SeqCst);
 }
 
 fn find(core: &Core) -> tauri_plugin_updater::Result<Option<Update>> {
@@ -176,11 +206,13 @@ fn find(core: &Core) -> tauri_plugin_updater::Result<Option<Update>> {
     tauri::async_runtime::block_on(builder.build()?.check())
 }
 
-fn check_and_install(core: &Arc<Core>) {
+/// Looks for a newer version and tells about it. Nothing is downloaded here.
+fn check(core: &Arc<Core>) {
     set(core, UpdateState::Checking, None);
-    let mut update = match find(core) {
+    let update = match find(core) {
         Ok(Some(update)) => update,
         Ok(None) => {
+            core.updates.keep(None);
             set(core, UpdateState::UpToDate, None);
             return;
         }
@@ -197,18 +229,42 @@ fn check_and_install(core: &Arc<Core>) {
         status.downloaded = 0;
         status.total = 0;
     });
+    core.updates.keep(Some(update));
+    set(core, UpdateState::Available, Some(&version));
 
-    if core.updates.status().portable {
-        set(core, UpdateState::Available, Some(&version));
-        announce(
-            core,
-            "native.notify.updateAvailable",
-            "native.notify.updateAvailableText",
-            &version,
-        );
+    // A version the user chose to skip stays visible in the settings and is
+    // not brought up again.
+    if core.engine.settings().skipped_version == version {
         return;
     }
+    let body = if core.updates.status().portable {
+        "native.notify.updateAvailableText"
+    } else {
+        "native.notify.updateAskText"
+    };
+    announce(core, "native.notify.updateAvailable", body, &version);
+}
 
+/// Downloads the version the user agreed to and hands over to its installer.
+fn install(core: &Arc<Core>) {
+    // Without a finished check there is nothing to agree to yet: ask now.
+    let found = match core.updates.found() {
+        Some(update) => Some(update),
+        None => find(core).unwrap_or_else(|error| {
+            tracing::info!("update check failed: {error}");
+            None
+        }),
+    };
+    let Some(mut update) = found else {
+        set(core, UpdateState::Failed, None);
+        return;
+    };
+    let version = update.version.clone();
+
+    core.updates.change(|status| {
+        status.downloaded = 0;
+        status.total = 0;
+    });
     set(core, UpdateState::Downloading, Some(&version));
     update.timeout = Some(DOWNLOAD_TIMEOUT);
     let progress = |chunk: usize, total: Option<u64>| {
@@ -252,6 +308,7 @@ fn check_and_install(core: &Arc<Core>) {
     }
 }
 
+/// The version stays known, so the user can ask for it once more.
 fn failed(core: &Core, version: &str, message: &str) {
     tracing::warn!(version, "update failed: {message}");
     set(core, UpdateState::Failed, Some(version));

@@ -17,7 +17,7 @@ use std::sync::Arc;
 use serde_json::{json, Value};
 
 use pixelit_ai::{Ai, ToolSpec};
-use pixelit_core::pipeline::{Conflict, Destination, Op, Pipeline};
+use pixelit_core::pipeline::{Conflict, Destination, Pipeline};
 use pixelit_core::{CancelToken, Error, Result};
 use pixelit_engine::batch::{self, BatchReport, BatchRequest};
 use pixelit_engine::settings::AgentAccess;
@@ -120,10 +120,10 @@ pub fn restrict(
         pipeline.output.replace_original = false;
         notes.push("Deleting files is switched off for agents; the source files were kept.");
     }
-    let repaints = pipeline.steps.iter().any(|step| {
-        step.enabled
-            && matches!(&step.op, Op::Inpaint(inpaint) if !inpaint.prompt.trim().is_empty())
-    });
+    let repaints = pipeline
+        .steps
+        .iter()
+        .any(|step| step.enabled && step.op.uses_generator());
     if repaints {
         context.check_cloud(context.ai.generation_leaves_computer())?;
     }

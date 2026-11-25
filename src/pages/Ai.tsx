@@ -1,8 +1,8 @@
 // Everything about models: what is installed on this computer, which
 // servers PixelIt talks to, and MCP.
 
-import { useEffect, useState } from "react";
-import { api } from "../api";
+import { useEffect, useRef, useState } from "react";
+import { api, toAppError } from "../api";
 import { useApp } from "../app/context";
 import { JobRow } from "../components/JobsPanel";
 import { PathField } from "../components/PathField";
@@ -11,6 +11,7 @@ import { formatBytes } from "../lib/format";
 import type {
   AiSettings,
   AiStatus,
+  AppError,
   ComponentKind,
   ComponentStatus,
   Endpoint,
@@ -47,6 +48,8 @@ const KINDS: readonly ComponentKind[] = [
 /** Tasks the one-click setup covers with one model each. */
 const STARTER_KINDS: readonly ComponentKind[] = ["background", "upscale", "inpaint", "faces"];
 const PROVIDERS: readonly GenerationProvider[] = ["none", "comfy", "forge", "sdCpp", "cloud"];
+/** Answers of a server that mean "the key is missing or wrong". */
+const KEY_STATUSES: readonly string[] = ["401", "403"];
 const SERVER_NAMES: Record<FoundServer["kind"], string> = {
   ollama: "Ollama",
   lmStudio: "LM Studio",
@@ -63,16 +66,31 @@ function hostOf(url: string): string {
   }
 }
 
-/** The key of a server, kept in the Windows Credential Manager and never shown again. */
-function KeyField({ url }: { url: string }) {
+/** The key of a server: whether one is stored, and the text typed for a new one. */
+interface ServerKey {
+  host: string;
+  stored: boolean;
+  typed: string;
+  setTyped: (text: string) => void;
+  /** Stores the text as the key of the server; resolves to `false` when the store refuses it. */
+  save: (text: string) => Promise<boolean>;
+  remove: () => void;
+}
+
+/**
+ * The key of the server at `url`, kept in the Windows Credential Manager and
+ * never shown again.
+ */
+function useServerKey(url: string): ServerKey {
   const { t } = useT();
   const { notify, showError } = useApp();
   const host = hostOf(url);
   const [stored, setStored] = useState(false);
-  const [key, setKey] = useState("");
+  const [typed, setTyped] = useState("");
+  const saving = useRef<Promise<boolean> | null>(null);
 
   useEffect(() => {
-    setKey("");
+    setTyped("");
     if (host === "") {
       setStored(false);
       return;
@@ -87,6 +105,48 @@ function KeyField({ url }: { url: string }) {
     };
   }, [host]);
 
+  const save = (text: string): Promise<boolean> => {
+    // Leaving the field and pressing a button arrive together: both wait for the same answer.
+    if (saving.current) {
+      return saving.current;
+    }
+    const key = text.trim();
+    if (host === "" || key === "") {
+      return Promise.resolve(false);
+    }
+    const answer = api
+      .aiKeySet(host, key)
+      .then(() => {
+        setStored(true);
+        setTyped("");
+        notify(t("ai.keySaved"));
+        return true;
+      })
+      .catch((error: unknown) => {
+        showError(error);
+        return false;
+      })
+      .finally(() => {
+        saving.current = null;
+      });
+    saving.current = answer;
+    return answer;
+  };
+
+  const remove = () => {
+    api
+      .aiKeyDelete(host)
+      .then(() => setStored(false))
+      .catch(showError);
+  };
+
+  return { host, stored, typed, setTyped, save, remove };
+}
+
+/** The field of a key. A pasted key is stored at once, a typed one when the field is left. */
+function KeyField({ serverKey }: { serverKey: ServerKey }) {
+  const { t } = useT();
+  const { host, stored, typed, setTyped, save, remove } = serverKey;
   if (host === "") {
     return null;
   }
@@ -95,35 +155,33 @@ function KeyField({ url }: { url: string }) {
       {stored ? (
         <>
           <Tag tone="ok">{t("ai.keyStored")}</Tag>
-          <Button
-            small
-            onClick={() =>
-              api
-                .aiKeyDelete(host)
-                .then(() => setStored(false))
-                .catch(showError)
-            }
-          >
+          <Button small onClick={remove}>
             {t("common.delete")}
           </Button>
         </>
       ) : (
         <>
-          <TextInput value={key} onChange={setKey} type="password" autoComplete="off" />
-          <Button
-            small
-            disabled={key.trim() === ""}
-            onClick={() =>
-              api
-                .aiKeySet(host, key.trim())
-                .then(() => {
-                  setStored(true);
-                  setKey("");
-                  notify(t("ai.keySaved"));
-                })
-                .catch(showError)
-            }
-          >
+          <TextInput
+            value={typed}
+            onChange={setTyped}
+            type="password"
+            autoComplete="off"
+            placeholder={t("ai.keyPaste")}
+            onPaste={(event) => {
+              const pasted = event.clipboardData.getData("text").trim();
+              if (pasted !== "") {
+                event.preventDefault();
+                void save(pasted);
+              }
+            }}
+            onBlur={() => void save(typed)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                void save(typed);
+              }
+            }}
+          />
+          <Button small disabled={typed.trim() === ""} onClick={() => void save(typed)}>
             {t("common.save")}
           </Button>
         </>
@@ -132,10 +190,49 @@ function KeyField({ url }: { url: string }) {
   );
 }
 
-function EndpointFields({ value, onChange }: { value: Endpoint; onChange: (value: Endpoint) => void }) {
+interface EndpointFieldsProps {
+  value: Endpoint;
+  onChange: (value: Endpoint) => void;
+  /**
+   * Asks to switch the outside services on for the server at `host` and
+   * saves the answer; resolves to `true` when they are allowed now.
+   */
+  onAllowCloud: (host: string) => Promise<boolean>;
+}
+
+function EndpointFields({ value, onChange, onAllowCloud }: EndpointFieldsProps) {
   const { t } = useT();
   const { showError } = useApp();
   const [models, setModels] = useState<string[]>([]);
+  const [listing, setListing] = useState(false);
+  const serverKey = useServerKey(value.url);
+
+  const listModels = async () => {
+    setListing(true);
+    try {
+      // A key that is typed and not stored yet is what the server is about to ask for.
+      const hasKey = serverKey.stored || (await serverKey.save(serverKey.typed));
+      let list: string[];
+      try {
+        list = await api.aiModels(value.url);
+      } catch (error) {
+        const failure = toAppError(error);
+        if (failure.code === "cloudDisabled" && (await onAllowCloud(failure.params?.host ?? serverKey.host))) {
+          list = await api.aiModels(value.url);
+        } else if (failure.code === "httpStatus" && KEY_STATUSES.includes(failure.params?.status ?? "") && !hasKey) {
+          const missing: AppError = { code: "keyMissing", params: { host: serverKey.host } };
+          throw missing;
+        } else {
+          throw error;
+        }
+      }
+      setModels(list);
+    } catch (error) {
+      showError(error);
+    } finally {
+      setListing(false);
+    }
+  };
 
   return (
     <>
@@ -149,8 +246,8 @@ function EndpointFields({ value, onChange }: { value: Endpoint; onChange: (value
       </Field>
       <Field label={t("op.model")}>
         <TextInput value={value.model} onChange={(model) => onChange({ ...value, model })} />
-        <Button small disabled={value.url.trim() === ""} onClick={() => api.aiModels(value.url).then(setModels).catch(showError)}>
-          {t("ai.listModels")}
+        <Button small disabled={value.url.trim() === "" || listing} onClick={() => void listModels()}>
+          {listing ? t("common.working") : t("ai.listModels")}
         </Button>
         {models.length > 0 ? (
           <Select
@@ -160,7 +257,7 @@ function EndpointFields({ value, onChange }: { value: Endpoint; onChange: (value
           />
         ) : null}
       </Field>
-      <KeyField url={value.url} />
+      <KeyField serverKey={serverKey} />
     </>
   );
 }
@@ -357,9 +454,16 @@ function ComponentsTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings
   );
 }
 
-function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSettings) => void }) {
+function ProvidersTab({
+  ai,
+  onSettings,
+}: {
+  ai: AiStatus;
+  /** Saves the settings; resolves to `false` when the core refuses them. */
+  onSettings: (settings: AiSettings) => Promise<boolean>;
+}) {
   const { t, td } = useT();
-  const { notify, showError } = useApp();
+  const { notify, showError, confirm } = useApp();
   const [draft, setDraft] = useState(ai.settings);
   const [found, setFound] = useState<FoundServer[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -388,6 +492,25 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
 
   const assignServer = (server: FoundServer, role: "vision" | "assistant") =>
     setDraft({ ...draft, [role]: { url: server.url, model: server.models[0] ?? "" } });
+
+  /**
+   * A server outside this computer was asked while the outside services are
+   * off. With the consent of the user they are switched on and the settings
+   * on this page are saved as they stand, so nothing typed is lost.
+   */
+  const allowCloud = async (host: string) => {
+    const agreed = await confirm({
+      title: t("ai.allowCloudTitle"),
+      text: t("ai.allowCloudText", { host }),
+      confirmLabel: t("ai.allowCloudYes"),
+    });
+    if (!agreed) {
+      return false;
+    }
+    const next = { ...draft, allowCloud: true };
+    setDraft(next);
+    return onSettings(next);
+  };
 
   return (
     <>
@@ -458,7 +581,11 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
         defaultOpen={false}
       >
         <p className="tool-text">{t("ai.visionText")}</p>
-        <EndpointFields value={draft.vision} onChange={(vision) => setDraft({ ...draft, vision })} />
+        <EndpointFields
+          value={draft.vision}
+          onChange={(vision) => setDraft({ ...draft, vision })}
+          onAllowCloud={allowCloud}
+        />
       </Section>
 
       <Section
@@ -468,7 +595,11 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
         defaultOpen={false}
       >
         <p className="tool-text">{t("ai.assistantText")}</p>
-        <EndpointFields value={draft.assistant} onChange={(assistant) => setDraft({ ...draft, assistant })} />
+        <EndpointFields
+          value={draft.assistant}
+          onChange={(assistant) => setDraft({ ...draft, assistant })}
+          onAllowCloud={allowCloud}
+        />
       </Section>
 
       <Section
@@ -531,7 +662,11 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
           </>
         ) : null}
         {generation.provider === "cloud" ? (
-          <EndpointFields value={generation.cloud} onChange={(cloud) => setGeneration({ cloud })} />
+          <EndpointFields
+            value={generation.cloud}
+            onChange={(cloud) => setGeneration({ cloud })}
+            onAllowCloud={allowCloud}
+          />
         ) : null}
         {generation.provider === "none" ? null : (
           <>
@@ -556,7 +691,7 @@ function ProvidersTab({ ai, onSettings }: { ai: AiStatus; onSettings: (settings:
         <Button disabled={!changed} onClick={() => setDraft(ai.settings)}>
           {t("common.reset")}
         </Button>
-        <Button variant="primary" disabled={!changed} onClick={() => onSettings(draft)}>
+        <Button variant="primary" disabled={!changed} onClick={() => void onSettings(draft)}>
           {t("common.save")}
         </Button>
       </div>
@@ -575,8 +710,15 @@ export default function AiPage({ active }: { active: boolean }) {
     }
   }, [active, refreshAi]);
 
-  const saveSettings = (settings: AiSettings) => {
-    api.aiSettingsSet(settings).then(refreshAi).catch(showError);
+  const saveSettings = async (settings: AiSettings) => {
+    try {
+      await api.aiSettingsSet(settings);
+      refreshAi();
+      return true;
+    } catch (error) {
+      showError(error);
+      return false;
+    }
   };
 
   return (

@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod batch;
+pub mod clock;
 pub mod compose;
 pub mod compress;
 pub mod duplicates;

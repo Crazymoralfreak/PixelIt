@@ -76,7 +76,13 @@
       "ready": "バージョン {version} をダウンロードしました。タスクの終了後にインストールされます",
       "installing": "バージョン {version} をインストールしています…",
       "failed": "更新を確認できませんでした"
-    }
+    },
+    "askTitle": "バージョン {version} を利用できます",
+    "askText": "現在のバージョンは {current} です。PixelIt をバージョン {version} に更新しますか？インストーラーをダウンロードして検証し、実行中のジョブが終わってからアプリを再起動します。",
+    "skip": "このバージョンをスキップ",
+    "later": "後で",
+    "install": "更新",
+    "installFailed": "バージョン {version} をインストールできませんでした"
   },
   "about": {
     "text": "画像の表示、編集、一括処理、生成。すべてお使いのコンピューター上で動作し、ネットワークに接続するのは操作を行ったときだけです。",
@@ -222,7 +228,8 @@
     "removeBackground": "背景の削除",
     "upscale": "拡大",
     "restoreFaces": "顔の復元",
-    "inpaint": "オブジェクトの削除"
+    "inpaint": "オブジェクトの削除",
+    "aiEdit": "AI 編集"
   },
   "op": {
     "mode": "モード",
@@ -327,7 +334,16 @@
       "highlight": "蛍光ペン",
       "blur": "ぼかし",
       "pixelate": "モザイク"
-    }
+    },
+    "keep": "残す範囲",
+    "keepHint": "残したい部分をブラシで塗ってください。背景の削除はその部分を変更しません。",
+    "editPrompt": "変更内容",
+    "editPromptHint": "画像または選択した範囲をどのようにしたいかを書いてください。",
+    "editArea": "範囲",
+    "editAreaHint": "変更したい部分をブラシで塗ってください。何も塗らない場合は画像全体が変更されます。",
+    "editStrength": "変更の強さ",
+    "editStrengthHint": "値が大きいほど、結果は元の画像から離れます。",
+    "generatorMissing": "このステップには画像生成器が必要です。"
   },
   "steps": {
     "empty": "ステップはまだありません",
@@ -368,7 +384,14 @@
     "tool": "ツール",
     "strokeWidth": "太さ",
     "fill": "塗りつぶし",
-    "textHint": "テキストを入力して、画像をクリックしてください。"
+    "textHint": "テキストを入力して、画像をクリックしてください。",
+    "run": "実行",
+    "editArea": "範囲を変更",
+    "markKeep": "残す範囲を指定",
+    "done": "完了",
+    "anotherVariant": "別の候補",
+    "retry": "再試行",
+    "stepFailed": "{step}：{error}"
   },
   "batch": {
     "addFiles": "ファイルを追加",
@@ -588,7 +611,8 @@
     "data": "データ",
     "dataFolder": "データフォルダー",
     "portable": "ポータブル版",
-    "logs": "ログファイル"
+    "logs": "ログファイル",
+    "updateAsk": "PixelIt は新しいバージョンを知らせ、インストールするかどうかを確認します。同意なしには何もダウンロードされません。"
   },
   "studio": {
     "tabGenerate": "生成",
@@ -612,7 +636,8 @@
     "generate": "生成",
     "slow": "グラフィックカードがない場合、このコンピューターでは 1 枚の生成に数分かかります。",
     "emptyTitle": "画像はここに表示されます",
-    "emptyText": "プロンプトを入力して「生成」を押してください。"
+    "emptyText": "プロンプトを入力して「生成」を押してください。",
+    "cloudSizeHint": "外部サービスは一部のサイズだけを受け付けます。指定したサイズが拒否された場合、PixelIt は同じ縦横比でいちばん近い許可サイズを要求します。"
   },
   "vision": {
     "noModelTitle": "モデルが選ばれていません",
@@ -726,7 +751,11 @@
       "inpaint": "塗った範囲を周囲に合わせて埋めます。",
       "faces": "写真の顔をくっきりさせます。",
       "detector": "復元する顔を見つけます。"
-    }
+    },
+    "keyPaste": "キーを貼り付けるとすぐに保存されます",
+    "allowCloudTitle": "外部サービスを許可しますか？",
+    "allowCloudText": "サーバー {host} はこのコンピューターの外にあり、外部サービスは現在オフになっています。利用を許可しますか？このページの設定は保存されます。",
+    "allowCloudYes": "許可"
   },
   "assistant": {
     "newChat": "新しいチャット",
@@ -871,7 +900,9 @@
     "unknownTool": "不明なツール: {name}",
     "unsupportedFormat": "このファイル形式には対応していません",
     "updating": "更新は既に進行中です",
-    "watchFailed": "フォルダーの監視を開始できませんでした"
+    "watchFailed": "フォルダーの監視を開始できませんでした",
+    "keyMissing": "サーバー {host} はアクセスキーを必要とします。下の欄にキーを入力して、もう一度お試しください。",
+    "updatePortable": "ポータブル版は手動で更新します"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt を更新しています",
       "updateInstallingText": "バージョン {version} をインストールしています。",
       "batchDone": "処理が完了しました",
-      "batchDoneText": "完了: {done}、エラー: {failed}"
+      "batchDoneText": "完了: {done}、エラー: {failed}",
+      "updateAskText": "バージョン {version} が公開されました。PixelIt を開いてインストールしてください。"
     },
     "dialog": {
       "openPictures": "画像を開く",

@@ -16,8 +16,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use pixelit_codecs::{decode_bytes, encode, DecodeOptions, EncodeOptions};
-use pixelit_core::pipeline::Mask;
-use pixelit_core::{CancelToken, Error, Image, ImageFormat, Result};
+use pixelit_core::pipeline::{Mask, ResizeFilter};
+use pixelit_core::{ops, CancelToken, Error, Image, ImageFormat, Result};
 use pixelit_engine::Paths;
 
 use crate::catalog::Kind;
@@ -550,6 +550,163 @@ fn sdcpp(
 
 // -------------------------------------------------------------------- cloud
 
+/// Longest side of a picture sent to a cloud service: larger ones travel
+/// long and most services refuse them.
+const CLOUD_SIDE: u32 = 2048;
+
+/// Pixel counts every known image service accepts: from 1024 x 1024 to
+/// 1536 x 1024.
+const CLOUD_MIN_AREA: u64 = 1024 * 1024;
+const CLOUD_MAX_AREA: u64 = 1536 * 1024;
+
+/// A size of the same shape inside the accepted pixel counts, with sides
+/// divisible by 16.
+fn budget_size(width: u32, height: u32) -> (u32, u32) {
+    let area = u64::from(width.max(1)) * u64::from(height.max(1));
+    let scale = if area < CLOUD_MIN_AREA {
+        (CLOUD_MIN_AREA as f64 / area as f64).sqrt()
+    } else if area > CLOUD_MAX_AREA {
+        (CLOUD_MAX_AREA as f64 / area as f64).sqrt()
+    } else {
+        1.0
+    };
+    let snap = |side: u32| ((f64::from(side) * scale / 16.0).round().max(1.0) as u32) * 16;
+    let (mut width, mut height) = (snap(width), snap(height));
+    let area = |width: u32, height: u32| u64::from(width) * u64::from(height);
+    while area(width, height) > CLOUD_MAX_AREA && width.max(height) > 16 {
+        if width >= height {
+            width -= 16;
+        } else {
+            height -= 16;
+        }
+    }
+    while area(width, height) < CLOUD_MIN_AREA {
+        if width <= height {
+            width += 16;
+        } else {
+            height += 16;
+        }
+    }
+    (width, height)
+}
+
+/// The size of the closest shape among those every service knows.
+fn standard_size(width: u32, height: u32) -> (u32, u32) {
+    let ratio = f64::from(width.max(1)) / f64::from(height.max(1));
+    if ratio > 1.25 {
+        (1536, 1024)
+    } else if ratio < 0.8 {
+        (1024, 1536)
+    } else {
+        (1024, 1024)
+    }
+}
+
+/// Sizes to ask a cloud service for, the most wanted first. Services differ
+/// in what they accept, so a refused size is followed by the next one;
+/// `None` leaves the choice to the service. `exact` puts the requested size
+/// itself first.
+fn cloud_sizes(width: u32, height: u32, exact: bool) -> Vec<Option<(u32, u32)>> {
+    let mut sizes = Vec::with_capacity(4);
+    if exact {
+        sizes.push(Some((width, height)));
+    }
+    for size in [
+        Some(budget_size(width, height)),
+        Some(standard_size(width, height)),
+        None,
+    ] {
+        if !sizes.contains(&size) {
+            sizes.push(size);
+        }
+    }
+    sizes
+}
+
+/// Whether a service turned the request down because of the picture size.
+fn refuses_size(error: &Error) -> bool {
+    if error.code != "httpStatus" {
+        return false;
+    }
+    let status = error.params.get("status").map_or("", String::as_str);
+    let detail = error
+        .params
+        .get("detail")
+        .map_or_default(|detail| detail.to_lowercase());
+    matches!(status, "400" | "422")
+        && ["size", "resolution", "dimension"]
+            .iter()
+            .any(|word| detail.contains(word))
+}
+
+fn resize_mask(mask: &Mask, width: u32, height: u32) -> Result<Mask> {
+    let mut rgba = Vec::with_capacity(mask.data.len() * 4);
+    for value in &mask.data {
+        rgba.extend_from_slice(&[*value, *value, *value, 255]);
+    }
+    let small = ops::resize::resize_to(
+        &Image::from_rgba8(mask.width, mask.height, rgba)?,
+        width,
+        height,
+        ResizeFilter::Bilinear,
+        false,
+        None,
+    )?;
+    Ok(Mask {
+        width,
+        height,
+        data: small
+            .to_rgba8()
+            .chunks_exact(4)
+            .map(|pixel| pixel[0])
+            .collect(),
+    })
+}
+
+/// The mask as the image services take it: transparent where the picture
+/// is to be changed.
+fn hole_mask_png(mask: &Mask) -> Result<Vec<u8>> {
+    let mut rgba = Vec::with_capacity(mask.data.len() * 4);
+    for value in &mask.data {
+        rgba.extend_from_slice(&[0, 0, 0, 255 - *value]);
+    }
+    png(&Image::from_rgba8(mask.width, mask.height, rgba)?)
+}
+
+/// What is uploaded for an edit: the picture and, with an area to change,
+/// its mask.
+struct Upload {
+    picture: Vec<u8>,
+    mask: Option<Vec<u8>>,
+}
+
+impl Upload {
+    fn of(source: &Source<'_>) -> Result<Self> {
+        let image = source.image;
+        let longest = image.width().max(image.height());
+        if longest <= CLOUD_SIDE {
+            return Ok(Self {
+                picture: opaque_png(image)?,
+                mask: source.mask.map(hole_mask_png).transpose()?,
+            });
+        }
+        let side = |value: u32| {
+            ((u64::from(value) * u64::from(CLOUD_SIDE) / u64::from(longest)).max(1)) as u32
+        };
+        let (width, height) = (side(image.width()), side(image.height()));
+        let small =
+            ops::resize::resize_to(image, width, height, ResizeFilter::Lanczos3, false, None)?;
+        let mask = match source.mask {
+            Some(mask) => Some(hole_mask_png(&resize_mask(mask, width, height)?)?),
+            None => None,
+        };
+        Ok(Self {
+            picture: opaque_png(&small)?,
+            mask,
+        })
+    }
+}
+
 fn cloud(
     net: &Net,
     settings: &AiSettings,
@@ -562,30 +719,61 @@ fn cloud(
     }
     let base = endpoint.url.as_str();
     let key = access(settings, base)?;
-    let size = format!("{}x{}", job.width, job.height);
     let count = job.count.to_string();
-    let answer = match source {
-        Some(source) => {
-            let picture = png_with_holes(source)?;
+    let upload = source.map(Upload::of).transpose()?;
+    let ask = |size: Option<(u32, u32)>| -> Result<Value> {
+        let size = size.map(|(width, height)| format!("{width}x{height}"));
+        if let Some(upload) = &upload {
+            let mut parts = vec![
+                Part::field("model", &endpoint.model),
+                Part::field("prompt", job.prompt),
+                Part::field("n", &count),
+            ];
+            if let Some(size) = &size {
+                parts.push(Part::field("size", size));
+            }
+            parts.push(Part::file(
+                "image",
+                "image.png",
+                "image/png",
+                &upload.picture,
+            ));
+            if let Some(mask) = &upload.mask {
+                parts.push(Part::file("mask", "mask.png", "image/png", mask));
+            }
             net.post_form(
                 &format!("{base}/images/edits"),
                 key.as_deref(),
-                &[
-                    Part::field("model", &endpoint.model),
-                    Part::field("prompt", job.prompt),
-                    Part::field("n", &count),
-                    Part::field("size", &size),
-                    Part::file("image", "image.png", "image/png", &picture),
-                ],
+                &parts,
                 Some(GENERATION_TIMEOUT),
-            )?
+            )
+        } else {
+            let mut body = json!({ "model": endpoint.model, "prompt": job.prompt, "n": job.count });
+            if let Some(size) = size {
+                body["size"] = json!(size);
+            }
+            net.post_json(
+                &format!("{base}/images/generations"),
+                key.as_deref(),
+                &body,
+                Some(GENERATION_TIMEOUT),
+            )
         }
-        None => net.post_json(
-            &format!("{base}/images/generations"),
-            key.as_deref(),
-            &json!({ "model": endpoint.model, "prompt": job.prompt, "n": job.count, "size": size }),
-            Some(GENERATION_TIMEOUT),
-        )?,
+    };
+    let mut refusal = None;
+    let mut answer = None;
+    for size in cloud_sizes(job.width, job.height, source.is_none()) {
+        match ask(size) {
+            Ok(value) => {
+                answer = Some(value);
+                break;
+            }
+            Err(error) if refuses_size(&error) => refusal = Some(error),
+            Err(error) => return Err(error),
+        }
+    }
+    let Some(answer) = answer else {
+        return Err(refusal.unwrap_or_else(|| failed("the service accepted no size")));
     };
     let mut images = Vec::new();
     for item in answer["data"].as_array().into_iter().flatten() {
@@ -795,6 +983,80 @@ mod tests {
         let plain = decode_image(&mask_png(&mask).unwrap()).unwrap();
         assert_eq!(plain.pixel8(0, 0)[0], 255);
         assert_eq!(plain.pixel8(1, 0)[0], 0);
+    }
+
+    #[test]
+    fn cloud_sizes_start_with_the_wanted_one() {
+        assert_eq!(budget_size(512, 512), (1024, 1024));
+        assert_eq!(budget_size(1024, 1024), (1024, 1024));
+        assert_eq!(budget_size(1536, 1024), (1536, 1024));
+        let (width, height) = budget_size(6000, 4000);
+        assert_eq!((width % 16, height % 16), (0, 0));
+        let area = u64::from(width) * u64::from(height);
+        assert!((CLOUD_MIN_AREA..=CLOUD_MAX_AREA).contains(&area));
+        assert!((f64::from(width) / f64::from(height) - 1.5).abs() < 0.05);
+        let (width, height) = budget_size(300, 800);
+        assert!(u64::from(width) * u64::from(height) >= CLOUD_MIN_AREA);
+        assert!(height > width);
+
+        assert_eq!(standard_size(1920, 1080), (1536, 1024));
+        assert_eq!(standard_size(900, 1600), (1024, 1536));
+        assert_eq!(standard_size(1000, 1100), (1024, 1024));
+
+        assert_eq!(
+            cloud_sizes(512, 512, true),
+            [Some((512, 512)), Some((1024, 1024)), None]
+        );
+        assert_eq!(cloud_sizes(1024, 1024, true), [Some((1024, 1024)), None]);
+        assert_eq!(cloud_sizes(2048, 1365, false), [Some((1536, 1024)), None]);
+    }
+
+    #[test]
+    fn only_size_refusals_are_retried() {
+        let refusal = Error::new("httpStatus")
+            .with("status", 400)
+            .detail("Invalid size '512x512'. Requested resolution is below the minimum.");
+        assert!(refuses_size(&refusal));
+        let key = Error::new("httpStatus")
+            .with("status", 401)
+            .detail("Missing bearer authentication in header");
+        assert!(!refuses_size(&key));
+        let busy = Error::new("httpStatus")
+            .with("status", 400)
+            .detail("The prompt was rejected");
+        assert!(!refuses_size(&busy));
+        assert!(!refuses_size(&Error::new("network").detail("size")));
+    }
+
+    #[test]
+    fn uploads_are_reduced_and_carry_the_mask() {
+        let image = Image::new(4096, 1024, Depth::Eight, Color::rgb(10, 20, 30)).unwrap();
+        let mut mask = Mask {
+            width: 4096,
+            height: 1024,
+            data: vec![0; 4096 * 1024],
+        };
+        mask.data[..4096 * 512].fill(255);
+        let upload = Upload::of(&Source {
+            image: &image,
+            mask: Some(&mask),
+        })
+        .unwrap();
+        let picture = decode_image(&upload.picture).unwrap();
+        assert_eq!((picture.width(), picture.height()), (2048, 512));
+        let holes = decode_image(&upload.mask.unwrap()).unwrap();
+        assert_eq!((holes.width(), holes.height()), (2048, 512));
+        assert_eq!(holes.pixel8(100, 10)[3], 0);
+        assert_eq!(holes.pixel8(100, 500)[3], 255);
+
+        let small = Image::new(8, 8, Depth::Eight, Color::WHITE).unwrap();
+        let plain = Upload::of(&Source {
+            image: &small,
+            mask: None,
+        })
+        .unwrap();
+        assert!(plain.mask.is_none());
+        assert_eq!(decode_image(&plain.picture).unwrap().width(), 8);
     }
 
     #[test]

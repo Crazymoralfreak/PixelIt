@@ -76,7 +76,13 @@
       "ready": "Version {version} ist geladen und wird installiert, sobald die Aufgaben beendet sind",
       "installing": "Version {version} wird installiert…",
       "failed": "Die Update-Prüfung ist fehlgeschlagen"
-    }
+    },
+    "askTitle": "Version {version} ist verfügbar",
+    "askText": "Derzeit ist Version {current} installiert. PixelIt auf Version {version} aktualisieren? Das Installationsprogramm wird heruntergeladen und geprüft, laufende Aufgaben werden beendet, danach startet die Anwendung neu.",
+    "skip": "Diese Version überspringen",
+    "later": "Später",
+    "install": "Aktualisieren",
+    "installFailed": "Version {version} konnte nicht installiert werden"
   },
   "about": {
     "text": "Bilder ansehen, bearbeiten, stapelweise verarbeiten und generieren. Alles läuft auf Ihrem Computer; ins Netz geht das Programm nur auf Ihre Anweisung.",
@@ -222,7 +228,8 @@
     "removeBackground": "Hintergrund entfernen",
     "upscale": "Hochskalieren",
     "restoreFaces": "Gesichter wiederherstellen",
-    "inpaint": "Objekte entfernen"
+    "inpaint": "Objekte entfernen",
+    "aiEdit": "KI-Bearbeitung"
   },
   "op": {
     "mode": "Modus",
@@ -327,7 +334,16 @@
       "highlight": "Textmarker",
       "blur": "Weichzeichnen",
       "pixelate": "Verpixeln"
-    }
+    },
+    "keep": "Was bleiben soll",
+    "keepHint": "Übermalen Sie, was bleiben soll: Diese Stellen lässt die Hintergrundentfernung unberührt.",
+    "editPrompt": "Was geändert werden soll",
+    "editPromptHint": "Beschreiben Sie, wie das Bild oder der markierte Bereich werden soll.",
+    "editArea": "Bereich",
+    "editAreaHint": "Übermalen Sie die Stelle, die geändert werden soll. Ohne Markierung wird das ganze Bild geändert.",
+    "editStrength": "Stärke der Änderung",
+    "editStrengthHint": "Je höher der Wert, desto weiter entfernt sich das Ergebnis vom Originalbild.",
+    "generatorMissing": "Dieser Schritt braucht einen Bildgenerator."
   },
   "steps": {
     "empty": "Noch keine Schritte",
@@ -368,7 +384,14 @@
     "tool": "Werkzeug",
     "strokeWidth": "Stärke",
     "fill": "Füllung",
-    "textHint": "Geben Sie den Text ein und klicken Sie auf das Bild."
+    "textHint": "Geben Sie den Text ein und klicken Sie auf das Bild.",
+    "run": "Ausführen",
+    "editArea": "Bereich ändern",
+    "markKeep": "Markieren, was bleiben soll",
+    "done": "Fertig",
+    "anotherVariant": "Andere Variante",
+    "retry": "Wiederholen",
+    "stepFailed": "{step}: {error}"
   },
   "batch": {
     "addFiles": "Dateien hinzufügen",
@@ -588,7 +611,8 @@
     "data": "Daten",
     "dataFolder": "Datenordner",
     "portable": "Portable Version",
-    "logs": "Protokolldateien"
+    "logs": "Protokolldateien",
+    "updateAsk": "PixelIt meldet eine neue Version und fragt, ob sie installiert werden soll. Ohne Ihre Zustimmung wird nichts heruntergeladen."
   },
   "studio": {
     "tabGenerate": "Generierung",
@@ -612,7 +636,8 @@
     "generate": "Generieren",
     "slow": "Ohne Grafikkarte dauert die Generierung auf diesem Computer mehrere Minuten pro Bild.",
     "emptyTitle": "Hier erscheinen die Bilder",
-    "emptyText": "Geben Sie eine Anfrage ein und drücken Sie „Generieren“."
+    "emptyText": "Geben Sie eine Anfrage ein und drücken Sie „Generieren“.",
+    "cloudSizeHint": "Ein externer Dienst akzeptiert nur bestimmte Größen. Lehnt er die eingestellte Größe ab, fordert PixelIt die nächste erlaubte mit demselben Seitenverhältnis an."
   },
   "vision": {
     "noModelTitle": "Kein Modell gewählt",
@@ -726,7 +751,11 @@
       "inpaint": "Füllt den übermalten Bereich aus der Umgebung.",
       "faces": "Macht Gesichter auf Fotos schärfer.",
       "detector": "Findet Gesichter für die Wiederherstellung."
-    }
+    },
+    "keyPaste": "Schlüssel einfügen – er wird sofort gespeichert",
+    "allowCloudTitle": "Externe Dienste erlauben?",
+    "allowCloudText": "Der Server {host} liegt außerhalb dieses Computers, und externe Dienste sind derzeit ausgeschaltet. Zugriff darauf erlauben? Die Einstellungen auf dieser Seite werden gespeichert.",
+    "allowCloudYes": "Erlauben"
   },
   "assistant": {
     "newChat": "Neuer Chat",
@@ -871,7 +900,9 @@
     "unknownTool": "Unbekanntes Werkzeug: {name}",
     "unsupportedFormat": "Das Dateiformat wird nicht unterstützt",
     "updating": "Ein Update läuft bereits",
-    "watchFailed": "Die Überwachung des Ordners konnte nicht gestartet werden"
+    "watchFailed": "Die Überwachung des Ordners konnte nicht gestartet werden",
+    "keyMissing": "Der Server {host} verlangt einen Zugangsschlüssel. Geben Sie den Schlüssel im Feld unten ein und versuchen Sie es erneut.",
+    "updatePortable": "Die portable Version wird von Hand aktualisiert"
   },
   "native": {
     "tray": {
@@ -886,7 +917,8 @@
       "updateInstalling": "PixelIt wird aktualisiert",
       "updateInstallingText": "Version {version} wird installiert.",
       "batchDone": "Verarbeitung abgeschlossen",
-      "batchDoneText": "Fertig: {done}, Fehler: {failed}"
+      "batchDoneText": "Fertig: {done}, Fehler: {failed}",
+      "updateAskText": "Version {version} ist erschienen. Öffnen Sie PixelIt, um sie zu installieren."
     },
     "dialog": {
       "openPictures": "Bilder öffnen",

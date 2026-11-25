@@ -8,6 +8,7 @@
 pub mod catalog;
 pub mod config;
 pub mod discover;
+mod edits;
 pub mod faces;
 pub mod generate;
 pub mod hardware;
@@ -24,9 +25,11 @@ use std::sync::{PoisonError, RwLock};
 
 use serde::Serialize;
 
-use pixelit_core::pipeline::{AiBackend, Mask, ResizeFilter};
+use pixelit_core::pipeline::{AiBackend, AiEdit, Mask, ResizeFilter};
 use pixelit_core::{ops, CancelToken, Error, Image, Result};
 use pixelit_engine::Paths;
+
+use crate::edits::{Edits, Print};
 
 pub use crate::catalog::{Entry, Kind};
 pub use crate::config::{AiSettings, DeviceChoice, Endpoint, Generation, GenerationProvider};
@@ -61,6 +64,7 @@ pub struct Ai {
     hardware: Hardware,
     settings: RwLock<AiSettings>,
     onnx: Onnx,
+    edits: Edits,
 }
 
 impl Ai {
@@ -71,6 +75,7 @@ impl Ai {
         let hardware = hardware::detect();
         let ai = Self {
             onnx: Onnx::new(paths.clone()),
+            edits: Edits::default(),
             net: Net::new(),
             settings: RwLock::new(settings),
             hardware,
@@ -261,6 +266,22 @@ impl Ai {
         generate::leaves_computer(&self.settings())
     }
 
+    /// Asks the generator to change a picture: inside the mask, or all of
+    /// it without one.
+    fn redraw(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        request: &GenerateRequest,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
+        let source = Source { image, mask };
+        self.generate(request, Some(&source), cancel)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| Error::new("generationFailed"))
+    }
+
     /// Repaints the masked area following a prompt, keeping everything
     /// outside the mask untouched.
     fn repaint(
@@ -275,42 +296,50 @@ impl Ai {
             strength: 0.85,
             ..GenerateRequest::default()
         };
-        let source = Source {
-            image,
-            mask: Some(mask),
-        };
-        let generated = self
-            .generate(&request, Some(&source), cancel)?
-            .into_iter()
-            .next()
-            .ok_or_else(|| Error::new("generationFailed"))?;
-        let generated = ops::resize::resize_to(
-            &generated,
-            image.width(),
-            image.height(),
-            ResizeFilter::Lanczos3,
-            false,
-            None,
-        )?
-        .to_rgba8();
-        let mut rgba = image.to_rgba8();
-        for ((pixel, new), cover) in rgba
-            .chunks_exact_mut(4)
-            .zip(generated.chunks_exact(4))
-            .zip(&mask.data)
-        {
-            let cover = u32::from(*cover);
-            for channel in 0..3 {
-                pixel[channel] = ((u32::from(pixel[channel]) * (255 - cover)
-                    + u32::from(new[channel]) * cover
-                    + 127)
-                    / 255) as u8;
+        let generated = self.redraw(image, Some(mask), &request, cancel)?;
+        place(image, &generated, Some(mask))
+    }
+}
+
+/// Puts a generated picture over the original: inside the mask, or over all
+/// of it without one. The size, the transparency and the depth stay those of
+/// the original.
+fn place(image: &Image, generated: &Image, mask: Option<&Mask>) -> Result<Image> {
+    let generated = ops::resize::resize_to(
+        generated,
+        image.width(),
+        image.height(),
+        ResizeFilter::Lanczos3,
+        false,
+        None,
+    )?
+    .to_rgba8();
+    let mut rgba = image.to_rgba8();
+    match mask {
+        Some(mask) => {
+            for ((pixel, new), cover) in rgba
+                .chunks_exact_mut(4)
+                .zip(generated.chunks_exact(4))
+                .zip(&mask.data)
+            {
+                let cover = u32::from(*cover);
+                for channel in 0..3 {
+                    pixel[channel] = ((u32::from(pixel[channel]) * (255 - cover)
+                        + u32::from(new[channel]) * cover
+                        + 127)
+                        / 255) as u8;
+                }
             }
         }
-        let mut result = Image::from_rgba8(image.width(), image.height(), rgba)?;
-        result.set_has_alpha(image.has_alpha());
-        Ok(result.into_depth(image.depth()))
+        None => {
+            for (pixel, new) in rgba.chunks_exact_mut(4).zip(generated.chunks_exact(4)) {
+                pixel[..3].copy_from_slice(&new[..3]);
+            }
+        }
     }
+    let mut result = Image::from_rgba8(image.width(), image.height(), rgba)?;
+    result.set_has_alpha(image.has_alpha());
+    Ok(result.into_depth(image.depth()))
 }
 
 impl AiBackend for Ai {
@@ -359,6 +388,34 @@ impl AiBackend for Ai {
             self.repaint(image, mask, prompt.trim(), cancel)
         }
     }
+
+    fn edit(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        spec: &AiEdit,
+        preview: bool,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
+        // The real run repeats what the editor has shown: a generator gives
+        // another picture every time it is asked.
+        let print = Print::of(image, spec)?;
+        if let Some(generated) = self.edits.find(&print) {
+            return place(image, &generated, mask);
+        }
+        let request = GenerateRequest {
+            prompt: spec.prompt.trim().to_owned(),
+            strength: (spec.strength / 100.0).clamp(0.05, 1.0),
+            seed: Some(u64::from(spec.variant)),
+            ..GenerateRequest::default()
+        };
+        let generated = self.redraw(image, mask, &request, cancel)?;
+        let result = place(image, &generated, mask)?;
+        if preview {
+            self.edits.remember(print, generated);
+        }
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
@@ -401,6 +458,31 @@ mod tests {
         };
         let repaint = ai.inpaint(&image, &mask, "", "a cat", &cancel).unwrap_err();
         assert_eq!(repaint.code, "providerNotSet");
+        let spec = AiEdit {
+            prompt: String::from("make it night"),
+            ..AiEdit::default()
+        };
+        let edit = ai.edit(&image, None, &spec, true, &cancel).unwrap_err();
+        assert_eq!(edit.code, "providerNotSet");
+    }
+
+    #[test]
+    fn generated_pictures_are_placed_over_the_original() {
+        let image = Image::new(4, 2, Depth::Eight, Color::WHITE).unwrap();
+        let generated = Image::new(8, 4, Depth::Eight, Color::rgb(10, 20, 30)).unwrap();
+        let whole = place(&image, &generated, None).unwrap();
+        assert_eq!((whole.width(), whole.height()), (4, 2));
+        assert_eq!(whole.pixel8(3, 1), [10, 20, 30, 255]);
+
+        let mut mask = Mask {
+            width: 4,
+            height: 2,
+            data: vec![0; 8],
+        };
+        mask.data[0] = 255;
+        let part = place(&image, &generated, Some(&mask)).unwrap();
+        assert_eq!(part.pixel8(0, 0), [10, 20, 30, 255]);
+        assert_eq!(part.pixel8(1, 0), [255, 255, 255, 255]);
     }
 
     #[test]

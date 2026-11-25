@@ -97,11 +97,20 @@ struct Header {
     outputs: Vec<Port>,
 }
 
+/// An open model and what is needed to open it again on the processor.
+struct Loaded {
+    info: ModelInfo,
+    path: PathBuf,
+    threads: usize,
+}
+
 pub struct Worker {
     child: Child,
     input: BufWriter<ChildStdin>,
     output: BufReader<ChildStdout>,
-    loaded: HashMap<String, ModelInfo>,
+    loaded: HashMap<String, Loaded>,
+    /// Models the video card could not run in this process.
+    moved_to_cpu: Vec<String>,
 }
 
 /// Where the worker program is: beside the application.
@@ -117,6 +126,17 @@ pub fn worker_program() -> Result<PathBuf> {
 
 fn broken(error: impl std::fmt::Display) -> Error {
     Error::new("aiWorkerFailed").detail(error)
+}
+
+/// The text of a refusal without what cannot be read: system messages of
+/// Windows arrive in the local code page and turn into replacement marks.
+fn readable(text: &str) -> String {
+    text.chars()
+        .filter(|sign| *sign != char::REPLACEMENT_CHARACTER && !sign.is_control())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn element_count(shape: &[i64]) -> Option<usize> {
@@ -156,6 +176,7 @@ impl Worker {
             input: BufWriter::with_capacity(1 << 20, input),
             output: BufReader::with_capacity(1 << 20, output),
             loaded: HashMap::new(),
+            moved_to_cpu: Vec::new(),
         };
         worker.call(&json!({ "op": "init", "runtime": runtime.to_string_lossy() }))?;
         Ok(worker)
@@ -187,7 +208,8 @@ impl Worker {
         if header.ok {
             Ok(header)
         } else {
-            Err(Error::new("aiModelFailed").detail(header.error.unwrap_or_default()))
+            Err(Error::new("aiModelFailed")
+                .detail(readable(header.error.as_deref().unwrap_or_default())))
         }
     }
 
@@ -233,8 +255,8 @@ impl Worker {
         gpu_index: i32,
         threads: usize,
     ) -> Result<ModelInfo> {
-        if let Some(info) = self.loaded.get(id) {
-            return Ok(info.clone());
+        if let Some(model) = self.loaded.get(id) {
+            return Ok(model.info.clone());
         }
         // The answer describes the model and carries no tensor data.
         let header = self.call(&json!({
@@ -250,27 +272,62 @@ impl Worker {
             inputs: header.inputs,
             outputs: header.outputs,
         };
-        self.loaded.insert(id.to_owned(), info.clone());
+        self.loaded.insert(
+            id.to_owned(),
+            Loaded {
+                info: info.clone(),
+                path: path.to_owned(),
+                threads,
+            },
+        );
         Ok(info)
     }
 
-    /// Runs a loaded model.
-    pub fn run(&mut self, id: &str, inputs: &[Tensor]) -> Result<Vec<Tensor>> {
+    fn exchange(&mut self, id: &str, inputs: &[Tensor]) -> Result<Vec<Tensor>> {
         let described: Vec<Value> = inputs
             .iter()
             .map(|tensor| json!({ "name": tensor.name, "dtype": "f32", "shape": tensor.shape }))
             .collect();
-        for tensor in inputs {
-            if element_count(&tensor.shape) != Some(tensor.data.len()) {
-                return Err(Error::new("aiModelFailed").detail("tensor shape and data differ"));
-            }
-        }
         self.send(
             &json!({ "op": "run", "model": id, "inputs": described }),
             inputs,
         )
         .map_err(broken)?;
         self.receive()
+    }
+
+    /// Runs a loaded model. A model the video card opens and then fails to
+    /// run is opened again on the processor and run there.
+    pub fn run(&mut self, id: &str, inputs: &[Tensor]) -> Result<Vec<Tensor>> {
+        for tensor in inputs {
+            if element_count(&tensor.shape) != Some(tensor.data.len()) {
+                return Err(Error::new("aiModelFailed").detail("tensor shape and data differ"));
+            }
+        }
+        let refusal = match self.exchange(id, inputs) {
+            Err(error) if error.code == "aiModelFailed" => error,
+            other => return other,
+        };
+        let on_gpu = self.loaded.get(id).is_some_and(|model| model.info.gpu);
+        if !on_gpu {
+            return Err(refusal);
+        }
+        tracing::warn!(
+            "{id} failed on the video card, running it on the processor: {}",
+            refusal.params.get("detail").map_or("", String::as_str)
+        );
+        let Some(model) = self.loaded.remove(id) else {
+            return Err(refusal);
+        };
+        let _ = self.call(&json!({ "op": "unload", "model": id }));
+        self.moved_to_cpu.push(id.to_owned());
+        self.load(id, &model.path, false, 0, model.threads)?;
+        self.exchange(id, inputs)
+    }
+
+    /// Models that had to leave the video card since the last call.
+    pub fn take_moved_to_cpu(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.moved_to_cpu)
     }
 
     /// Closes a model and frees its memory.
@@ -323,6 +380,13 @@ mod tests {
         assert_eq!(port.fixed(3), Some(128));
         assert_eq!(port.fixed(7), None);
         assert_eq!(element_count(&port.shape), None);
+    }
+
+    #[test]
+    fn refusals_are_made_readable() {
+        let raw = "MatMul failed\r\n  80070057 \u{fffd}\u{fffd}\u{fffd} \u{fffd}\u{fffd}.\n";
+        assert_eq!(readable(raw), "MatMul failed 80070057 .");
+        assert_eq!(readable("plain text"), "plain text");
     }
 
     #[test]
