@@ -118,6 +118,9 @@ pub struct Settings {
     pub capture_hotkey: String,
     /// Folder of the PDFium library; empty looks next to the application.
     pub pdfium_folder: String,
+    /// Folder for pictures downloaded from the web; empty keeps them in the
+    /// `downloads` folder of the application data.
+    pub download_folder: String,
     pub agents: AgentAccess,
     /// Folders opened recently, newest first.
     pub recent_folders: Vec<String>,
@@ -144,6 +147,7 @@ impl Default for Settings {
             skipped_version: String::new(),
             capture_hotkey: String::new(),
             pdfium_folder: String::new(),
+            download_folder: String::new(),
             agents: AgentAccess::default(),
             recent_folders: Vec::new(),
         }
@@ -186,6 +190,16 @@ impl Settings {
     pub fn pdfium(&self) -> Option<PathBuf> {
         let folder = self.pdfium_folder.trim();
         (!folder.is_empty()).then(|| PathBuf::from(folder))
+    }
+
+    /// Where pictures downloaded from the web are saved.
+    pub fn downloads(&self, paths: &Paths) -> PathBuf {
+        let folder = self.download_folder.trim();
+        if folder.is_empty() {
+            paths.downloads()
+        } else {
+            PathBuf::from(folder)
+        }
     }
 
     pub fn remember_folder(&mut self, folder: &str) {
@@ -243,6 +257,15 @@ mod tests {
         assert!(!access.allows(&allowed.join("..").join("other.png")));
         assert!(!access.allows(Path::new("relative.png")));
         assert!(!AgentAccess::default().allows(&allowed.join("new.png")));
+    }
+
+    #[test]
+    fn downloads_go_to_the_chosen_folder() {
+        let paths = Paths::at("/data");
+        let mut settings = Settings::default();
+        assert_eq!(settings.downloads(&paths), paths.downloads());
+        settings.download_folder = String::from("  /pictures/web ");
+        assert_eq!(settings.downloads(&paths), PathBuf::from("/pictures/web"));
     }
 
     #[test]

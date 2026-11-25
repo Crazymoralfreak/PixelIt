@@ -5,7 +5,8 @@
 //! is verified.
 
 use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,6 +15,7 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use serde_json::Value;
 use sha2::{Digest, Sha256, Sha512};
+use url::Url;
 
 use pixelit_core::{CancelToken, Error, Result};
 
@@ -25,6 +27,22 @@ const ERROR_TEXT: usize = 400;
 
 /// Digits of a hexadecimal hash.
 const HEX: &[u8; 16] = b"0123456789abcdef";
+
+/// Redirects followed for one request.
+const MAX_REDIRECTS: u32 = 8;
+
+/// What a request that was kept out of the local network says about itself.
+const INSIDE: &str = "the name points at the local network";
+
+/// How PixelIt names itself to servers. Wikimedia asks every client for a
+/// name with an address where its authors can be reached.
+const USER_AGENT: &str = concat!(
+    "PixelIt/",
+    env!("CARGO_PKG_VERSION"),
+    " (+",
+    env!("CARGO_PKG_REPOSITORY"),
+    ")"
+);
 
 /// Expected hash of a downloaded file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,9 +83,26 @@ impl<'a> Part<'a> {
     }
 }
 
+/// How a page or a picture of the web is asked for.
+#[derive(Clone, Copy, Debug)]
+pub struct Ask<'a> {
+    /// What the server is told PixelIt accepts.
+    pub accept: &'a str,
+    /// The page the address was found on; some servers hand a picture out
+    /// only to a request that names it.
+    pub referer: Option<&'a str>,
+    /// Whether the address may point at this computer or its local network.
+    pub local: bool,
+    pub timeout: Option<Duration>,
+}
+
 #[derive(Clone)]
 pub struct Net {
     agent: ureq::Agent,
+    /// Follows no redirects by itself, so every address on the way is checked.
+    direct: ureq::Agent,
+    /// Like `direct`, and connects to nothing inside the local network.
+    outside: ureq::Agent,
 }
 
 /// An open response whose body is read as it arrives.
@@ -75,11 +110,36 @@ pub struct Stream {
     pub status: u16,
     /// Media type without parameters, lower-cased.
     pub content_type: String,
+    /// The address that answered, after redirects.
+    pub url: String,
+    /// Size of the body, when the server tells it.
+    pub length: Option<u64>,
     headers: Vec<(String, String)>,
     reader: Box<dyn Read + Send + Sync + 'static>,
 }
 
 impl Stream {
+    fn of(response: ureq::Response) -> Self {
+        let headers = response
+            .headers_names()
+            .into_iter()
+            .filter_map(|name| {
+                let value = response.header(&name)?.to_owned();
+                Some((name.to_ascii_lowercase(), value))
+            })
+            .collect();
+        Self {
+            status: response.status(),
+            content_type: response.content_type().to_ascii_lowercase(),
+            url: response.get_url().to_owned(),
+            length: response
+                .header("Content-Length")
+                .and_then(|length| length.trim().parse().ok()),
+            headers,
+            reader: response.into_reader(),
+        }
+    }
+
     /// A response header by its case-insensitive name.
     pub fn header(&self, name: &str) -> Option<&str> {
         let name = name.to_ascii_lowercase();
@@ -135,16 +195,126 @@ pub fn is_local(url: &str) -> bool {
             host == "localhost"
                 || host == "::1"
                 || host
-                    .parse::<std::net::Ipv4Addr>()
+                    .parse::<Ipv4Addr>()
                     .is_ok_and(|address| address.is_loopback())
         }
         None => false,
     }
 }
 
+/// Whether a network address belongs to this computer or its local network.
+fn private_ip(address: IpAddr) -> bool {
+    match address {
+        IpAddr::V4(address) => {
+            address.is_loopback()
+                || address.is_private()
+                || address.is_link_local()
+                || address.is_unspecified()
+                || address.is_broadcast()
+                // Carrier-grade NAT, 100.64.0.0/10.
+                || (address.octets()[0] == 100 && address.octets()[1] & 0xc0 == 64)
+        }
+        IpAddr::V6(address) => {
+            let first = address.segments()[0];
+            address.is_loopback()
+                || address.is_unspecified()
+                // Unique local (fc00::/7) and link-local (fe80::/10) addresses.
+                || first & 0xfe00 == 0xfc00
+                || first & 0xffc0 == 0xfe80
+                || address
+                    .to_ipv4_mapped()
+                    .is_some_and(|mapped| private_ip(IpAddr::V4(mapped)))
+        }
+    }
+}
+
+/// Whether the address, as it is written, points at this computer or at its
+/// local network. What a name resolves to is checked when the connection is
+/// made, see [`outside_only`].
+pub fn is_private(url: &str) -> bool {
+    let Some(host) = host_of(url) else {
+        return false;
+    };
+    // Names of this computer and of the devices beside it.
+    if matches!(host.rsplit('.').next(), Some("localhost" | "local")) {
+        return true;
+    }
+    host.parse::<IpAddr>().is_ok_and(private_ip)
+}
+
+/// Resolves a name and keeps only the addresses outside the local network,
+/// so a public name that points inside is not a way in.
+fn outside_only(netloc: &str) -> io::Result<Vec<SocketAddr>> {
+    let found: Vec<SocketAddr> = netloc
+        .to_socket_addrs()?
+        .filter(|address| !private_ip(address.ip()))
+        .collect();
+    if found.is_empty() {
+        return Err(io::Error::new(io::ErrorKind::PermissionDenied, INSIDE));
+    }
+    Ok(found)
+}
+
+/// The error of a request that was not allowed to reach the local network.
+fn refused(error: ureq::Error, address: &str) -> Error {
+    let inside = matches!(&error, ureq::Error::Transport(transport)
+        if transport.kind() == ureq::ErrorKind::Dns && transport.to_string().contains(INSIDE));
+    if inside {
+        Error::new("localAddress").with("url", address)
+    } else {
+        failure(error)
+    }
+}
+
 fn is_http(url: &str) -> bool {
     let lower = url.trim().to_ascii_lowercase();
     lower.starts_with("http://") || lower.starts_with("https://")
+}
+
+/// The hexadecimal form of a hash.
+fn hex(digest: &[u8]) -> String {
+    let mut text = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        text.push(char::from(HEX[usize::from(byte >> 4)]));
+        text.push(char::from(HEX[usize::from(byte & 15)]));
+    }
+    text
+}
+
+/// A short name for an address, safe in a file name: the start of its SHA-256.
+pub fn fingerprint(text: &str) -> String {
+    let mut name = hex(Sha256::digest(text.as_bytes()).as_slice());
+    name.truncate(32);
+    name
+}
+
+/// Reads at most `limit` bytes of a body. A longer body is an error, unless
+/// `cut` says the start of it is enough.
+pub fn read_body(
+    reader: &mut dyn Read,
+    limit: u64,
+    cut: bool,
+    cancel: &CancelToken,
+) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let mut buffer = vec![0u8; 1 << 16];
+    loop {
+        cancel.check()?;
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|error| Error::new("network").detail(error))?;
+        if read == 0 {
+            return Ok(bytes);
+        }
+        bytes.extend_from_slice(&buffer[..read]);
+        if bytes.len() as u64 > limit {
+            if cut {
+                bytes.truncate(limit as usize);
+                return Ok(bytes);
+            }
+            return Err(Error::new("responseTooLarge"));
+        }
+    }
 }
 
 fn failure(error: ureq::Error) -> Error {
@@ -205,13 +375,7 @@ pub fn verify(path: &Path, checksum: &Checksum, cancel: &CancelToken) -> Result<
     }
     Ok(match checksum {
         Checksum::Sha256(expected) => {
-            let digest = sha256.finalize();
-            let mut actual = String::with_capacity(64);
-            for byte in digest.as_slice() {
-                actual.push(char::from(HEX[usize::from(byte >> 4)]));
-                actual.push(char::from(HEX[usize::from(byte & 15)]));
-            }
-            actual.eq_ignore_ascii_case(expected)
+            hex(sha256.finalize().as_slice()).eq_ignore_ascii_case(expected)
         }
         Checksum::Sha512(expected) => {
             let digest = sha512.finalize();
@@ -258,18 +422,29 @@ pub fn multipart(parts: &[Part<'_>]) -> (String, Vec<u8>) {
 
 impl Net {
     pub fn new() -> Self {
-        let mut builder = ureq::AgentBuilder::new()
-            .timeout_connect(Duration::from_secs(15))
-            .timeout_read(Duration::from_secs(90))
-            .timeout_write(Duration::from_secs(90))
-            .redirects(8)
-            .user_agent(concat!("PixelIt/", env!("CARGO_PKG_VERSION")));
-        match native_tls::TlsConnector::new() {
-            Ok(connector) => builder = builder.tls_connector(Arc::new(connector)),
-            Err(error) => tracing::warn!("TLS is unavailable: {error}"),
-        }
+        let connector = match native_tls::TlsConnector::new() {
+            Ok(connector) => Some(Arc::new(connector)),
+            Err(error) => {
+                tracing::warn!("TLS is unavailable: {error}");
+                None
+            }
+        };
+        let builder = |redirects: u32| {
+            let mut builder = ureq::AgentBuilder::new()
+                .timeout_connect(Duration::from_secs(15))
+                .timeout_read(Duration::from_secs(90))
+                .timeout_write(Duration::from_secs(90))
+                .redirects(redirects)
+                .user_agent(USER_AGENT);
+            if let Some(connector) = &connector {
+                builder = builder.tls_connector(Arc::clone(connector));
+            }
+            builder
+        };
         Self {
-            agent: builder.build(),
+            agent: builder(MAX_REDIRECTS).build(),
+            direct: builder(0).build(),
+            outside: builder(0).resolver(outside_only).build(),
         }
     }
 
@@ -355,20 +530,51 @@ impl Net {
             request = request.set(name, value);
         }
         let response = request.send_json(body).map_err(failure)?;
-        let headers = response
-            .headers_names()
-            .into_iter()
-            .filter_map(|name| {
-                let value = response.header(&name)?.to_owned();
-                Some((name.to_ascii_lowercase(), value))
-            })
-            .collect();
-        Ok(Stream {
-            status: response.status(),
-            content_type: response.content_type().to_ascii_lowercase(),
-            headers,
-            reader: response.into_reader(),
-        })
+        Ok(Stream::of(response))
+    }
+
+    /// Asks for a page or a picture and hands the response over unread, so
+    /// the caller decides how much of it to take. Redirects are followed one
+    /// by one: with `ask.local` off, none of them may lead to this computer
+    /// or its local network.
+    pub fn open_get(&self, url: &str, ask: &Ask<'_>) -> Result<Stream> {
+        let mut address = url.trim().to_owned();
+        for _ in 0..=MAX_REDIRECTS {
+            if !is_http(&address) {
+                return Err(Error::new("badUrl").with("url", address));
+            }
+            if !ask.local && is_private(&address) {
+                return Err(Error::new("localAddress").with("url", address));
+            }
+            let agent = if ask.local {
+                &self.direct
+            } else {
+                &self.outside
+            };
+            let mut request = agent.request("GET", &address).set("Accept", ask.accept);
+            if let Some(referer) = ask.referer.filter(|referer| is_http(referer)) {
+                request = request.set("Referer", referer.trim());
+            }
+            if let Some(timeout) = ask.timeout {
+                request = request.timeout(timeout);
+            }
+            let response = request.call().map_err(|error| refused(error, &address))?;
+            if !(300..400).contains(&response.status()) {
+                let mut stream = Stream::of(response);
+                stream.url = address;
+                return Ok(stream);
+            }
+            let next = response
+                .header("Location")
+                .and_then(|location| Url::parse(&address).ok()?.join(location.trim()).ok());
+            match next {
+                Some(next) => address = next.into(),
+                None => {
+                    return Err(Error::new("badResponse").detail("a redirect without an address"))
+                }
+            }
+        }
+        Err(Error::new("network").detail("too many redirects"))
     }
 
     /// Sends a form with files and returns the JSON response.
@@ -494,6 +700,75 @@ mod tests {
         assert!(!is_local("http://192.168.1.10:11434"));
         assert!(!is_local("https://api.openai.com/v1"));
         assert!(!is_local("http://localhost.example.com"));
+    }
+
+    #[test]
+    fn the_local_network_is_private() {
+        for address in [
+            "http://localhost/x",
+            "http://printer.local/",
+            "http://app.localhost:3000",
+            "http://127.0.0.1:8080",
+            "http://10.1.2.3/",
+            "http://172.20.0.1/",
+            "http://192.168.1.1/reboot",
+            "http://169.254.169.254/latest",
+            "http://0.0.0.0/",
+            "http://[::1]/",
+            "http://[fd00::1]/",
+            "http://[fe80::1]/",
+            "http://[::ffff:192.168.1.1]/",
+            "http://100.64.0.1/",
+        ] {
+            assert!(is_private(address), "{address}");
+        }
+        for address in [
+            "https://www.pinterest.com/pin/1/",
+            "https://8.8.8.8/",
+            "https://localhost.example.com/",
+            "https://[2001:4860:4860::8888]/",
+            "",
+        ] {
+            assert!(!is_private(address), "{address}");
+        }
+    }
+
+    #[test]
+    fn local_addresses_are_refused_before_any_request() {
+        let net = Net::new();
+        let ask = Ask {
+            accept: "*/*",
+            referer: None,
+            local: false,
+            timeout: None,
+        };
+        let refused = net.open_get("http://192.168.0.1/", &ask).err().unwrap();
+        assert_eq!(refused.code, "localAddress");
+        let bad = net.open_get("ftp://example.org/a.png", &ask).err().unwrap();
+        assert_eq!(bad.code, "badUrl");
+        assert!(outside_only("127.0.0.1:80").is_err());
+        assert_eq!(outside_only("8.8.8.8:443").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn bodies_are_read_up_to_the_limit() {
+        let cancel = CancelToken::new();
+        let data = vec![7u8; 100_000];
+        let whole = read_body(&mut data.as_slice(), 200_000, false, &cancel).unwrap();
+        assert_eq!(whole.len(), 100_000);
+        let cut = read_body(&mut data.as_slice(), 1000, true, &cancel).unwrap();
+        assert_eq!(cut.len(), 1000);
+        let refused = read_body(&mut data.as_slice(), 1000, false, &cancel).unwrap_err();
+        assert_eq!(refused.code, "responseTooLarge");
+    }
+
+    #[test]
+    fn fingerprints_are_short_and_stable() {
+        let name = fingerprint("https://example.org/a.png");
+        assert_eq!(name.len(), 32);
+        assert_eq!(name, fingerprint("https://example.org/a.png"));
+        assert_ne!(name, fingerprint("https://example.org/b.png"));
+        assert!(name.bytes().all(|byte| byte.is_ascii_hexdigit()));
     }
 
     #[test]

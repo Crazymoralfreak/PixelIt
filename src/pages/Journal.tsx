@@ -14,6 +14,8 @@ export default function JournalPage({ active }: { active: boolean }) {
   const { confirm, notify, showError } = useApp();
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [open, setOpen] = useState<string | null>(null);
+  /** The download whose sources are listed. */
+  const [sources, setSources] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     api.journalList().then(setEntries).catch(showError);
@@ -86,17 +88,39 @@ export default function JournalPage({ active }: { active: boolean }) {
                 {entry.cancelled ? <Tag>{t("jobs.state.cancelled")}</Tag> : null}
                 {entry.failed > 0 ? <Tag tone="danger">{t("journal.failed", { count: entry.failed })}</Tag> : null}
               </div>
-              <div className="journal-text">
-                {t("batch.reportCounts", { done: entry.done, skipped: entry.skipped, failed: entry.failed })}
-                {entry.done > 0
-                  ? ` · ${t("batch.reportSize", {
-                      before: formatBytes(entry.sourceBytes),
-                      after: formatBytes(entry.outputBytes),
-                      saving: formatSaving(entry.sourceBytes, entry.outputBytes),
-                      time: formatDuration(entry.elapsedMs / 1000),
-                    })}`
-                  : ""}
-              </div>
+              {entry.kind === "download" ? (
+                // A download has nothing to compare its size with.
+                <div className="journal-text">
+                  {t("journal.downloadText", {
+                    done: entry.done,
+                    failed: entry.failed,
+                    size: formatBytes(entry.outputBytes),
+                    time: formatDuration(entry.elapsedMs / 1000),
+                  })}
+                </div>
+              ) : (
+                <div className="journal-text">
+                  {t("batch.reportCounts", { done: entry.done, skipped: entry.skipped, failed: entry.failed })}
+                  {entry.done > 0
+                    ? ` · ${t("batch.reportSize", {
+                        before: formatBytes(entry.sourceBytes),
+                        after: formatBytes(entry.outputBytes),
+                        saving: formatSaving(entry.sourceBytes, entry.outputBytes),
+                        time: formatDuration(entry.elapsedMs / 1000),
+                      })}`
+                    : ""}
+                </div>
+              )}
+              {sources === entry.id
+                ? (entry.origins ?? []).map((origin) => (
+                    <div key={origin.path} className="journal-origin" title={origin.path}>
+                      <div>
+                        {[fileName(origin.path), origin.author, origin.license].filter(Boolean).join(" · ")}
+                      </div>
+                      <div className="journal-origin-page">{origin.page || origin.url}</div>
+                    </div>
+                  ))
+                : null}
               {open === entry.id
                 ? entry.errors.map((item) => (
                     <div key={item.path} className="report-error" title={item.path}>
@@ -113,6 +137,11 @@ export default function JournalPage({ active }: { active: boolean }) {
                 {entry.undoId ? (
                   <Button small onClick={() => void undo(entry)}>
                     {t("journal.undo")}
+                  </Button>
+                ) : null}
+                {entry.origins && entry.origins.length > 0 ? (
+                  <Button small variant="ghost" onClick={() => setSources(sources === entry.id ? null : entry.id)}>
+                    {sources === entry.id ? t("journal.hideSources") : t("journal.showSources")}
                   </Button>
                 ) : null}
                 {entry.errors.length > 0 ? (

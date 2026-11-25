@@ -12,12 +12,13 @@ import {
   type AskNameOptions,
   type ConfirmOptions,
   type Incoming,
+  type IncomingLink,
   type Page,
 } from "./app/context";
 import { parseChangelog, ReleaseNotes, type Release } from "./components/Changelog";
 import { activeJobs, JobsDialog } from "./components/JobsPanel";
 import { I18nProvider, useT } from "./i18n";
-import { blobToBase64, pastedPicture } from "./lib/clipboard";
+import { blobToBase64, isTextTarget, pastedLink, pastedPicture } from "./lib/clipboard";
 import { newPipeline } from "./lib/pipeline";
 import AboutPage from "./pages/About";
 import AiPage from "./pages/Ai";
@@ -30,6 +31,7 @@ import SettingsPage from "./pages/Settings";
 import StudioPage from "./pages/Studio";
 import ToolsPage from "./pages/Tools";
 import ViewerPage from "./pages/Viewer";
+import WebPage from "./pages/Web";
 import type { AiStatus, AppError, AppInfo, JobInfo, Pipeline, Recipe, Settings, UpdateStatus } from "./types";
 import { Button, cx, Modal, TextInput } from "./ui";
 
@@ -166,6 +168,8 @@ function PageView({ page, active }: { page: Page; active: boolean }) {
       return <ToolsPage />;
     case "studio":
       return <StudioPage />;
+    case "web":
+      return <WebPage />;
     case "assistant":
       return <AssistantPage active={active} />;
     case "journal":
@@ -196,6 +200,7 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
   const [batchPipeline, setBatchPipeline] = useState<Pipeline>(() => newPipeline(boot.settings.output));
   const [incoming, setIncoming] = useState<Incoming | null>(null);
   const [editorPath, setEditorPath] = useState<string | null>(null);
+  const [webLink, setWebLink] = useState<IncomingLink | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [confirming, setConfirming] = useState<{ options: ConfirmOptions; done: (ok: boolean) => void } | null>(
     null,
@@ -391,6 +396,14 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
     [navigate],
   );
 
+  const openLink = useCallback(
+    (url: string) => {
+      setWebLink({ url, token: nextIncoming.current++ });
+      navigate("web");
+    },
+    [navigate],
+  );
+
   const addToQueue = useCallback((inputs: string[]) => {
     setQueue((current) => [...current, ...inputs.filter((input) => !current.includes(input))]);
   }, []);
@@ -458,19 +471,25 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
     };
   }, [openPaths]);
 
-  // A picture pasted from the clipboard opens in the editor.
+  // A picture pasted from the clipboard opens in the editor; a web address
+  // pasted outside any field goes to the "From the web" page.
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       const picture = pastedPicture(event.clipboardData);
-      if (!picture) {
+      if (picture) {
+        event.preventDefault();
+        blobToBase64(picture).then(api.pasteImage).then(openInEditor).catch(showError);
         return;
       }
-      event.preventDefault();
-      blobToBase64(picture).then(api.pasteImage).then(openInEditor).catch(showError);
+      const link = isTextTarget(event.target) ? null : pastedLink(event.clipboardData);
+      if (link) {
+        event.preventDefault();
+        openLink(link);
+      }
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [openInEditor, showError]);
+  }, [openInEditor, openLink, showError]);
 
   const clearJobs = useCallback(() => {
     api
@@ -507,6 +526,8 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
       openPaths,
       editorPath,
       openInEditor,
+      webLink,
+      openLink,
       confirm,
       askName,
       notify,
@@ -534,6 +555,8 @@ function Shell({ boot, onInfo }: { boot: Boot; onInfo: (info: AppInfo) => void }
       openPaths,
       editorPath,
       openInEditor,
+      webLink,
+      openLink,
       confirm,
       askName,
       notify,

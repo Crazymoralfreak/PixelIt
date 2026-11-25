@@ -38,7 +38,11 @@ import type {
   UpdateStatus,
   VisionTask,
   WatchRule,
+  WebImage,
+  WebInspected,
   WebKitRequest,
+  WebSearchPage,
+  WebSource,
 } from "../types";
 
 export function isAppError(value: unknown): value is AppError {
@@ -155,6 +159,16 @@ export const api = {
     invoke<number>("generate_start", { start: { request, source, confirmed } }),
   visionStart: (files: string[], task: VisionTask, apply: boolean, confirmed: boolean) =>
     invoke<number>("vision_start", { start: { files, task, apply, confirmed } }),
+
+  /** Looks what a link leads to: a picture, or a page with pictures. */
+  webInspect: (url: string) => invoke<WebInspected>("web_inspect", { url }),
+  /** Searches a catalogue; `page` starts at 1. */
+  webSearch: (source: WebSource, query: string, page: number) =>
+    invoke<WebSearchPage>("web_search", { source, query, page }),
+  /** Downloads a picture for the list of what was found; returns the path of the file. */
+  webPreview: (url: string, page: string | null) => invoke<string>("web_preview", { url, page }),
+  /** The saved files are the result of the returned job. */
+  webDownload: (images: WebImage[], title: string) => invoke<number>("web_download", { download: { images, title } }),
 
   chatsList: () => invoke<ChatSummary[]>("chats_list"),
   chatGet: (id: string) => invoke<Chat>("chat_get", { id }),

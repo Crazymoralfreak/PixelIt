@@ -10,6 +10,7 @@ pub mod args;
 pub mod assistant;
 mod files;
 mod neural;
+mod web;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -217,7 +218,11 @@ pub fn run_pipeline(
 
 /// Every tool, in the order they are offered.
 pub fn tools() -> Vec<&'static Tool> {
-    files::TOOLS.iter().chain(neural::TOOLS).collect()
+    files::TOOLS
+        .iter()
+        .chain(neural::TOOLS)
+        .chain(web::TOOLS)
+        .collect()
 }
 
 /// The tools as a model sees them.

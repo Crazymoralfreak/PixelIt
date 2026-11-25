@@ -16,11 +16,30 @@ const JOURNAL_LIMIT: usize = 500;
 /// Failed files listed per entry.
 pub const ERRORS_LISTED: usize = 20;
 
+/// Downloaded files whose origin is kept per entry.
+pub const ORIGINS_LISTED: usize = 200;
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct JournalError {
     pub path: String,
     pub error: Option<Error>,
+}
+
+/// Where a downloaded file came from and on what terms it may be used.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct JournalOrigin {
+    /// The saved file.
+    pub path: String,
+    /// The address the file was downloaded from.
+    pub url: String,
+    /// The page the picture was found on.
+    pub page: String,
+    pub author: String,
+    /// The short name of the licence, as the source gives it.
+    pub license: String,
+    pub license_url: String,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +63,9 @@ pub struct JournalEntry {
     /// Undo record of the entry, while the action can still be reversed.
     pub undo_id: Option<String>,
     pub errors: Vec<JournalError>,
+    /// For downloads: the source, the author and the licence of every file.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub origins: Vec<JournalOrigin>,
 }
 
 impl JournalEntry {
@@ -115,6 +137,12 @@ mod tests {
         let mut entry = JournalEntry::new("batch", "Resize");
         entry.undo_id = Some("u1".into());
         entry.done = 3;
+        entry.origins.push(JournalOrigin {
+            path: "fox.jpg".into(),
+            author: "Someone".into(),
+            license: "CC BY 4.0".into(),
+            ..JournalOrigin::default()
+        });
         Journal::push(&paths, entry.clone()).unwrap();
         Journal::push(&paths, JournalEntry::new("edit", "Crop")).unwrap();
         let journal = Journal::load(&paths);

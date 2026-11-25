@@ -2,11 +2,22 @@
 
 ## [0.0.2] - 2026-11-25
 
+### Images from the web
+
+- A new page, "From the web". By link: a Pinterest pin (a short `pin.it` link too), any web page or an image itself. An image behind a direct link is downloaded at once; for a page PixelIt shows the images found on it, the main one first and already selected. No account is needed.
+- Search in the Openverse and Wikimedia Commons catalogues: freely licensed images, each shown with its author and license. No key is needed; the text of the query goes to the chosen catalogue only.
+- The selection can be downloaded, downloaded and opened in the editor, or downloaded and added to the batch. A download runs as a job with progress and cancel.
+- A link pasted with Ctrl+V outside input fields opens this page with the address filled in.
+- The settings have a "Download folder"; until it is chosen, files are saved into the `downloads` folder in the PixelIt data.
+- The history keeps the source address of every downloaded file, and its author and license when they are known; a download can be undone.
+- The assistant and MCP agents have two new tools, `find_web_images` and `download_web_image`. They work only with the permission to download from the web and inside the allowed folders; addresses of this computer and of the local network are closed to agents.
+
 ### Editor
 
 - A new step, "AI edit": the connected generator changes the whole picture or the area painted with the brush by your description. It has a strength setting and an "Another variant" button; the export uses the same result the editor shows.
 - Background removal: the brush marks the areas to keep.
 - Steps with a brush have "Run" and "Change the area" buttons: the step starts once the area is marked.
+- The "Brush size" slider is always in sight, and the hint under it names the button that turns the brush on. The outline of the brush shows under the pointer; the [ and ] keys change the size too.
 - An indicator over the picture shows that it is being processed; the error of a step stays on screen with a "Try again" button.
 - Object removal: a model that does not start on the graphics card moves to the processor by itself.
 

@@ -8,7 +8,7 @@ import { editorBaseUrl, editorRenderUrl } from "../api/urls";
 import { useApp } from "../app/context";
 import { OutputEditor } from "../components/OutputEditor";
 import { StepsEditor } from "../components/StepsEditor";
-import { useT } from "../i18n";
+import { useT, type Translator } from "../i18n";
 import { extensionOf, fileName, folderOf, formatBytes, formatSaving, newId, stemOf } from "../lib/format";
 import {
   extensionOfFormat,
@@ -116,6 +116,32 @@ function canRun(op: BrushedOp): boolean {
   }
 }
 
+/** Limits of the brush, in percent of the short side, and what a key press changes it by. */
+const BRUSH_MIN = 0.5;
+const BRUSH_MAX = 30;
+const BRUSH_KEY_STEP = 1;
+
+/** The brush after a key press: whole sizes, with the smallest one below them. */
+function nextBrush(brush: number, grow: boolean): number {
+  const next = grow ? Math.floor(brush + BRUSH_KEY_STEP) : Math.ceil(brush - BRUSH_KEY_STEP);
+  return Math.min(BRUSH_MAX, Math.max(BRUSH_MIN, next));
+}
+
+/** The button that turns the brush of a step on. */
+function paintLabel(op: BrushedOp, t: Translator["t"]): string {
+  switch (op.type) {
+    case "inpaint":
+    case "aiEdit":
+      return t("editor.editArea");
+    case "removeBackground":
+      return t("editor.markKeep");
+    default: {
+      const unreachable: never = op;
+      return unreachable;
+    }
+  }
+}
+
 /** The step the overlay shapes, when the op is one it can shape. */
 function asShaped(op: Op): ShapedOp | null {
   return op.type === "crop" || op.type === "annotate" || isBrushed(op) ? op : null;
@@ -149,11 +175,20 @@ function ToolControls({
 }) {
   const { t, td } = useT();
   if (isBrushed(step.op)) {
-    return painting ? (
-      <Field label={t("editor.brush")}>
-        <Slider value={tool.brush} onChange={(brush) => onTool({ brush })} min={0.5} max={30} step={0.5} reset={4} />
+    // The brush is always in sight; while it is off, the hint names the button that turns it on.
+    const button = paintLabel(step.op, t);
+    return (
+      <Field label={t("editor.brush")} hint={painting ? t("editor.brushHint") : t("editor.brushIdle", { button })}>
+        <Slider
+          value={tool.brush}
+          onChange={(brush) => onTool({ brush })}
+          min={BRUSH_MIN}
+          max={BRUSH_MAX}
+          step={0.5}
+          reset={DEFAULT_TOOL.brush}
+        />
       </Field>
-    ) : null;
+    );
   }
   if (step.op.type !== "annotate") {
     return null;
@@ -757,6 +792,10 @@ export default function EditorPage({ active }: { active: boolean }) {
         setActual(true);
       } else if (event.code === "Digit0") {
         setActual(false);
+      } else if (painting !== null && (event.code === "BracketLeft" || event.code === "BracketRight")) {
+        // The keys beside P, whatever the layout prints on them.
+        const grow = event.code === "BracketRight";
+        setTool((current) => ({ ...current, brush: nextBrush(current.brush, grow) }));
       } else if (event.key === "Escape") {
         setSelected(null);
         setPainting(null);
@@ -778,7 +817,7 @@ export default function EditorPage({ active }: { active: boolean }) {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
     };
-  }, [active, chooseFile, commit, exportWith, output, redo, saveAs, selected, steps, undo]);
+  }, [active, chooseFile, commit, exportWith, output, painting, redo, saveAs, selected, steps, undo]);
 
   if (!session) {
     return (

@@ -5,6 +5,7 @@
 pub mod agents;
 pub mod files;
 pub mod neural;
+pub mod web;
 pub mod work;
 
 use std::os::windows::process::CommandExt;
@@ -248,6 +249,7 @@ pub fn cache_info(core: CoreState<'_>) -> CacheInfo {
 #[tauri::command(async)]
 pub fn cache_clear(core: CoreState<'_>) -> CacheInfo {
     thumbs::clear_cache(core.paths());
+    pixelit_ai::web::clear_previews(core.paths());
     cache_info(core)
 }
 

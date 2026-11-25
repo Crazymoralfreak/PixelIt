@@ -90,6 +90,17 @@ fn reserve(path: &Path) -> Result<PathBuf> {
         .detail("no free file name"))
 }
 
+/// Gives a finished file of the same folder its name: `temp` becomes `path`,
+/// or `name (2).ext` and so on when the name is taken. Returns the name used.
+pub fn place_file(temp: &Path, path: &Path) -> Result<PathBuf> {
+    let target = reserve(path)?;
+    if let Err(error) = fs::rename(temp, &target) {
+        let _ = fs::remove_file(&target);
+        return Err(Error::from(error).with("path", target.display()));
+    }
+    Ok(target)
+}
+
 fn write_temp(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
     let temp = folder.join(format!(".pixelit-{:08x}.tmp", fastrand::u32(..)));
     let written = (|| -> std::io::Result<()> {
@@ -383,6 +394,24 @@ mod tests {
         let written = write_file(&path, b"new", Conflict::Overwrite).unwrap();
         assert_eq!(written, Written::Created(path.clone()));
         assert_eq!(fs::read(&path).unwrap(), b"new");
+    }
+
+    #[test]
+    fn finished_files_get_free_names() {
+        let folder = tempfile::tempdir().unwrap();
+        let target = folder.path().join("fox.jpg");
+        for (index, name) in ["fox.jpg", "fox (2).jpg", "fox (3).jpg"].iter().enumerate() {
+            let temp = folder.path().join(".part");
+            fs::write(&temp, [index as u8]).unwrap();
+            let placed = place_file(&temp, &target).unwrap();
+            assert_eq!(placed, folder.path().join(name));
+            assert_eq!(fs::read(&placed).unwrap(), [index as u8]);
+            assert!(!temp.exists());
+        }
+        let missing = place_file(&folder.path().join("absent"), &target).unwrap_err();
+        assert_eq!(missing.code, "notFound");
+        // The name reserved for the file that never came is free again.
+        assert!(!folder.path().join("fox (4).jpg").exists());
     }
 
     #[test]

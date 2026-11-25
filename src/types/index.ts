@@ -312,6 +312,8 @@ export interface Settings {
   skippedVersion: string;
   captureHotkey: string;
   pdfiumFolder: string;
+  /** Folder for pictures downloaded from the web; empty keeps them in the application data. */
+  downloadFolder: string;
   agents: AgentAccess;
   recentFolders: string[];
 }
@@ -516,6 +518,67 @@ export interface JournalEntry {
   folder: string;
   undoId: string | null;
   errors: Array<{ path: string; error: AppError | null }>;
+  /** For downloads: where every file came from. Absent for everything else. */
+  origins?: JournalOrigin[];
+}
+
+/** Where a downloaded file came from and on what terms it may be used. */
+export interface JournalOrigin {
+  path: string;
+  url: string;
+  page: string;
+  author: string;
+  license: string;
+  licenseUrl: string;
+}
+
+/** Catalogues of pictures that are searched without an account. */
+export type WebSource = "openverse" | "commons";
+
+export const WEB_SOURCES: readonly WebSource[] = ["openverse", "commons"];
+
+/** A picture of the web with what is known about where it comes from. */
+export interface WebImage {
+  /** The address of the picture in its best size. */
+  url: string;
+  /** A smaller copy, when the source has one; otherwise the same address. */
+  preview: string;
+  title: string;
+  /** The size in pixels; zero when the source does not tell it. */
+  width: number;
+  height: number;
+  /** The page the picture was found on. */
+  page: string;
+  author: string;
+  license: string;
+  licenseUrl: string;
+  /** The catalogue or the site the picture comes from. */
+  source: string;
+  /** The picture the page is about: its cover, or the pin itself. */
+  main: boolean;
+}
+
+/** What a link leads to. */
+export interface WebInspected {
+  /** The address that answered, after redirects. */
+  url: string;
+  title: string;
+  /** The link is a picture itself, not a page. */
+  direct: boolean;
+  images: WebImage[];
+}
+
+export interface WebSearchPage {
+  images: WebImage[];
+  /** Whether the next page has something. */
+  more: boolean;
+}
+
+/** The result of a download job. */
+export interface WebDownloaded {
+  files: string[];
+  failed: Array<{ url: string; error: AppError }>;
+  folder: string;
 }
 
 export interface UndoReport {

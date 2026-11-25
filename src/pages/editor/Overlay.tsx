@@ -389,18 +389,23 @@ interface BrushOverlayProps {
 /** An area painted with a brush, stroke by stroke. */
 function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes }: BrushOverlayProps) {
   const [draft, setDraft] = useState<Stroke | null>(null);
+  /** Where the pointer is: the outline of the brush is drawn there. */
+  const [pointer, setPointer] = useState<Point | null>(null);
   const short = Math.min(width, height);
 
   const begin = (event: ReactPointerEvent<SVGSVGElement>) => {
     const point = fraction(event);
+    setPointer(point);
     // Two equal points make a dot, which a single click should leave.
     setDraft({ points: [point, point], width: brush });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const move = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const point = fraction(event);
+    setPointer(point);
     if (draft) {
-      setDraft({ ...draft, points: [...draft.points, fraction(event)] });
+      setDraft({ ...draft, points: [...draft.points, point] });
     }
   };
 
@@ -412,6 +417,7 @@ function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes
   };
 
   const strokes = draft ? [...painted, draft] : painted;
+  const radius = Math.max(1, (brush / 100) * short) / 2;
   return (
     <svg
       className="overlay overlay-draw"
@@ -420,6 +426,7 @@ function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={end}
+      onPointerLeave={() => setPointer(null)}
     >
       {strokes.map((stroke, index) => (
         <polyline
@@ -432,6 +439,13 @@ function BrushOverlay({ width, height, brush, color, strokes: painted, onStrokes
           strokeLinejoin="round"
         />
       ))}
+      {pointer ? (
+        // The size of the brush, dark under light so it shows on any picture.
+        <g className="brush-outline">
+          <circle cx={pointer[0] * width} cy={pointer[1] * height} r={radius} className="brush-outline-dark" />
+          <circle cx={pointer[0] * width} cy={pointer[1] * height} r={radius} className="brush-outline-light" />
+        </g>
+      ) : null}
     </svg>
   );
 }

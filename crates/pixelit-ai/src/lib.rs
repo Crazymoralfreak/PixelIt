@@ -18,6 +18,7 @@ pub mod net;
 pub mod onnx;
 pub mod secrets;
 pub mod vision;
+pub mod web;
 pub mod worker;
 
 use std::path::PathBuf;
@@ -42,6 +43,7 @@ pub use crate::llm::{Message, Reply, Role, ToolCall, ToolSpec};
 pub use crate::net::Net;
 pub use crate::onnx::{Device, Onnx};
 pub use crate::vision::VisionTask;
+pub use crate::web::{WebImage, WebSource};
 
 /// What the AI part can do right now, for the interface and the tool list.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]

@@ -18,6 +18,7 @@ The files are not signed with a code signing certificate, so Windows SmartScreen
 ## What it can do
 
 - **Viewer.** Folders with thumbnails, sorting and a filter; size, format, bit depth and metadata of every image. Files open by drag and drop, from a dialog, from the clipboard (Ctrl+V), from Explorer and from launch arguments.
+- **From the web.** Images by link — a Pinterest pin, any web page or the direct address of an image — and search in the Openverse and Wikimedia Commons catalogues of freely licensed images. No account and no keys are needed. A download opens in the editor or goes to the batch; its source, author and license are kept in the history. A link can be pasted with Ctrl+V from anywhere in the application.
 - **Formats.** Reads JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, GIF, BMP, ICO, camera RAW, SVG, PDF and PSD. Writes JPEG, PNG, WebP, AVIF, JPEG XL, TIFF, GIF, BMP and ICO. 16 bits per channel are kept where the format has them.
 - **Editor.** A stack of steps that never changes the source: resize, crop, rotate, flip, adjustments, filters, watermarks, annotations. Before and after comparison, undo and redo, a size estimate and a comparison of formats before saving.
 - **Batch.** A queue of files and folders processed in parallel, with pause, cancel and the remaining time. A target file size, quality chosen by visual similarity, automatic choice of the smallest format.
@@ -39,7 +40,8 @@ Privacy rules:
 
 - External services are off until you switch them on, and PixelIt asks before it sends an image or a prompt to one. A server on this computer (loopback address) counts as local.
 - Keys are kept in the Windows Credential Manager, not in the settings files.
-- The assistant and external agents work only inside the folders you allowed. Overwriting, deleting, downloading models and using external services are separate permissions, all off by default.
+- The assistant and external agents work only inside the folders you allowed. Overwriting, deleting, downloading from the web (models, components, images) and using external services are separate permissions, all off by default.
+- The "From the web" page uses the network only when you act: the link you pasted, the search catalogue you chose and the addresses of the images found. The text of a query goes to the chosen catalogue only. Addresses of this computer and of the local network are closed to agents.
 
 ## Updates
 
@@ -71,7 +73,7 @@ PixelIt help
 
 ## MCP server
 
-`PixelIt.exe mcp` is an MCP server on the standard input and output. An agent (Cursor, Claude Desktop and other MCP clients) gets the same tools as the built-in assistant: `list_images`, `image_info`, `list_recipes`, `run_recipe`, `convert`, `run_pipeline`, `compare_formats`, `find_duplicates`, `undo`, `ai_status`, `remove_background`, `upscale`, `restore_faces`, `generate_image`, `describe_image`, `install_component`.
+`PixelIt.exe mcp` is an MCP server on the standard input and output. An agent (Cursor, Claude Desktop and other MCP clients) gets the same tools as the built-in assistant: `list_images`, `image_info`, `list_recipes`, `run_recipe`, `convert`, `run_pipeline`, `compare_formats`, `find_duplicates`, `undo`, `ai_status`, `remove_background`, `upscale`, `restore_faces`, `generate_image`, `describe_image`, `install_component`, `find_web_images`, `download_web_image`.
 
 The "Models and AI" page, tab "MCP", shows the ready text for the settings of the client. Its form:
 
@@ -84,7 +86,7 @@ The "Models and AI" page, tab "MCP", shows the ready text for the settings of th
 }
 ```
 
-The same tab sets what agents may do: the allowed folders and the separate permissions to overwrite, delete, download models and use external services. By default the server writes new files only and downloads nothing.
+The same tab sets what agents may do: the allowed folders and the separate permissions to overwrite, delete, download from the web and use external services. By default the server writes new files only and downloads nothing.
 
 PixelIt is an MCP client as well: the same tab connects external MCP servers (a program over the standard streams or an address with the Streamable HTTP transport), with a permission for every tool: allow, ask or deny.
 
@@ -98,7 +100,7 @@ PixelIt is an MCP client as well: the same tab connects external MCP servers (a 
 
 ## Data
 
-Recipes, settings, the journal, chats, downloaded models and the thumbnail cache are in `%AppData%\PixelIt`. The portable version keeps them in the `data` folder beside `PixelIt.exe`. Only one instance runs at a time; a second start hands its files to the first.
+Recipes, settings, the journal, chats, downloaded models and the thumbnail cache are in `%AppData%\PixelIt`. The portable version keeps them in the `data` folder beside `PixelIt.exe`. Images from the web are saved there too, in the `downloads` folder, until the settings name another one. Only one instance runs at a time; a second start hands its files to the first.
 
 When the program is uninstalled the folder stays. A separate box in the uninstall window deletes it; it is off by default.
 

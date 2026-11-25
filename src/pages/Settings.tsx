@@ -175,6 +175,13 @@ export default function SettingsPage() {
             />
           </div>
         </Field>
+        <Field label={t("settings.downloadFolder")} hint={t("settings.downloadFolderHint")}>
+          <PathField
+            kind="folder"
+            value={settings.downloadFolder}
+            onChange={(downloadFolder) => set({ downloadFolder })}
+          />
+        </Field>
         <Field label={t("settings.pdfium")} hint={t("settings.pdfiumHint")}>
           <PathField kind="folder" value={settings.pdfiumFolder} onChange={(pdfiumFolder) => set({ pdfiumFolder })} />
         </Field>

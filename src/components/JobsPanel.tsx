@@ -15,14 +15,22 @@ export function activeJobs(jobs: JobInfo[]): JobInfo[] {
   return jobs.filter(isActive);
 }
 
-/** Progress of a job in words: files for most jobs, bytes for downloads. */
+/**
+ * Progress of a job in words: files for most jobs, bytes for an installation,
+ * a share for pictures from the web, whose sizes are not known in advance.
+ */
 export function jobAmount(job: JobInfo): string {
   if (job.total <= 0) {
     return "";
   }
-  return job.kind === "install"
-    ? `${formatBytes(job.done)} / ${formatBytes(job.total)}`
-    : `${job.done} / ${job.total}`;
+  switch (job.kind) {
+    case "install":
+      return `${formatBytes(job.done)} / ${formatBytes(job.total)}`;
+    case "download":
+      return `${Math.min(100, Math.floor((job.done / job.total) * 100))}%`;
+    default:
+      return `${job.done} / ${job.total}`;
+  }
 }
 
 export function JobRow({ job }: { job: JobInfo }) {

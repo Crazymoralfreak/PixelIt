@@ -108,6 +108,11 @@ impl Paths {
         self.root.join("generated")
     }
 
+    /// Pictures downloaded from the web, unless the settings name a folder.
+    pub fn downloads(&self) -> PathBuf {
+        self.root.join("downloads")
+    }
+
     /// Creates the folders the application writes into.
     pub fn ensure(&self) -> Result<()> {
         for folder in [
@@ -141,6 +146,8 @@ mod tests {
             paths.thumbs(),
             paths.models(),
             paths.logs(),
+            paths.generated(),
+            paths.downloads(),
         ] {
             assert!(path.starts_with("/data"), "{path:?}");
         }

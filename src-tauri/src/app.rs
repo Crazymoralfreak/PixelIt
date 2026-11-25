@@ -468,6 +468,8 @@ pub fn setup(
             background.restart_watch();
             let limit = u64::from(background.engine.settings().thumb_cache_mb) * 1024 * 1024;
             thumbs::trim_cache(background.paths(), limit);
+            // Previews of web pictures live for one run of the application.
+            pixelit_ai::web::clear_previews(background.paths());
             // Servers the user switched on are started in the background; a
             // server outside this computer needs the cloud permission.
             let remote = background.ai.settings().allow_cloud;

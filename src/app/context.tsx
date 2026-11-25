@@ -11,6 +11,7 @@ export type Page =
   | "recipes"
   | "tools"
   | "studio"
+  | "web"
   | "assistant"
   | "journal"
   | "ai"
@@ -24,6 +25,7 @@ export const PAGES: readonly Page[] = [
   "recipes",
   "tools",
   "studio",
+  "web",
   "assistant",
   "journal",
   "ai",
@@ -49,6 +51,13 @@ export interface AskNameOptions {
 export interface Incoming {
   paths: string[];
   /** Grows with every hand-over, so the same paths can arrive twice. */
+  token: number;
+}
+
+/** A web address handed to the "From the web" page: a paste outside any field. */
+export interface IncomingLink {
+  url: string;
+  /** Grows with every hand-over, so the same address can arrive twice. */
   token: number;
 }
 
@@ -88,6 +97,9 @@ export interface AppContextValue {
   /** The file the editor works on. */
   editorPath: string | null;
   openInEditor: (path: string) => void;
+  webLink: IncomingLink | null;
+  /** Opens the "From the web" page with the address filled in; nothing is requested yet. */
+  openLink: (url: string) => void;
 
   confirm: (options: ConfirmOptions) => Promise<boolean>;
   /** Asks for a name; resolves to `null` when the dialog is dismissed. */
