@@ -143,6 +143,232 @@ pub struct Generation {
     /// Write the prompt into the PNG, in the text block other tools read.
     #[serde(default = "remember_parameters")]
     pub embed_parameters: bool,
+    /// Which upscaler enlarges pictures. Empty uses the built-in model.
+    /// `onnx:`, `comfy:` and `forge:` name a file or a model on that server.
+    pub upscaler: String,
+    /// After enlarging, ask the generator to paint detail back in.
+    pub upscale_refine: bool,
+    /// How far that pass may move from the enlarged picture, from 0 to 1.
+    pub upscale_strength: f32,
+}
+
+/// Which local program a card is about.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AppKind {
+    Comfy,
+    Forge,
+}
+
+impl AppKind {
+    /// The name used in commands and job titles.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Comfy => "comfy",
+            Self::Forge => "forge",
+        }
+    }
+
+    /// `None` when the text is not a program name.
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim() {
+            "comfy" => Some(Self::Comfy),
+            "forge" => Some(Self::Forge),
+            _ => None,
+        }
+    }
+}
+
+/// Where the copy on a card came from.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum AppOrigin {
+    #[default]
+    Missing,
+    /// This section downloaded it.
+    Ours,
+    /// A folder the user pointed at.
+    Folder,
+    /// A package already installed by Stability Matrix.
+    StabilityMatrix,
+}
+
+fn comfy_port() -> u16 {
+    8188
+}
+
+fn forge_port() -> u16 {
+    7860
+}
+
+/// One installed ComfyUI or Forge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LocalApp {
+    pub home: String,
+    pub origin: AppOrigin,
+    /// Release tag of a copy this section installed. Empty for any other copy.
+    pub release: String,
+    /// Size of the archive this section installed, so a later release can be told apart.
+    pub bytes: u64,
+    pub port: u16,
+}
+
+impl Default for LocalApp {
+    fn default() -> Self {
+        Self {
+            home: String::new(),
+            origin: AppOrigin::Missing,
+            release: String::new(),
+            bytes: 0,
+            port: comfy_port(),
+        }
+    }
+}
+
+/// A kind of model file the shared folders hold.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ModelKind {
+    Checkpoints,
+    Loras,
+    Vaes,
+    Embeddings,
+    ControlNet,
+    Upscale,
+}
+
+impl ModelKind {
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Checkpoints => "checkpoints",
+            Self::Loras => "loras",
+            Self::Vaes => "vaes",
+            Self::Embeddings => "embeddings",
+            Self::ControlNet => "controlNet",
+            Self::Upscale => "upscale",
+        }
+    }
+
+    pub fn parse(text: &str) -> Option<Self> {
+        match text.trim() {
+            "checkpoints" => Some(Self::Checkpoints),
+            "loras" => Some(Self::Loras),
+            "vaes" => Some(Self::Vaes),
+            "embeddings" => Some(Self::Embeddings),
+            "controlNet" => Some(Self::ControlNet),
+            "upscale" => Some(Self::Upscale),
+            _ => None,
+        }
+    }
+}
+
+/// Folders of checkpoints, LoRA and the other kinds. Several of one kind are kept.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ModelLibrary {
+    pub checkpoints: Vec<String>,
+    pub loras: Vec<String>,
+    pub vaes: Vec<String>,
+    pub embeddings: Vec<String>,
+    pub control_net: Vec<String>,
+    pub upscale: Vec<String>,
+}
+
+impl ModelLibrary {
+    pub fn of(&self, kind: ModelKind) -> &[String] {
+        match kind {
+            ModelKind::Checkpoints => &self.checkpoints,
+            ModelKind::Loras => &self.loras,
+            ModelKind::Vaes => &self.vaes,
+            ModelKind::Embeddings => &self.embeddings,
+            ModelKind::ControlNet => &self.control_net,
+            ModelKind::Upscale => &self.upscale,
+        }
+    }
+
+    pub fn of_mut(&mut self, kind: ModelKind) -> &mut Vec<String> {
+        match kind {
+            ModelKind::Checkpoints => &mut self.checkpoints,
+            ModelKind::Loras => &mut self.loras,
+            ModelKind::Vaes => &mut self.vaes,
+            ModelKind::Embeddings => &mut self.embeddings,
+            ModelKind::ControlNet => &mut self.control_net,
+            ModelKind::Upscale => &mut self.upscale,
+        }
+    }
+}
+
+/// ComfyUI, Forge and the folders their models are read from.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LocalApps {
+    pub comfy: LocalApp,
+    pub forge: LocalApp,
+    pub models: ModelLibrary,
+    /// Adult results stay hidden until this is switched on.
+    pub show_nsfw: bool,
+}
+
+impl Default for LocalApps {
+    fn default() -> Self {
+        Self {
+            comfy: LocalApp {
+                port: comfy_port(),
+                ..LocalApp::default()
+            },
+            forge: LocalApp {
+                port: forge_port(),
+                ..LocalApp::default()
+            },
+            models: ModelLibrary::default(),
+            show_nsfw: false,
+        }
+    }
+}
+
+impl LocalApps {
+    pub fn of(&self, kind: AppKind) -> &LocalApp {
+        match kind {
+            AppKind::Comfy => &self.comfy,
+            AppKind::Forge => &self.forge,
+        }
+    }
+
+    pub fn of_mut(&mut self, kind: AppKind) -> &mut LocalApp {
+        match kind {
+            AppKind::Comfy => &mut self.comfy,
+            AppKind::Forge => &mut self.forge,
+        }
+    }
+
+    fn normalize(&mut self) {
+        for app in [&mut self.comfy, &mut self.forge] {
+            app.home = app.home.trim().to_owned();
+            if app.home.is_empty() {
+                app.origin = AppOrigin::Missing;
+            }
+        }
+        if self.comfy.port == 0 {
+            self.comfy.port = comfy_port();
+        }
+        if self.forge.port == 0 {
+            self.forge.port = forge_port();
+        }
+        for folders in [
+            &mut self.models.checkpoints,
+            &mut self.models.loras,
+            &mut self.models.vaes,
+            &mut self.models.embeddings,
+            &mut self.models.control_net,
+            &mut self.models.upscale,
+        ] {
+            for folder in folders.iter_mut() {
+                *folder = folder.trim().to_owned();
+            }
+            folders.retain(|folder| !folder.is_empty());
+        }
+    }
 }
 
 /// Key of [`Generation::model_defaults`] for one generator and model.
@@ -170,6 +396,9 @@ impl Default for Generation {
             styles: Vec::new(),
             model_defaults: BTreeMap::new(),
             embed_parameters: true,
+            upscaler: String::new(),
+            upscale_refine: true,
+            upscale_strength: 0.35,
         }
     }
 }
@@ -192,6 +421,8 @@ pub struct AiSettings {
     /// Model of the assistant chat.
     pub assistant: Endpoint,
     pub generation: Generation,
+    /// ComfyUI, Forge and the shared model folders.
+    pub apps: LocalApps,
 }
 
 impl Default for AiSettings {
@@ -206,6 +437,7 @@ impl Default for AiSettings {
             vision: Endpoint::default(),
             assistant: Endpoint::default(),
             generation: Generation::default(),
+            apps: LocalApps::default(),
         }
     }
 }
@@ -245,6 +477,12 @@ impl AiSettings {
         } else {
             6.0
         };
+        generation.upscale_strength = if generation.upscale_strength.is_finite() {
+            generation.upscale_strength.clamp(0.05, 1.0)
+        } else {
+            0.35
+        };
+        self.apps.normalize();
         for url in [
             &mut generation.comfy_url,
             &mut generation.forge_url,

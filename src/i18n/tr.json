@@ -740,7 +740,29 @@
       "sketch": "Kurşun kalem eskizi",
       "oil": "Yağlı boya",
       "portrait": "Portre"
-    }
+    },
+    "enlarge": "Büyütme",
+    "enlargeOff": "Yok",
+    "enlargeHint": "Her resim, üretildikten hemen sonra seçilen modelle büyütülür.",
+    "upscaleInstallTitle": "Büyütme modeli kurulsun mu?",
+    "upscaleInstallText": "Büyütme için yerel {name} modeli ({size}) gerekiyor. İndirilip kurulsun mu?",
+    "upscaleInstall": "Kur",
+    "upscaleInstalling": "Büyütme modeli indiriliyor. Hemen ardından görsel büyütülecek.",
+    "upscaler": "Büyütme modeli",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "çalışan bir ComfyUI veya Forge gerekir",
+    "upscalerMissing": "Bu model şu anda kullanılamıyor. Program çalışırken listeyi yenileyin.",
+    "upscaleMode": "Ayrıntı",
+    "upscaleFast": "Hızlı",
+    "upscaleRefine": "Ayrıntılı",
+    "upscaleRefineHint": "Üretici, ince ayrıntı geri gelsin diye büyütülmüş resmi bir kez daha boyar. Bu, üretmek kadar sürer.",
+    "upscaleFastHint": "Yalnızca büyütme modeli çalışır. Daha hızlıdır ve yeni ayrıntı eklemez.",
+    "upscaleStrength": "Ayrıntı gücü",
+    "upscaleStrengthHint": "Üreticinin büyütülmüş resimden ne kadar uzaklaşabileceği. Düşük değer daha yakın kalır.",
+    "upscaleOptions": "Büyütme ayarları",
+    "noticeNeedsGenerator": "Ayrıntı için ComfyUI veya Forge gerekir. Resim yalnızca büyütüldü.",
+    "noticeNoPrompt": "Bu resimde kayıtlı bir istem yok, bu yüzden yalnızca büyütüldü.",
+    "noticeRefineFailed": "Üretici yanıt vermedi, bu yüzden resim yalnızca büyütüldü."
   },
   "vision": {
     "noModelTitle": "Model seçilmedi",
@@ -820,7 +842,7 @@
     "allowCloud": "Dış hizmetlere izin ver",
     "confirmCloud": "Her gönderimden önce sor",
     "localServers": "Yerel sunucular",
-    "localServersText": "Bu bilgisayarda çalışan Ollama, LM Studio, ComfyUI ve Forge sunucularını arar.",
+    "localServersText": "Bu bilgisayarda çalışan Ollama, LM Studio, ComfyUI, Forge ve Fooocus sunucularını arar.",
     "discover": "Bul",
     "noneFound": "Çalışan sunucu bulunamadı",
     "modelsCount": "Model: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "{host} sunucusu bu bilgisayarın dışında ve dış hizmetler şu anda kapalı. Bunlara erişime izin verilsin mi? Bu sayfadaki ayarlar kaydedilecek.",
     "allowCloudYes": "İzin ver",
     "forgeCheckpoint": "Model",
-    "forgeCheckpointHint": "Forge’un gösterdiği ad. Boş bırakılırsa orada yüklü model kalır."
+    "forgeCheckpointHint": "Forge’un gösterdiği ad. Boş bırakılırsa orada yüklü model kalır.",
+    "tabApps": "Uygulamalar",
+    "apps": {
+      "title": "Uygulamalar",
+      "text": "ComfyUI veya Forge kurar, başlatır ve durdurur ve ortak model klasörleri tutar.",
+      "install": "Kur",
+      "useStability": "Stability Matrix’ten al",
+      "fillModels": "Stability Matrix klasörleri",
+      "start": "Başlat",
+      "stop": "Durdur",
+      "open": "Aç",
+      "checkUpdates": "Güncellemeleri denetle",
+      "update": "Güncelle",
+      "noHome": "Henüz klasör yok",
+      "nvidia": "NVIDIA derlemesi",
+      "foreignUpdate": "Bu kopyayı kuran kişi günceller.",
+      "updateReady": "{version} sürümü hazır.",
+      "models": "Model klasörleri",
+      "modelsText": "ComfyUI her klasörü alır. Forge her türden bir klasör alır.",
+      "search": "Model ara",
+      "searchText": "Stability Matrix’in aradığı kataloglar. Dosya yalnızca istendiğinde, kendi türünün ilk klasörüne indirilir.",
+      "source": "Katalog",
+      "query": "Arama",
+      "modelKind": "Tür",
+      "sort": "Sıra",
+      "period": "Dönem",
+      "baseModel": "Temel model",
+      "hideInstalled": "Kurulu olanları gizle",
+      "showNsfw": "Yetişkin modelleri göster",
+      "searchButton": "Ara",
+      "download": "İndir",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Kurulu değil",
+        "stopped": "Durdu",
+        "running": "Çalışıyor",
+        "foreign": "Zaten çalışıyor"
+      },
+      "origin": {
+        "missing": "Kurulu değil",
+        "ours": "Buradan kuruldu",
+        "folder": "Seçilen klasör",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Liste",
+        "grid": "Izgara"
+      },
+      "sorts": {
+        "downloads": "Populer",
+        "rating": "En yuksek puan",
+        "newest": "En yeni"
+      },
+      "periods": {
+        "all": "Tum zaman",
+        "year": "Son yil",
+        "month": "Son ay",
+        "week": "Son hafta",
+        "day": "Son gun"
+      },
+      "notInFolder": "Program bu klasörde bulunamadı",
+      "log": "Başlatma günlüğü",
+      "logEmpty": "Günlük boş. Başlatmadan sonra dolar.",
+      "logFile": "Dosyayı göster",
+      "logCut": "Günlüğün yalnızca sonu gösteriliyor. Tamamı dosyada.",
+      "worksLocally": "ComfyUI olmadan çalışır",
+      "file": "Dosya"
+    },
+    "notSupportedYet": "Henüz desteklenmiyor"
   },
   "assistant": {
     "newChat": "Yeni sohbet",
@@ -1041,7 +1148,15 @@
     "keyMissing": "{host} sunucusu erişim anahtarı istiyor. Anahtarı aşağıdaki alana girip yeniden deneyin.",
     "updatePortable": "Taşınabilir sürüm elle güncellenir",
     "builtinStyle": "Yerleşik bir biçem değiştirilemez veya silinemez.",
-    "emptyName": "Bir ad yazın."
+    "emptyName": "Bir ad yazın.",
+    "appAlreadyRunning": "Program zaten çalışıyor ve onu PixelIt başlatmadı",
+    "appLaunchFailed": "Program başlatılamadı",
+    "appMissing": "Önce programı seçin veya kurun",
+    "appNotOurs": "PixelIt bu programı başlatmadı, bu yüzden durdurmaz",
+    "noArchive": "Bu bilgisayar için sabitlenmiş bir {id} arşivi yok",
+    "noModelFolder": "Önce bu tür modeller için bir klasör ekleyin",
+    "upscaleModelFailed": "Büyütme modeli çalışmadı: {model}",
+    "upscalerMissing": "Büyütme modeli bulunamadı: {model}"
   },
   "native": {
     "tray": {

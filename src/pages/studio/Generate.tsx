@@ -10,7 +10,7 @@ import { JobRow } from "../../components/JobsPanel";
 import { PathField } from "../../components/PathField";
 import { useT } from "../../i18n";
 import { copyText } from "../../lib/clipboard";
-import type { Expand, GeneratePreview, GenerateRequest, GeneratedRecord, GenerationProvider, Stroke } from "../../types";
+import type { Expand, GeneratePreview, GenerateRequest, GeneratedRecord, Generation, GenerationProvider, Stroke } from "../../types";
 import { Button, EmptyState, Field, Section, Segmented, Slider, Tag, TextArea } from "../../ui";
 import { Advanced } from "./Advanced";
 import { EditSource } from "./EditSource";
@@ -19,6 +19,12 @@ import type { StudioHandoff } from "./handoff";
 import { PictureDialog, type PictureItem } from "./PictureDialog";
 import { Results } from "./Results";
 import { StyleBar, useStyles } from "./Styles";
+import { UpscaleFields, tellUpscale } from "./UpscaleOptions";
+import { useUpscale } from "./upscale";
+
+/** Enlargement applied to every picture right after it is generated; 0 leaves it as it is. */
+type Enlarge = 0 | 2 | 4;
+const ENLARGE: readonly Enlarge[] = [0, 2, 4];
 
 const CLOUD_SIZES: ReadonlyArray<readonly [number, number, number, number]> = [
   [1, 1, 1024, 1024],
@@ -44,6 +50,8 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
   const { t, td } = useT();
   const { ai, jobs, jobResult, navigate, openInEditor, addToQueue, notify, showError, withCloud, refreshAi } = useApp();
   const { styles, reload } = useStyles();
+  const { ensure: ensureUpscale, upscale } = useUpscale();
+  const [enlarge, setEnlarge] = useState<Enlarge>(0);
   const generation = ai?.settings.generation;
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [request, setRequest] = useState<GenerateRequest | null>(null);
@@ -214,6 +222,12 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
   const items: PictureItem[] = record ? record.pictures.map((picture) => ({ record, picture })) : [];
 
   const set = (patch: Partial<GenerateRequest>) => setRequest({ ...request, ...patch });
+  const saveUpscale = (patch: Partial<Generation>) => {
+    void api
+      .aiSettingsSet({ ...ai.settings, generation: { ...generation, ...patch } })
+      .then(() => refreshAi())
+      .catch(showError);
+  };
 
   const rememberModel = async (nextProvider: GenerationProvider, nextModel: string, patch: Partial<GenerateRequest> = {}) => {
     const kept = nextModel || modelOf({ ...generation, provider: nextProvider });
@@ -258,6 +272,17 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
     if (next.prompt.trim() === "") {
       return;
     }
+    if (enlarge !== 0) {
+      // The model is asked for before the generation, not after a long wait.
+      try {
+        if (!(await ensureUpscale())) {
+          return;
+        }
+      } catch (error) {
+        showError(error);
+        return;
+      }
+    }
     setRequest(next);
     setBusy(true);
     setPreviews([]);
@@ -286,10 +311,13 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
           mode === "edit" && sourceOverride === undefined ? strokes : [],
           mode === "edit" && sourceOverride === undefined && !expandEmpty(expand) ? expand : NO_EXPAND,
           confirmed,
+          enlarge,
         ),
       );
       setJobId(id);
-      setRecord(await jobResult<GeneratedRecord>(id));
+      const made = await jobResult<GeneratedRecord>(id);
+      tellUpscale(made.notice, t, notify);
+      setRecord(made);
     } catch (error) {
       showError(error);
     } finally {
@@ -405,6 +433,17 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
               onChange={(count) => set({ count: Number(count) })}
             />
           </Field>
+          <Field label={t("studio.enlarge")} hint={enlarge === 0 ? undefined : t("studio.enlargeHint")}>
+            <Segmented
+              value={String(enlarge)}
+              options={ENLARGE.map((factor) => ({
+                value: String(factor),
+                label: factor === 0 ? t("studio.enlargeOff") : `×${factor}`,
+              }))}
+              onChange={(value) => setEnlarge(ENLARGE.find((factor) => String(factor) === value) ?? 0)}
+            />
+          </Field>
+          {enlarge !== 0 ? <UpscaleFields generation={generation} onChange={saveUpscale} /> : null}
           {mode === "edit" ? (
             <>
               <Field label={t("studio.source")} hint={t("studio.sourceHint")}>
@@ -454,7 +493,6 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
             previews={previews}
             busy={busy}
             count={request.count}
-            upscaleReady={ai.capabilities.upscale}
             onOpen={setOpen}
             onVariants={(item) => void run({ prompt: item.prompt, negative: item.negative, seed: null, count: 1, styles: item.styles }, null)}
             onSimilar={(item, file) => {
@@ -469,10 +507,8 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
               setExpand(NO_EXPAND);
             }}
             onUpscale={(file, factor) => {
-              void api
-                .generatedUpscale(file, factor)
-                .then((id) => jobResult<GeneratedRecord>(id))
-                .then(setRecord)
+              void upscale(file, factor)
+                .then((enlarged) => enlarged && setRecord(enlarged))
                 .catch(showError);
             }}
             onEditor={openInEditor}
@@ -490,7 +526,6 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
         <PictureDialog
           items={items}
           index={open}
-          upscaleReady={ai.capabilities.upscale}
           onIndex={setOpen}
           onClose={() => setOpen(null)}
           onRepeat={(item) => set({ prompt: item.prompt, negative: item.negative, styles: item.styles, seed: null })}
@@ -504,10 +539,8 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
             setExpand(NO_EXPAND);
           }}
           onUpscale={(file, factor) => {
-            void api
-              .generatedUpscale(file, factor)
-              .then((id) => jobResult<GeneratedRecord>(id))
-              .then(setRecord)
+            void upscale(file, factor)
+              .then((enlarged) => enlarged && setRecord(enlarged))
               .catch(showError);
           }}
           onEditor={openInEditor}

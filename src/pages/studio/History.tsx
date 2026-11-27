@@ -9,6 +9,7 @@ import { useT } from "../../i18n";
 import type { GeneratedRecord, Style } from "../../types";
 import { Button, Checkbox, EmptyState, Field, TextInput } from "../../ui";
 import { PictureDialog, type PictureItem } from "./PictureDialog";
+import { useUpscale } from "./upscale";
 
 function itemsOf(records: GeneratedRecord[]): PictureItem[] {
   return records.flatMap((record) => record.pictures.map((picture) => ({ record, picture })));
@@ -16,7 +17,6 @@ function itemsOf(records: GeneratedRecord[]): PictureItem[] {
 
 export function History({
   styles,
-  upscaleReady,
   onRepeat,
   onSeed,
   onVariants,
@@ -24,7 +24,6 @@ export function History({
   onEdit,
 }: {
   styles: Style[];
-  upscaleReady: boolean;
   onRepeat: (record: GeneratedRecord) => void;
   onSeed: (seed: number) => void;
   onVariants: (record: GeneratedRecord) => void;
@@ -32,7 +31,8 @@ export function History({
   onEdit: (file: string) => void;
 }) {
   const { t, td } = useT();
-  const { addToQueue, notify, showError, openInEditor, confirm, jobResult } = useApp();
+  const { addToQueue, notify, showError, openInEditor, confirm } = useApp();
+  const { upscale } = useUpscale();
   const [records, setRecords] = useState<GeneratedRecord[]>([]);
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState(false);
@@ -194,7 +194,6 @@ export function History({
         <PictureDialog
           items={flat}
           index={open}
-          upscaleReady={upscaleReady}
           onIndex={setOpen}
           onClose={() => setOpen(null)}
           onRepeat={onRepeat}
@@ -203,10 +202,7 @@ export function History({
           onSimilar={onSimilar}
           onEdit={onEdit}
           onUpscale={(file, factor) => {
-            void api
-              .generatedUpscale(file, factor)
-              .then((id) => jobResult(id))
-              .catch(showError);
+            void upscale(file, factor).catch(showError);
           }}
           onEditor={openInEditor}
           onBatch={(files) => {

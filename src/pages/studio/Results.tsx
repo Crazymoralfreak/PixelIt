@@ -5,13 +5,13 @@ import { thumbUrl } from "../../api/urls";
 import { useT } from "../../i18n";
 import type { GeneratePreview, GeneratedPicture, GeneratedRecord } from "../../types";
 import { Button } from "../../ui";
+import { UpscaleMenu } from "./UpscaleOptions";
 
 export function Results({
   record,
   previews,
   busy,
   count,
-  upscaleReady,
   onOpen,
   onVariants,
   onSimilar,
@@ -25,7 +25,6 @@ export function Results({
   previews: GeneratePreview[];
   busy: boolean;
   count: number;
-  upscaleReady: boolean;
   onOpen: (index: number) => void;
   onVariants: (record: GeneratedRecord) => void;
   onSimilar: (record: GeneratedRecord, file: string) => void;
@@ -50,7 +49,6 @@ export function Results({
             picture={picture}
             preview={preview}
             pending={busy && !picture}
-            upscaleReady={upscaleReady}
             onOpen={() => onOpen(index)}
             onVariants={() => record && onVariants(record)}
             onSimilar={() => record && picture && onSimilar(record, picture.file)}
@@ -70,7 +68,6 @@ function ResultTile({
   picture,
   preview,
   pending,
-  upscaleReady,
   onOpen,
   onVariants,
   onSimilar,
@@ -83,7 +80,6 @@ function ResultTile({
   picture: GeneratedPicture | undefined;
   preview: GeneratePreview | undefined;
   pending: boolean;
-  upscaleReady: boolean;
   onOpen: () => void;
   onVariants: () => void;
   onSimilar: () => void;
@@ -118,12 +114,13 @@ function ResultTile({
           <Button small onClick={onEdit}>
             {t("studio.editThis")}
           </Button>
-          <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(2)}>
+          <Button small onClick={() => onUpscale(2)}>
             {t("studio.upscale2")}
           </Button>
-          <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(4)}>
+          <Button small onClick={() => onUpscale(4)}>
             {t("studio.upscale4")}
           </Button>
+          <UpscaleMenu />
           <Button small onClick={onEditor}>
             {t("viewer.edit")}
           </Button>

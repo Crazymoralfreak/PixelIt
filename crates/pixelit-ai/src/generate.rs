@@ -182,7 +182,7 @@ fn mask_png(mask: &Mask) -> Result<Vec<u8>> {
     png(&image)
 }
 
-fn opaque_png(image: &Image) -> Result<Vec<u8>> {
+pub(crate) fn opaque_png(image: &Image) -> Result<Vec<u8>> {
     let mut flat = image.clone();
     flat.flatten(pixelit_core::Color::WHITE);
     png(&flat)
@@ -263,7 +263,12 @@ fn fill_workflow(template: &str, job: &Job<'_>, upload: Option<&str>) -> Result<
     serde_json::from_str(&filled).map_err(|error| Error::new("badWorkflow").detail(error))
 }
 
-fn comfy_checkpoint(net: &Net, base: &str, key: Option<&str>, wanted: &str) -> Result<String> {
+pub(crate) fn comfy_checkpoint(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    wanted: &str,
+) -> Result<String> {
     if !wanted.trim().is_empty() {
         return Ok(wanted.trim().to_owned());
     }
@@ -278,7 +283,7 @@ fn comfy_checkpoint(net: &Net, base: &str, key: Option<&str>, wanted: &str) -> R
         .ok_or_else(|| Error::new("noCheckpoint"))
 }
 
-fn watch_comfy(
+pub(crate) fn watch_comfy(
     net: &Net,
     base: &str,
     key: Option<&str>,
@@ -318,6 +323,134 @@ fn watch_comfy(
     }
 }
 
+pub(crate) fn upload_png(net: &Net, base: &str, key: Option<&str>, bytes: &[u8]) -> Result<String> {
+    let name = format!("pixelit-{:08x}.png", fastrand::u32(..));
+    let answer = net.post_form(
+        &format!("{base}/upload/image"),
+        key,
+        &[
+            Part::file("image", &name, "image/png", bytes),
+            Part::field("overwrite", "true"),
+        ],
+        Some(Duration::from_secs(120)),
+    )?;
+    let stored = answer["name"].as_str().unwrap_or(&name).to_owned();
+    Ok(match answer["subfolder"].as_str() {
+        Some(folder) if !folder.is_empty() => format!("{folder}/{stored}"),
+        _ => stored,
+    })
+}
+
+/// Queues one graph and returns the pictures it saved.
+pub(crate) fn run_comfy(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    client: &str,
+    graph: &Value,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+    index: u32,
+    count: u32,
+    steps: u32,
+) -> Result<Vec<Image>> {
+    tick(index, count, 0, steps, None);
+    cancel.check()?;
+    let queued = net.post_json(
+        &format!("{base}/prompt"),
+        key,
+        &json!({ "prompt": graph, "client_id": client }),
+        Some(SHORT_TIMEOUT),
+    )?;
+    let id = queued["prompt_id"]
+        .as_str()
+        .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
+        .to_owned();
+    let started = Instant::now();
+    let outputs = loop {
+        if cancel.is_cancelled() {
+            let _ = net.post(
+                &format!("{base}/interrupt"),
+                key,
+                &json!({}),
+                Some(SHORT_TIMEOUT),
+            );
+            return Err(Error::cancelled());
+        }
+        if started.elapsed() > GENERATION_TIMEOUT {
+            return Err(failed("timed out"));
+        }
+        thread::sleep(Duration::from_millis(700));
+        let history = net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
+        let entry = &history[id.as_str()];
+        if entry.is_null() {
+            continue;
+        }
+        if entry["status"]["status_str"].as_str() == Some("error") {
+            return Err(failed(entry["status"]["messages"].to_string()));
+        }
+        break entry["outputs"].clone();
+    };
+    let mut images = Vec::new();
+    for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
+        for file in node["images"].as_array().into_iter().flatten() {
+            let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str()) else {
+                continue;
+            };
+            let url = format!(
+                "{base}/view?filename={}&subfolder={}&type={}",
+                percent_encode(name),
+                percent_encode(file["subfolder"].as_str().unwrap_or_default()),
+                percent_encode(kind.unwrap_or("output")),
+            );
+            images.push(decode_image(&net.get(
+                &url,
+                key,
+                Some(Duration::from_secs(120)),
+            )?)?);
+        }
+    }
+    if images.is_empty() {
+        return Err(failed("the workflow saved no pictures"));
+    }
+    Ok(images)
+}
+
+/// Runs one graph and watches it for previews.
+pub(crate) fn comfy_once(
+    net: &Net,
+    settings: &AiSettings,
+    graph: &Value,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+    index: u32,
+    count: u32,
+    steps: u32,
+) -> Result<Image> {
+    let base = settings.generation.comfy_url.as_str();
+    let key = access(settings, base)?;
+    let key = key.as_deref();
+    let client = format!("pixelit-{:016x}", fastrand::u64(..));
+    let stop = AtomicBool::new(false);
+    let picture = AtomicU32::new(index);
+    let images = thread::scope(|scope| {
+        scope.spawn(|| {
+            watch_comfy(
+                net, base, key, &client, &picture, count, &stop, cancel, tick,
+            );
+        });
+        let result = run_comfy(
+            net, base, key, &client, graph, cancel, tick, index, count, steps,
+        );
+        stop.store(true, Ordering::Relaxed);
+        result
+    })?;
+    images
+        .into_iter()
+        .next()
+        .ok_or_else(|| failed("the workflow saved no pictures"))
+}
+
 fn comfy(
     net: &Net,
     settings: &AiSettings,
@@ -330,24 +463,7 @@ fn comfy(
     let key = access(settings, base)?;
     let key = key.as_deref();
     let upload = match source {
-        Some(source) => {
-            let bytes = png_with_holes(source)?;
-            let name = format!("pixelit-{:08x}.png", fastrand::u32(..));
-            let answer = net.post_form(
-                &format!("{base}/upload/image"),
-                key,
-                &[
-                    Part::file("image", &name, "image/png", &bytes),
-                    Part::field("overwrite", "true"),
-                ],
-                Some(Duration::from_secs(120)),
-            )?;
-            let stored = answer["name"].as_str().unwrap_or(&name).to_owned();
-            Some(match answer["subfolder"].as_str() {
-                Some(folder) if !folder.is_empty() => format!("{folder}/{stored}"),
-                _ => stored,
-            })
-        }
+        Some(source) => Some(upload_png(net, base, key, &png_with_holes(source)?)?),
         None => None,
     };
     let masked = source.is_some_and(|source| source.mask.is_some());
@@ -378,8 +494,6 @@ fn comfy(
         let result = (|| -> Result<Vec<Image>> {
             for index in 0..job.count {
                 picture.store(index, Ordering::Relaxed);
-                tick(index, job.count, 0, job.steps, None);
-                cancel.check()?;
                 let job = Job {
                     seed: job.seed.wrapping_add(u64::from(index)),
                     ..*job
@@ -388,61 +502,9 @@ fn comfy(
                     Some(template) => fill_workflow(template, &job, upload.as_deref())?,
                     None => comfy_graph(&job, &checkpoint, upload.as_deref(), masked),
                 };
-                let queued = net.post_json(
-                    &format!("{base}/prompt"),
-                    key,
-                    &json!({ "prompt": graph, "client_id": client }),
-                    Some(SHORT_TIMEOUT),
-                )?;
-                let id = queued["prompt_id"]
-                    .as_str()
-                    .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
-                    .to_owned();
-                let started = Instant::now();
-                let outputs = loop {
-                    if cancel.is_cancelled() {
-                        let _ = net.post(
-                            &format!("{base}/interrupt"),
-                            key,
-                            &json!({}),
-                            Some(SHORT_TIMEOUT),
-                        );
-                        return Err(Error::cancelled());
-                    }
-                    if started.elapsed() > GENERATION_TIMEOUT {
-                        return Err(failed("timed out"));
-                    }
-                    thread::sleep(Duration::from_millis(700));
-                    let history =
-                        net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
-                    let entry = &history[id.as_str()];
-                    if entry.is_null() {
-                        continue;
-                    }
-                    if entry["status"]["status_str"].as_str() == Some("error") {
-                        return Err(failed(entry["status"]["messages"].to_string()));
-                    }
-                    break entry["outputs"].clone();
-                };
-                for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
-                    for file in node["images"].as_array().into_iter().flatten() {
-                        let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str())
-                        else {
-                            continue;
-                        };
-                        let url = format!(
-                            "{base}/view?filename={}&subfolder={}&type={}",
-                            percent_encode(name),
-                            percent_encode(file["subfolder"].as_str().unwrap_or_default()),
-                            percent_encode(kind.unwrap_or("output")),
-                        );
-                        images.push(decode_image(&net.get(
-                            &url,
-                            key,
-                            Some(Duration::from_secs(120)),
-                        )?)?);
-                    }
-                }
+                images.extend(run_comfy(
+                    net, base, key, &client, &graph, cancel, tick, index, job.count, job.steps,
+                )?);
             }
             if images.is_empty() {
                 return Err(failed("the workflow saved no pictures"));

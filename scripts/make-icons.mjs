@@ -2,7 +2,9 @@
 // src-tauri/icons/{32x32.png,128x128.png,128x128@2x.png,icon.ico}.
 //
 // The icon is described here in code, so it needs no source image and no
-// packages: PNG is written with zlib from Node, ICO holds PNG frames.
+// packages: PNG is written with zlib from Node. The ICO holds ordinary
+// bitmaps, not PNG frames: NSIS copies those into the installer, and a PNG
+// frame leaves the setup file with the default icon.
 //
 //   node scripts/make-icons.mjs
 
@@ -148,9 +150,45 @@ function png(size) {
   ]);
 }
 
-/** An ICO file whose frames are PNG images. */
+/** One icon size as a 32-bit bitmap: header, bottom-up BGRA and the mask. */
+function bmpFrame(size) {
+  const pixels = draw(size);
+  const header = Buffer.alloc(40);
+  header.writeUInt32LE(40, 0);
+  header.writeInt32LE(size, 4);
+  // The height counts the colour rows and the mask rows.
+  header.writeInt32LE(size * 2, 8);
+  header.writeUInt16LE(1, 12);
+  header.writeUInt16LE(32, 14);
+  const colours = Buffer.alloc(size * size * 4);
+  const maskStride = Math.ceil(size / 32) * 4;
+  const mask = Buffer.alloc(maskStride * size);
+  for (let y = 0; y < size; y += 1) {
+    const source = (size - 1 - y) * size;
+    for (let x = 0; x < size; x += 1) {
+      const from = (source + x) * 4;
+      const to = (y * size + x) * 4;
+      // Windows stores a 32-bit icon with the colour already multiplied by
+      // the alpha. Straight colour leaves a fringe on the rounded edge.
+      const alpha = pixels[from + 3];
+      const scale = alpha / 255;
+      colours[to] = Math.round(pixels[from + 2] * scale);
+      colours[to + 1] = Math.round(pixels[from + 1] * scale);
+      colours[to + 2] = Math.round(pixels[from] * scale);
+      colours[to + 3] = alpha;
+      // A clear pixel is transparent even for a reader that ignores the alpha.
+      if (pixels[from + 3] === 0) {
+        mask[y * maskStride + (x >> 3)] |= 0x80 >> (x & 7);
+      }
+    }
+  }
+  header.writeUInt32LE(colours.length + mask.length, 20);
+  return Buffer.concat([header, colours, mask]);
+}
+
+/** An ICO file whose frames are bitmaps. */
 function ico(sizes) {
-  const frames = sizes.map((size) => ({ size, data: png(size) }));
+  const frames = sizes.map((size) => ({ size, data: bmpFrame(size) }));
   const header = Buffer.alloc(6);
   header.writeUInt16LE(1, 2); // type: icon
   header.writeUInt16LE(frames.length, 4);

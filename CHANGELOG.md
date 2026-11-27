@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Applications
+
+- ComfyUI and Forge can be installed, started and stopped from Models and AI. A folder you already have, including one from Stability Matrix, is used as it is.
+- Checkpoints, LoRA and the other model folders are shared. ComfyUI receives all of them. The built-in generator lists checkpoints from those folders.
+- ComfyUI and Forge installed from this page can check for a newer release of that program. PixelIt's own updater is unchanged.
+- Models can be searched on CivitAI, CivArchive, Hugging Face and OpenModelDB and downloaded into the matching folder.
+- A ComfyUI Desktop data folder brings in the program itself, its model folders and the port it last used.
+- The studio can enlarge ×2 or ×4 as part of a generation. When the enlargement model is missing, the Enlarge buttons offer to install it instead of staying grey.
+- A model download in a search card shows the bar, the share and the time left; Download becomes Cancel for that time.
+- The start log folds, scrolls and follows new lines. It can be copied, cleared and shown as a file. Each start begins the log again; the one before it stays beside it as `.prev.log`.
+- The search for local servers also finds ComfyUI Desktop and Fooocus, on whichever port they took. Fooocus is listed as found; it is not a generator yet.
+- Enlargement can use the built-in model, an ONNX file from the upscaler folders, or a model a running ComfyUI or Forge reports. By default the generator then paints detail back in; Fast skips that pass.
+- An upscaler on OpenModelDB that has an ONNX file is marked as working without ComfyUI, and that file can be the one downloaded.
+
+### macOS
+
+- A version tag also builds disk images `PixelIt_<version>_MacOS_Silicon.dmg` and `PixelIt_<version>_MacOS_Intel.dmg`. The image is signed locally, so Gatekeeper asks before the first open. The Explorer menu, screen capture, HEIC and the local ONNX models stay on Windows.
+- The Windows installer and uninstaller carry the application icon.
+
 ## [0.0.3] - 2026-11-25
 
 ### Studio

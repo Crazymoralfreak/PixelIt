@@ -740,7 +740,29 @@
       "sketch": "铅笔画",
       "oil": "油画",
       "portrait": "肖像"
-    }
+    },
+    "enlarge": "放大",
+    "enlargeOff": "不放大",
+    "enlargeHint": "每张图片在生成后会立即用所选模型放大。",
+    "upscaleInstallTitle": "安装放大模型？",
+    "upscaleInstallText": "放大需要本地模型 {name}（{size}）。下载并安装它吗？",
+    "upscaleInstall": "安装",
+    "upscaleInstalling": "正在下载放大模型。下载完成后会立即放大图片。",
+    "upscaler": "放大模型",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "需要正在运行的 ComfyUI 或 Forge",
+    "upscalerMissing": "这个模型现在不可用。请在程序运行后刷新列表。",
+    "upscaleMode": "细节",
+    "upscaleFast": "快速",
+    "upscaleRefine": "补细节",
+    "upscaleRefineHint": "生成器会再画一遍放大后的图片，从而补回细部。耗时大约和生成一张图片相当。",
+    "upscaleFastHint": "只运行放大模型。更快，但不会补出新的细节。",
+    "upscaleStrength": "细节强度",
+    "upscaleStrengthHint": "生成器可以偏离放大后图片的程度。数值越低，越接近原图。",
+    "upscaleOptions": "放大设置",
+    "noticeNeedsGenerator": "补细节需要 ComfyUI 或 Forge。图片只做了放大。",
+    "noticeNoPrompt": "这张图片没有保存提示词，所以只做了放大。",
+    "noticeRefineFailed": "生成器没有响应，所以图片只做了放大。"
   },
   "vision": {
     "noModelTitle": "尚未选择模型",
@@ -820,7 +842,7 @@
     "allowCloud": "允许使用外部服务",
     "confirmCloud": "每次发送前询问",
     "localServers": "本地服务器",
-    "localServersText": "查找这台电脑上正在运行的 Ollama、LM Studio、ComfyUI 和 Forge。",
+    "localServersText": "查找这台电脑上正在运行的 Ollama、LM Studio、ComfyUI、Forge 和 Fooocus。",
     "discover": "查找",
     "noneFound": "未找到正在运行的服务器",
     "modelsCount": "模型：{count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "服务器 {host} 不在这台电脑上，而外部服务目前处于关闭状态。是否允许访问？本页的设置将被保存。",
     "allowCloudYes": "允许",
     "forgeCheckpoint": "模型",
-    "forgeCheckpointHint": "Forge 列出的名称。留空则继续用已经加载的模型。"
+    "forgeCheckpointHint": "Forge 列出的名称。留空则继续用已经加载的模型。",
+    "tabApps": "应用程序",
+    "apps": {
+      "title": "应用程序",
+      "text": "安装、启动和停止 ComfyUI 或 Forge，并共用模型文件夹。",
+      "install": "安装",
+      "useStability": "使用 Stability Matrix",
+      "fillModels": "从 Stability Matrix 填入文件夹",
+      "start": "启动",
+      "stop": "停止",
+      "open": "打开",
+      "checkUpdates": "检查更新",
+      "update": "更新",
+      "noHome": "还没有文件夹",
+      "nvidia": "NVIDIA 版本",
+      "foreignUpdate": "这份副本由安装它的人来更新。",
+      "updateReady": "已有版本 {version}。",
+      "models": "模型文件夹",
+      "modelsText": "ComfyUI 会用到每一个文件夹。Forge 每种只用一个文件夹。",
+      "search": "查找模型",
+      "searchText": "和 Stability Matrix 相同的目录。只有在你要求时才会下载，并放进该种类的第一个文件夹。",
+      "source": "目录",
+      "query": "搜索",
+      "modelKind": "种类",
+      "sort": "排序",
+      "period": "时间",
+      "baseModel": "基础模型",
+      "hideInstalled": "隐藏已安装的",
+      "showNsfw": "显示成人模型",
+      "searchButton": "搜索",
+      "download": "下载",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "未安装",
+        "stopped": "已停止",
+        "running": "运行中",
+        "foreign": "已经在运行"
+      },
+      "origin": {
+        "missing": "未安装",
+        "ours": "由这里安装",
+        "folder": "选定的文件夹",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "列表",
+        "grid": "网格"
+      },
+      "sorts": {
+        "downloads": "热门",
+        "rating": "评分最高",
+        "newest": "最新"
+      },
+      "periods": {
+        "all": "全部时间",
+        "year": "近一年",
+        "month": "近一月",
+        "week": "近一周",
+        "day": "近一天"
+      },
+      "notInFolder": "在此文件夹中没有找到程序",
+      "log": "启动日志",
+      "logEmpty": "日志为空。启动后会有内容。",
+      "logFile": "显示文件",
+      "logCut": "只显示日志的结尾。完整内容在文件中。",
+      "worksLocally": "无需 ComfyUI 即可使用",
+      "file": "文件"
+    },
+    "notSupportedYet": "暂不支持"
   },
   "assistant": {
     "newChat": "新对话",
@@ -1041,7 +1148,15 @@
     "keyMissing": "服务器 {host} 需要访问密钥。请在下方的字段中输入密钥后重试。",
     "updatePortable": "便携版需要手动更新",
     "builtinStyle": "内置风格不能修改或删除。",
-    "emptyName": "请输入名称。"
+    "emptyName": "请输入名称。",
+    "appAlreadyRunning": "程序已经在运行，而且不是 PixelIt 启动的",
+    "appLaunchFailed": "程序无法启动",
+    "appMissing": "请先选择或安装程序",
+    "appNotOurs": "PixelIt 没有启动这个程序，所以不会停止它",
+    "noArchive": "这台电脑没有固定的 {id} 压缩包",
+    "noModelFolder": "请先为这种模型添加一个文件夹",
+    "upscaleModelFailed": "放大模型无法运行：{model}",
+    "upscalerMissing": "找不到放大模型：{model}"
   },
   "native": {
     "tray": {

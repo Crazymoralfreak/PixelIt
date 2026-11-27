@@ -740,7 +740,29 @@
       "sketch": "鉛筆スケッチ",
       "oil": "油彩",
       "portrait": "肖像"
-    }
+    },
+    "enlarge": "拡大",
+    "enlargeOff": "なし",
+    "enlargeHint": "各画像は生成の直後に、選んだモデルで拡大されます。",
+    "upscaleInstallTitle": "拡大モデルをインストールしますか？",
+    "upscaleInstallText": "拡大にはローカルのモデル {name}（{size}）が必要です。ダウンロードしてインストールしますか？",
+    "upscaleInstall": "インストール",
+    "upscaleInstalling": "拡大モデルをダウンロードしています。終わるとすぐに画像を拡大します。",
+    "upscaler": "拡大モデル",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "起動中の ComfyUI または Forge が必要",
+    "upscalerMissing": "このモデルは今は使えません。プログラムの起動後に一覧を更新してください。",
+    "upscaleMode": "ディテール",
+    "upscaleFast": "高速",
+    "upscaleRefine": "ディテール付き",
+    "upscaleRefineHint": "生成器が拡大した画像をもう一度描き、細かいディテールを戻します。生成とほぼ同じ時間がかかります。",
+    "upscaleFastHint": "拡大モデルだけが動きます。速く、新しいディテールは加わりません。",
+    "upscaleStrength": "ディテールの強さ",
+    "upscaleStrengthHint": "生成器が拡大後の画像からどれだけ離れてよいか。低いほど近くに留まります。",
+    "upscaleOptions": "拡大の設定",
+    "noticeNeedsGenerator": "ディテールには ComfyUI か Forge が必要です。画像は拡大のみです。",
+    "noticeNoPrompt": "この画像にはプロンプトが保存されていないため、拡大のみです。",
+    "noticeRefineFailed": "生成器が応答しなかったため、画像は拡大のみです。"
   },
   "vision": {
     "noModelTitle": "モデルが選ばれていません",
@@ -820,7 +842,7 @@
     "allowCloud": "外部サービスを許可する",
     "confirmCloud": "送信のたびに確認する",
     "localServers": "ローカルサーバー",
-    "localServersText": "このコンピューターで動作中の Ollama、LM Studio、ComfyUI、Forge を探します。",
+    "localServersText": "このコンピューターで動作中の Ollama、LM Studio、ComfyUI、Forge、Fooocus を探します。",
     "discover": "探す",
     "noneFound": "動作中のサーバーは見つかりませんでした",
     "modelsCount": "モデル: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "サーバー {host} はこのコンピューターの外にあり、外部サービスは現在オフになっています。利用を許可しますか？このページの設定は保存されます。",
     "allowCloudYes": "許可",
     "forgeCheckpoint": "モデル",
-    "forgeCheckpointHint": "Forge が表示する名前です。空なら、そこで読み込み済みのモデルを使います。"
+    "forgeCheckpointHint": "Forge が表示する名前です。空なら、そこで読み込み済みのモデルを使います。",
+    "tabApps": "アプリ",
+    "apps": {
+      "title": "アプリ",
+      "text": "ComfyUI と Forge を入れ、起動と停止をし、モデルのフォルダーを共有します。",
+      "install": "インストール",
+      "useStability": "Stability Matrix を使う",
+      "fillModels": "Stability Matrix のフォルダー",
+      "start": "起動",
+      "stop": "停止",
+      "open": "開く",
+      "checkUpdates": "更新を確認",
+      "update": "更新",
+      "noHome": "フォルダーは未選択",
+      "nvidia": "NVIDIA 版",
+      "foreignUpdate": "このコピーは、入れた人が更新します。",
+      "updateReady": "バージョン {version} があります。",
+      "models": "モデルのフォルダー",
+      "modelsText": "ComfyUI はすべてのフォルダーを使います。Forge は種類ごとに一つです。",
+      "search": "モデルを探す",
+      "searchText": "Stability Matrix と同じカタログです。ファイルは頼んだときだけ、その種類の最初のフォルダーに入ります。",
+      "source": "カタログ",
+      "query": "検索",
+      "modelKind": "種類",
+      "sort": "順序",
+      "period": "期間",
+      "baseModel": "ベースモデル",
+      "hideInstalled": "入っているものを隠す",
+      "showNsfw": "成人向けモデルを表示",
+      "searchButton": "検索",
+      "download": "ダウンロード",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "未インストール",
+        "stopped": "停止",
+        "running": "動作中",
+        "foreign": "すでに動作中"
+      },
+      "origin": {
+        "missing": "未インストール",
+        "ours": "ここで入れた",
+        "folder": "選んだフォルダー",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "リスト",
+        "grid": "グリッド"
+      },
+      "sorts": {
+        "downloads": "人気",
+        "rating": "評価が高い",
+        "newest": "新しい"
+      },
+      "periods": {
+        "all": "全期間",
+        "year": "1年",
+        "month": "1か月",
+        "week": "1週間",
+        "day": "1日"
+      },
+      "notInFolder": "このフォルダにプログラムが見つかりません",
+      "log": "起動ログ",
+      "logEmpty": "ログは空です。起動すると記録されます。",
+      "logFile": "ファイルを表示",
+      "logCut": "ログの末尾だけを表示しています。全体はファイルにあります。",
+      "worksLocally": "ComfyUI なしで動く",
+      "file": "ファイル"
+    },
+    "notSupportedYet": "まだ未対応"
   },
   "assistant": {
     "newChat": "新しいチャット",
@@ -1041,7 +1148,15 @@
     "keyMissing": "サーバー {host} はアクセスキーを必要とします。下の欄にキーを入力して、もう一度お試しください。",
     "updatePortable": "ポータブル版は手動で更新します",
     "builtinStyle": "内蔵のスタイルは変更も削除もできません。",
-    "emptyName": "名前を入力してください。"
+    "emptyName": "名前を入力してください。",
+    "appAlreadyRunning": "プログラムはすでに動いていて、起動したのは PixelIt ではありません",
+    "appLaunchFailed": "プログラムを起動できませんでした",
+    "appMissing": "先にプログラムを選ぶかインストールしてください",
+    "appNotOurs": "PixelIt はこのプログラムを起動していないので、停止しません",
+    "noArchive": "このコンピューター向けの固定された {id} の書庫はありません",
+    "noModelFolder": "先にこの種類のモデル用フォルダーを追加してください",
+    "upscaleModelFailed": "拡大モデルを実行できませんでした: {model}",
+    "upscalerMissing": "拡大モデルが見つかりません: {model}"
   },
   "native": {
     "tray": {

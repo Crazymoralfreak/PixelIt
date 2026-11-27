@@ -740,7 +740,29 @@
       "sketch": "Pencil sketch",
       "oil": "Oil painting",
       "portrait": "Portrait"
-    }
+    },
+    "enlarge": "Enlarge",
+    "enlargeOff": "No",
+    "enlargeHint": "Every picture is enlarged with the chosen upscaler right after it is generated.",
+    "upscaleInstallTitle": "Install the enlargement model?",
+    "upscaleInstallText": "Enlarging needs the local model {name} ({size}). Download and install it?",
+    "upscaleInstall": "Install",
+    "upscaleInstalling": "The enlargement model is downloading. The picture is enlarged right after that.",
+    "upscaler": "Upscaler",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "needs a running ComfyUI or Forge",
+    "upscalerMissing": "This model is not available right now. Refresh the list when the program is running.",
+    "upscaleMode": "Detail",
+    "upscaleFast": "Fast",
+    "upscaleRefine": "With detail",
+    "upscaleRefineHint": "The generator paints the enlarged picture again, so fine detail comes back. This takes about as long as generating the picture.",
+    "upscaleFastHint": "Only the upscaler runs. Quicker, and no new detail is added.",
+    "upscaleStrength": "Detail strength",
+    "upscaleStrengthHint": "How far the generator may move from the enlarged picture. Lower keeps it closer.",
+    "upscaleOptions": "Upscale settings",
+    "noticeNeedsGenerator": "Detail needs ComfyUI or Forge. The picture was only enlarged.",
+    "noticeNoPrompt": "This picture has no prompt stored, so it was only enlarged.",
+    "noticeRefineFailed": "The generator did not answer, so the picture was only enlarged."
   },
   "vision": {
     "noModelTitle": "No model is chosen",
@@ -820,7 +842,7 @@
     "allowCloud": "Allow external services",
     "confirmCloud": "Ask before every upload",
     "localServers": "Local servers",
-    "localServersText": "Looks for Ollama, LM Studio, ComfyUI and Forge running on this computer.",
+    "localServersText": "Looks for Ollama, LM Studio, ComfyUI, Forge and Fooocus running on this computer.",
     "discover": "Find",
     "noneFound": "No running servers found",
     "modelsCount": "Models: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "The server {host} is outside this computer, and outside services are switched off now. Allow PixelIt to reach them? The settings on this page will be saved.",
     "allowCloudYes": "Allow",
     "forgeCheckpoint": "Model",
-    "forgeCheckpointHint": "The name as Forge lists it. Empty keeps the model already loaded there."
+    "forgeCheckpointHint": "The name as Forge lists it. Empty keeps the model already loaded there.",
+    "tabApps": "Applications",
+    "apps": {
+      "title": "Applications",
+      "text": "Install ComfyUI or Forge, start and stop them, and keep one set of model folders.",
+      "install": "Install",
+      "useStability": "Use Stability Matrix",
+      "fillModels": "Fill from Stability Matrix",
+      "start": "Start",
+      "stop": "Stop",
+      "open": "Open",
+      "checkUpdates": "Check for updates",
+      "update": "Update",
+      "noHome": "No folder yet",
+      "nvidia": "NVIDIA build",
+      "foreignUpdate": "This copy is updated by whoever installed it.",
+      "updateReady": "Release {version} is available.",
+      "models": "Model folders",
+      "modelsText": "ComfyUI receives every folder. Forge receives one folder of each kind.",
+      "search": "Find models",
+      "searchText": "The same catalogues Stability Matrix searches. A file is downloaded only when you ask, into the first folder of its kind.",
+      "source": "Catalogue",
+      "query": "Search",
+      "modelKind": "Kind",
+      "sort": "Order",
+      "period": "Period",
+      "baseModel": "Base model",
+      "hideInstalled": "Hide installed",
+      "showNsfw": "Show adult models",
+      "searchButton": "Search",
+      "download": "Download",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Not installed",
+        "stopped": "Stopped",
+        "running": "Running",
+        "foreign": "Already running"
+      },
+      "origin": {
+        "missing": "Not installed",
+        "ours": "Installed here",
+        "folder": "Chosen folder",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "List",
+        "grid": "Grid"
+      },
+      "sorts": {
+        "downloads": "Popular",
+        "rating": "Highest rated",
+        "newest": "Newest"
+      },
+      "periods": {
+        "all": "All time",
+        "year": "Past year",
+        "month": "Past month",
+        "week": "Past week",
+        "day": "Past day"
+      },
+      "notInFolder": "The program was not found in this folder",
+      "log": "Start log",
+      "logEmpty": "The log is empty. It fills in after a start.",
+      "logFile": "Show file",
+      "logCut": "Only the end of the log is shown. The file has all of it.",
+      "worksLocally": "Works without ComfyUI",
+      "file": "File"
+    },
+    "notSupportedYet": "Not supported yet"
   },
   "assistant": {
     "newChat": "New chat",
@@ -1041,7 +1148,15 @@
     "keyMissing": "The server {host} asks for an access key. Enter the key in the field below and try again.",
     "updatePortable": "The portable version is updated by hand",
     "builtinStyle": "A built-in style cannot be changed or removed.",
-    "emptyName": "Type a name."
+    "emptyName": "Type a name.",
+    "appAlreadyRunning": "The program is already running, and PixelIt did not start it",
+    "appLaunchFailed": "The program could not be started",
+    "appMissing": "Choose or install the program first",
+    "appNotOurs": "PixelIt did not start this program, so it will not stop it",
+    "noArchive": "There is no pinned archive of {id} for this computer",
+    "noModelFolder": "Add a folder for this kind of model first",
+    "upscaleModelFailed": "The upscaler could not run: {model}",
+    "upscalerMissing": "The upscaler was not found: {model}"
   },
   "native": {
     "tray": {

@@ -78,17 +78,64 @@ pub fn delete(host: &str) {
 }
 
 #[cfg(not(windows))]
-pub fn set(_host: &str, _key: &str) -> Result<()> {
-    Err(Error::new("keyStoreFailed"))
+pub fn set(host: &str, key: &str) -> Result<()> {
+    let key = key.trim();
+    if key.is_empty() || key.len() > MAX_KEY {
+        return Err(Error::new("badKey"));
+    }
+    let status = std::process::Command::new("security")
+        .args([
+            "add-generic-password",
+            "-U",
+            "-s",
+            &target(host),
+            "-a",
+            "PixelIt",
+            "-w",
+            key,
+        ])
+        .status()
+        .map_err(Error::from)?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(Error::new("keyStoreFailed"))
+    }
 }
 
 #[cfg(not(windows))]
-pub fn get(_host: &str) -> Option<String> {
-    None
+pub fn get(host: &str) -> Option<String> {
+    let output = std::process::Command::new("security")
+        .args([
+            "find-generic-password",
+            "-s",
+            &target(host),
+            "-a",
+            "PixelIt",
+            "-w",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let text = String::from_utf8(output.stdout).ok()?;
+    let text = text.trim();
+    (!text.is_empty()).then(|| text.to_owned())
 }
 
 #[cfg(not(windows))]
-pub fn delete(_host: &str) {}
+pub fn delete(host: &str) {
+    let _ = std::process::Command::new("security")
+        .args([
+            "delete-generic-password",
+            "-s",
+            &target(host),
+            "-a",
+            "PixelIt",
+        ])
+        .status();
+}
 
 /// Whether a key is stored for the host.
 pub fn has(host: &str) -> bool {

@@ -17,7 +17,7 @@ use pixelit_ai::generate::{self, save_generated, GenerateRequest, Outcome, Sourc
 use pixelit_ai::parameters::{self, Parameters};
 use pixelit_ai::{history, styles, Expand, GenerationProvider, Style};
 use pixelit_core::ops::annotate::stroke_mask;
-use pixelit_core::pipeline::{AiBackend as _, Mask, Stroke};
+use pixelit_core::pipeline::{Mask, Stroke};
 use pixelit_core::{Error, Image, Result};
 use pixelit_engine::{JobContext, Lane};
 
@@ -146,6 +146,17 @@ pub struct GenerateStart {
     pub expand: Expand,
     /// The user agreed to send the picture and the prompt off this computer.
     pub confirmed: bool,
+    /// 2 or 4 enlarges every picture with the local model before it is kept.
+    pub upscale: u32,
+}
+
+/// The enlargement a request asks for: 0, 2 or 4.
+fn enlargement(asked: u32) -> u32 {
+    match asked {
+        0 | 1 => 0,
+        2 | 3 => 2,
+        _ => 4,
+    }
 }
 
 /// Generates pictures as a job. The result is the history entry, including
@@ -166,6 +177,14 @@ pub fn generate_start(core: CoreState<'_>, start: GenerateStart) -> Result<u64> 
         generate::leaves_with(&settings, provider),
         start.confirmed,
     )?;
+    let enlarge = enlargement(start.upscale);
+    // Asked before the generation, so a long run does not end without its picture.
+    if enlarge > 0
+        && pixelit_ai::upscale::uses_builtin(&settings)
+        && !core.ai.capabilities().upscale
+    {
+        return Err(Error::new("modelMissing").with("model", "upscale"));
+    }
     let title: String = start.request.prompt.chars().take(60).collect();
     let core = Arc::clone(core.inner());
     Ok(core.engine.jobs.spawn("generate", &title, Lane::Gpu, {
@@ -226,13 +245,39 @@ pub fn generate_start(core: CoreState<'_>, start: GenerateStart) -> Result<u64> 
                     .unwrap_or_default()
                 })
                 .collect();
-            let files = save_generated(core.paths(), &placed, Some(&notes))?;
-            let mut entry = remember(&core, &outcome, &files, &placed, &start)?;
+            // The note keeps the size that was generated, so a repeat asks for it again.
+            let mut notice = "";
+            let kept = if enlarge > 0 {
+                let total = placed.len() as u64;
+                let label = format!("×{enlarge}");
+                let mut enlarged = Vec::with_capacity(placed.len());
+                for (index, image) in placed.iter().enumerate() {
+                    job.progress(index as u64, total, &label);
+                    let done = core.ai.enlarge(
+                        image,
+                        enlarge,
+                        &pixelit_ai::upscale::Notes::from_outcome(&outcome, index),
+                        index as u32,
+                        placed.len() as u32,
+                        &job.cancel,
+                        &tick,
+                    )?;
+                    if notice.is_empty() {
+                        notice = done.notice;
+                    }
+                    enlarged.push(done.image);
+                }
+                enlarged
+            } else {
+                placed
+            };
+            let files = save_generated(core.paths(), &kept, Some(&notes))?;
+            let mut entry = remember(&core, &outcome, &files, &kept, &start)?;
             let folder = core.paths().generated();
             for picture in &mut entry.pictures {
                 picture.file = display(&folder.join(&picture.file));
             }
-            serde_json::to_value(&entry).map_err(|error| Error::new("internal").detail(error))
+            with_notice(&entry, notice)
         }
     }))
 }
@@ -306,11 +351,12 @@ pub fn generated_export(
     Ok(written.iter().map(|path| display(path)).collect())
 }
 
-/// Enlarges one generated picture with the local upscale model and keeps the result.
+/// Enlarges one generated picture with the chosen upscaler and keeps the result.
 #[tauri::command(async)]
 pub fn generated_upscale(core: CoreState<'_>, file: String, factor: u32) -> Result<u64> {
     core.ensure_not_updating()?;
-    if !core.ai.capabilities().upscale {
+    let settings = core.ai.settings();
+    if pixelit_ai::upscale::uses_builtin(&settings) && !core.ai.capabilities().upscale {
         return Err(Error::new("modelMissing").with("model", "upscale"));
     }
     let factor = if factor >= 4 { 4 } else { 2 };
@@ -326,14 +372,34 @@ pub fn generated_upscale(core: CoreState<'_>, file: String, factor: u32) -> Resu
                 .media
                 .into_first()
                 .ok_or_else(|| Error::new("emptyImage").with("path", &file))?;
-            let enlarged = core.ai.upscale(&image, "", factor, &job.cancel)?;
-            let width = enlarged.width();
-            let height = enlarged.height();
-            let files = save_generated(core.paths(), &[enlarged], None)?;
+            let notes = pixelit_ai::upscale::notes_of_file(core.paths(), Path::new(&file));
+            let app = core.app().clone();
+            let tick = |index: u32, count: u32, step: u32, steps: u32, preview: Option<&[u8]>| {
+                let image = preview
+                    .filter(|bytes| bytes.len() <= 1_500_000)
+                    .map(|bytes| STANDARD.encode(bytes));
+                let _ = app.emit(
+                    "generate:preview",
+                    json!({ "index": index, "count": count, "step": step, "steps": steps, "image": image }),
+                );
+            };
+            let done = core
+                .ai
+                .enlarge(&image, factor, &notes, 0, 1, &job.cancel, &tick)?;
+            let width = done.image.width();
+            let height = done.image.height();
+            let written = pixelit_ai::upscale::parameters_of(&notes, &done.image);
+            let files = save_generated(core.paths(), &[done.image], Some(&[written]))?;
             let mut entry = history::record(
                 core.paths(),
                 history::Record {
-                    prompt: String::new(),
+                    prompt: notes.prompt.clone(),
+                    negative: notes.negative.clone(),
+                    final_prompt: notes.prompt.clone(),
+                    provider: notes.provider,
+                    model: notes.model,
+                    steps: notes.steps,
+                    cfg: notes.cfg,
                     source: file.clone(),
                     kind: history::GeneratedKind::Upscale,
                     width,
@@ -342,6 +408,7 @@ pub fn generated_upscale(core: CoreState<'_>, file: String, factor: u32) -> Resu
                         .iter()
                         .map(|path| history::Picture {
                             file: file_name(path),
+                            seed: notes.seed,
                             width,
                             height,
                             ..history::Picture::default()
@@ -355,9 +422,24 @@ pub fn generated_upscale(core: CoreState<'_>, file: String, factor: u32) -> Resu
                 picture.file = display(&folder.join(&picture.file));
             }
             changed(&core);
-            serde_json::to_value(&entry).map_err(|error| Error::new("internal").detail(error))
+            with_notice(&entry, done.notice)
         }
     }))
+}
+
+/// The upscalers the studio can offer right now.
+#[tauri::command(async)]
+pub fn upscalers_list(core: CoreState<'_>) -> Vec<pixelit_ai::upscale::Upscaler> {
+    pixelit_ai::upscale::list(core.ai.net(), core.paths(), &core.ai.settings())
+}
+
+fn with_notice(entry: &history::Record, notice: &str) -> Result<serde_json::Value> {
+    let mut value =
+        serde_json::to_value(entry).map_err(|error| Error::new("internal").detail(error))?;
+    if !notice.is_empty() {
+        value["notice"] = json!(notice);
+    }
+    Ok(value)
 }
 
 // --------------------------------------------------------------------- styles

@@ -740,7 +740,29 @@
       "sketch": "Bleistiftskizze",
       "oil": "Ölmalerei",
       "portrait": "Porträt"
-    }
+    },
+    "enlarge": "Vergrößern",
+    "enlargeOff": "Nein",
+    "enlargeHint": "Jedes Bild wird gleich nach dem Erzeugen mit dem gewählten Modell vergrößert.",
+    "upscaleInstallTitle": "Vergrößerungsmodell installieren?",
+    "upscaleInstallText": "Zum Vergrößern wird das lokale Modell {name} ({size}) gebraucht. Herunterladen und installieren?",
+    "upscaleInstall": "Installieren",
+    "upscaleInstalling": "Das Vergrößerungsmodell wird heruntergeladen. Gleich danach wird das Bild vergrößert.",
+    "upscaler": "Vergrößerungsmodell",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "braucht ein laufendes ComfyUI oder Forge",
+    "upscalerMissing": "Dieses Modell ist gerade nicht verfügbar. Liste erneuern, wenn das Programm läuft.",
+    "upscaleMode": "Details",
+    "upscaleFast": "Schnell",
+    "upscaleRefine": "Mit Details",
+    "upscaleRefineHint": "Der Generator malt das vergrößerte Bild noch einmal, damit feine Details zurückkommen. Das dauert etwa so lange wie das Erzeugen.",
+    "upscaleFastHint": "Nur das Vergrößerungsmodell läuft. Schneller, ohne neue Details.",
+    "upscaleStrength": "Stärke der Details",
+    "upscaleStrengthHint": "Wie weit der Generator vom vergrößerten Bild abweichen darf. Weniger bleibt näher daran.",
+    "upscaleOptions": "Einstellungen der Vergrößerung",
+    "noticeNeedsGenerator": "Details brauchen ComfyUI oder Forge. Das Bild wurde nur vergrößert.",
+    "noticeNoPrompt": "Zu diesem Bild ist kein Prompt gespeichert, daher wurde es nur vergrößert.",
+    "noticeRefineFailed": "Der Generator hat nicht geantwortet, daher wurde das Bild nur vergrößert."
   },
   "vision": {
     "noModelTitle": "Kein Modell gewählt",
@@ -820,7 +842,7 @@
     "allowCloud": "Externe Dienste erlauben",
     "confirmCloud": "Vor jedem Senden fragen",
     "localServers": "Lokale Server",
-    "localServersText": "Sucht nach Ollama, LM Studio, ComfyUI und Forge, die auf diesem Computer laufen.",
+    "localServersText": "Sucht nach Ollama, LM Studio, ComfyUI, Forge und Fooocus, die auf diesem Computer laufen.",
     "discover": "Suchen",
     "noneFound": "Keine laufenden Server gefunden",
     "modelsCount": "Modelle: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "Der Server {host} liegt außerhalb dieses Computers, und externe Dienste sind derzeit ausgeschaltet. Zugriff darauf erlauben? Die Einstellungen auf dieser Seite werden gespeichert.",
     "allowCloudYes": "Erlauben",
     "forgeCheckpoint": "Modell",
-    "forgeCheckpointHint": "Der Name, wie Forge ihn zeigt. Leer lässt das dort geladene Modell."
+    "forgeCheckpointHint": "Der Name, wie Forge ihn zeigt. Leer lässt das dort geladene Modell.",
+    "tabApps": "Anwendungen",
+    "apps": {
+      "title": "Anwendungen",
+      "text": "Installiert ComfyUI oder Forge, startet und stoppt sie und hält gemeinsame Modellordner.",
+      "install": "Installieren",
+      "useStability": "Aus Stability Matrix nehmen",
+      "fillModels": "Ordner aus Stability Matrix",
+      "start": "Starten",
+      "stop": "Stoppen",
+      "open": "Öffnen",
+      "checkUpdates": "Nach Updates suchen",
+      "update": "Aktualisieren",
+      "noHome": "Noch kein Ordner",
+      "nvidia": "NVIDIA-Build",
+      "foreignUpdate": "Diese Kopie aktualisiert, wer sie installiert hat.",
+      "updateReady": "Version {version} ist verfügbar.",
+      "models": "Modellordner",
+      "modelsText": "ComfyUI bekommt jeden Ordner. Forge bekommt einen Ordner je Art.",
+      "search": "Modelle suchen",
+      "searchText": "Dieselben Kataloge wie in Stability Matrix. Eine Datei wird nur auf Wunsch in den ersten Ordner ihrer Art geladen.",
+      "source": "Katalog",
+      "query": "Suche",
+      "modelKind": "Art",
+      "sort": "Reihenfolge",
+      "period": "Zeitraum",
+      "baseModel": "Basismodell",
+      "hideInstalled": "Installierte ausblenden",
+      "showNsfw": "Modelle für Erwachsene zeigen",
+      "searchButton": "Suchen",
+      "download": "Herunterladen",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Nicht installiert",
+        "stopped": "Gestoppt",
+        "running": "Läuft",
+        "foreign": "Läuft schon"
+      },
+      "origin": {
+        "missing": "Nicht installiert",
+        "ours": "Hier installiert",
+        "folder": "Gewählter Ordner",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Liste",
+        "grid": "Raster"
+      },
+      "sorts": {
+        "downloads": "Beliebt",
+        "rating": "Bestbewertet",
+        "newest": "Neu"
+      },
+      "periods": {
+        "all": "Gesamte Zeit",
+        "year": "Letztes Jahr",
+        "month": "Letzter Monat",
+        "week": "Letzte Woche",
+        "day": "Letzter Tag"
+      },
+      "notInFolder": "Das Programm wurde in diesem Ordner nicht gefunden",
+      "log": "Startprotokoll",
+      "logEmpty": "Das Protokoll ist leer. Es füllt sich nach einem Start.",
+      "logFile": "Datei anzeigen",
+      "logCut": "Es wird nur das Ende des Protokolls gezeigt. Die Datei enthält alles.",
+      "worksLocally": "Läuft ohne ComfyUI",
+      "file": "Datei"
+    },
+    "notSupportedYet": "Noch nicht unterstützt"
   },
   "assistant": {
     "newChat": "Neuer Chat",
@@ -1041,7 +1148,15 @@
     "keyMissing": "Der Server {host} verlangt einen Zugangsschlüssel. Geben Sie den Schlüssel im Feld unten ein und versuchen Sie es erneut.",
     "updatePortable": "Die portable Version wird von Hand aktualisiert",
     "builtinStyle": "Ein mitgelieferter Stil kann nicht geändert oder entfernt werden.",
-    "emptyName": "Geben Sie einen Namen ein."
+    "emptyName": "Geben Sie einen Namen ein.",
+    "appAlreadyRunning": "Das Programm läuft schon, und PixelIt hat es nicht gestartet",
+    "appLaunchFailed": "Das Programm konnte nicht gestartet werden",
+    "appMissing": "Zuerst das Programm wählen oder installieren",
+    "appNotOurs": "PixelIt hat dieses Programm nicht gestartet und beendet es nicht",
+    "noArchive": "Für diesen Computer gibt es kein festes Archiv von {id}",
+    "noModelFolder": "Zuerst einen Ordner für diese Art von Modell hinzufügen",
+    "upscaleModelFailed": "Das Vergrößerungsmodell lief nicht: {model}",
+    "upscalerMissing": "Das Vergrößerungsmodell wurde nicht gefunden: {model}"
   },
   "native": {
     "tray": {

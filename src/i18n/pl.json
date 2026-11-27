@@ -740,7 +740,29 @@
       "sketch": "Szkic ołówkiem",
       "oil": "Olej",
       "portrait": "Portret"
-    }
+    },
+    "enlarge": "Powiększenie",
+    "enlargeOff": "Nie",
+    "enlargeHint": "Każdy obraz jest powiększany wybranym modelem zaraz po wygenerowaniu.",
+    "upscaleInstallTitle": "Zainstalować model powiększania?",
+    "upscaleInstallText": "Do powiększania potrzebny jest lokalny model {name} ({size}). Pobrać go i zainstalować?",
+    "upscaleInstall": "Zainstaluj",
+    "upscaleInstalling": "Model powiększania jest pobierany. Zaraz potem obraz zostanie powiększony.",
+    "upscaler": "Model powiększania",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "potrzebuje uruchomionego ComfyUI lub Forge",
+    "upscalerMissing": "Ten model jest teraz niedostępny. Odśwież listę, gdy program działa.",
+    "upscaleMode": "Szczegóły",
+    "upscaleFast": "Szybko",
+    "upscaleRefine": "Ze szczegółami",
+    "upscaleRefineHint": "Generator maluje powiększony obraz jeszcze raz, więc wracają drobne szczegóły. Trwa to mniej więcej tyle, co generowanie.",
+    "upscaleFastHint": "Działa tylko model powiększania. Szybciej i bez nowych szczegółów.",
+    "upscaleStrength": "Siła szczegółów",
+    "upscaleStrengthHint": "Jak bardzo generator może odejść od powiększonego obrazu. Mniej zostaje bliżej.",
+    "upscaleOptions": "Ustawienia powiększania",
+    "noticeNeedsGenerator": "Szczegóły wymagają ComfyUI lub Forge. Obraz został tylko powiększony.",
+    "noticeNoPrompt": "Przy tym obrazie nie zapisano zapytania, więc został tylko powiększony.",
+    "noticeRefineFailed": "Generator nie odpowiedział, więc obraz został tylko powiększony."
   },
   "vision": {
     "noModelTitle": "Nie wybrano modelu",
@@ -820,7 +842,7 @@
     "allowCloud": "Zezwól na usługi zewnętrzne",
     "confirmCloud": "Pytaj przed każdym wysłaniem",
     "localServers": "Serwery lokalne",
-    "localServersText": "Szuka uruchomionych na tym komputerze Ollama, LM Studio, ComfyUI i Forge.",
+    "localServersText": "Szuka uruchomionych na tym komputerze Ollama, LM Studio, ComfyUI, Forge i Fooocus.",
     "discover": "Znajdź",
     "noneFound": "Nie znaleziono uruchomionych serwerów",
     "modelsCount": "Modele: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "Serwer {host} znajduje się poza tym komputerem, a usługi zewnętrzne są teraz wyłączone. Zezwolić na korzystanie z nich? Ustawienia na tej stronie zostaną zapisane.",
     "allowCloudYes": "Zezwól",
     "forgeCheckpoint": "Model",
-    "forgeCheckpointHint": "Nazwa, jak pokazuje ją Forge. Puste pole zostawia już wczytany model."
+    "forgeCheckpointHint": "Nazwa, jak pokazuje ją Forge. Puste pole zostawia już wczytany model.",
+    "tabApps": "Aplikacje",
+    "apps": {
+      "title": "Aplikacje",
+      "text": "Instaluje ComfyUI lub Forge, uruchamia je i zatrzymuje oraz trzyma wspólne foldery modeli.",
+      "install": "Zainstaluj",
+      "useStability": "Weź ze Stability Matrix",
+      "fillModels": "Foldery ze Stability Matrix",
+      "start": "Uruchom",
+      "stop": "Zatrzymaj",
+      "open": "Otwórz",
+      "checkUpdates": "Sprawdź aktualizacje",
+      "update": "Aktualizuj",
+      "noHome": "Nie wybrano jeszcze folderu",
+      "nvidia": "kompilacja NVIDIA",
+      "foreignUpdate": "Tę kopię aktualizuje ten, kto ją zainstalował.",
+      "updateReady": "Dostępne jest wydanie {version}.",
+      "models": "Foldery modeli",
+      "modelsText": "ComfyUI dostaje każdy folder. Forge dostaje jeden folder każdego rodzaju.",
+      "search": "Szukaj modeli",
+      "searchText": "Te same katalogi co Stability Matrix. Plik pobiera się tylko na żądanie, do pierwszego folderu swojego rodzaju.",
+      "source": "Katalog",
+      "query": "Szukaj",
+      "modelKind": "Rodzaj",
+      "sort": "Kolejność",
+      "period": "Okres",
+      "baseModel": "Model bazowy",
+      "hideInstalled": "Ukryj zainstalowane",
+      "showNsfw": "Pokaż modele dla dorosłych",
+      "searchButton": "Szukaj",
+      "download": "Pobierz",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Nie zainstalowano",
+        "stopped": "Zatrzymane",
+        "running": "Działa",
+        "foreign": "Już działa"
+      },
+      "origin": {
+        "missing": "Nie zainstalowano",
+        "ours": "Zainstalowane tutaj",
+        "folder": "Wybrany folder",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Lista",
+        "grid": "Siatka"
+      },
+      "sorts": {
+        "downloads": "Popularne",
+        "rating": "Najwyzej oceniane",
+        "newest": "Najnowsze"
+      },
+      "periods": {
+        "all": "Cala historia",
+        "year": "Ostatni rok",
+        "month": "Ostatni miesiac",
+        "week": "Ostatni tydzien",
+        "day": "Ostatnia doba"
+      },
+      "notInFolder": "W tym folderze nie ma programu",
+      "log": "Dziennik uruchomienia",
+      "logEmpty": "Dziennik jest pusty. Zapełni się po uruchomieniu.",
+      "logFile": "Pokaż plik",
+      "logCut": "Widać tylko koniec dziennika. Całość jest w pliku.",
+      "worksLocally": "Działa bez ComfyUI",
+      "file": "Plik"
+    },
+    "notSupportedYet": "Jeszcze nieobsługiwane"
   },
   "assistant": {
     "newChat": "Nowa rozmowa",
@@ -1041,7 +1148,15 @@
     "keyMissing": "Serwer {host} wymaga klucza dostępu. Wpisz klucz w polu poniżej i spróbuj ponownie.",
     "updatePortable": "Wersja przenośna jest aktualizowana ręcznie",
     "builtinStyle": "Wbudowanego stylu nie można zmienić ani usunąć.",
-    "emptyName": "Wpisz nazwę."
+    "emptyName": "Wpisz nazwę.",
+    "appAlreadyRunning": "Program już działa, a nie uruchomił go PixelIt",
+    "appLaunchFailed": "Nie udało się uruchomić programu",
+    "appMissing": "Najpierw wybierz lub zainstaluj program",
+    "appNotOurs": "PixelIt nie uruchamiał tego programu i go nie zatrzyma",
+    "noArchive": "Dla tego komputera nie ma przypiętego archiwum {id}",
+    "noModelFolder": "Najpierw dodaj folder na modele tego rodzaju",
+    "upscaleModelFailed": "Model powiększania nie uruchomił się: {model}",
+    "upscalerMissing": "Nie znaleziono modelu powiększania: {model}"
   },
   "native": {
     "tray": {

@@ -740,7 +740,29 @@
       "sketch": "Croquis au crayon",
       "oil": "Peinture à l’huile",
       "portrait": "Portrait"
-    }
+    },
+    "enlarge": "Agrandir",
+    "enlargeOff": "Non",
+    "enlargeHint": "Chaque image est agrandie avec le modèle choisi juste après sa génération.",
+    "upscaleInstallTitle": "Installer le modèle d’agrandissement ?",
+    "upscaleInstallText": "L’agrandissement a besoin du modèle local {name} ({size}). Le télécharger et l’installer ?",
+    "upscaleInstall": "Installer",
+    "upscaleInstalling": "Le modèle d’agrandissement se télécharge. L’image sera agrandie juste après.",
+    "upscaler": "Modèle d’agrandissement",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "nécessite ComfyUI ou Forge en cours d’exécution",
+    "upscalerMissing": "Ce modèle n’est pas disponible pour le moment. Actualisez la liste quand le programme tourne.",
+    "upscaleMode": "Détail",
+    "upscaleFast": "Rapide",
+    "upscaleRefine": "Avec détail",
+    "upscaleRefineHint": "Le générateur repeint l’image agrandie pour faire revenir les détails fins. Cela prend à peu près le temps d’une génération.",
+    "upscaleFastHint": "Seul le modèle d’agrandissement travaille. Plus rapide, sans détail nouveau.",
+    "upscaleStrength": "Force du détail",
+    "upscaleStrengthHint": "Jusqu’où le générateur peut s’écarter de l’image agrandie. Plus bas reste plus proche.",
+    "upscaleOptions": "Réglages d’agrandissement",
+    "noticeNeedsGenerator": "Le détail a besoin de ComfyUI ou de Forge. L’image a seulement été agrandie.",
+    "noticeNoPrompt": "Aucun prompt n’est enregistré pour cette image, elle a donc seulement été agrandie.",
+    "noticeRefineFailed": "Le générateur n’a pas répondu, l’image a donc seulement été agrandie."
   },
   "vision": {
     "noModelTitle": "Aucun modèle choisi",
@@ -820,7 +842,7 @@
     "allowCloud": "Autoriser les services externes",
     "confirmCloud": "Demander avant chaque envoi",
     "localServers": "Serveurs locaux",
-    "localServersText": "Recherche Ollama, LM Studio, ComfyUI et Forge lancés sur cet ordinateur.",
+    "localServersText": "Recherche Ollama, LM Studio, ComfyUI, Forge et Fooocus lancés sur cet ordinateur.",
     "discover": "Rechercher",
     "noneFound": "Aucun serveur lancé n’a été trouvé",
     "modelsCount": "Modèles : {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "Le serveur {host} se trouve hors de cet ordinateur et les services externes sont désactivés. Autoriser leur utilisation ? Les réglages de cette page seront enregistrés.",
     "allowCloudYes": "Autoriser",
     "forgeCheckpoint": "Modèle",
-    "forgeCheckpointHint": "Le nom tel que Forge l’affiche. Vide laisse le modèle déjà chargé."
+    "forgeCheckpointHint": "Le nom tel que Forge l’affiche. Vide laisse le modèle déjà chargé.",
+    "tabApps": "Applications",
+    "apps": {
+      "title": "Applications",
+      "text": "Installe ComfyUI ou Forge, les démarre et les arrête, et garde des dossiers de modèles communs.",
+      "install": "Installer",
+      "useStability": "Prendre dans Stability Matrix",
+      "fillModels": "Dossiers de Stability Matrix",
+      "start": "Démarrer",
+      "stop": "Arrêter",
+      "open": "Ouvrir",
+      "checkUpdates": "Chercher des mises à jour",
+      "update": "Mettre à jour",
+      "noHome": "Pas encore de dossier",
+      "nvidia": "version NVIDIA",
+      "foreignUpdate": "Cette copie est mise à jour par celui qui l’a installée.",
+      "updateReady": "La version {version} est disponible.",
+      "models": "Dossiers de modèles",
+      "modelsText": "ComfyUI reçoit chaque dossier. Forge en reçoit un de chaque sorte.",
+      "search": "Chercher des modèles",
+      "searchText": "Les mêmes catalogues que Stability Matrix. Un fichier n’est téléchargé que sur demande, dans le premier dossier de sa sorte.",
+      "source": "Catalogue",
+      "query": "Recherche",
+      "modelKind": "Sorte",
+      "sort": "Ordre",
+      "period": "Période",
+      "baseModel": "Modèle de base",
+      "hideInstalled": "Masquer ceux déjà là",
+      "showNsfw": "Montrer les modèles pour adultes",
+      "searchButton": "Chercher",
+      "download": "Télécharger",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Pas installé",
+        "stopped": "Arrêté",
+        "running": "En marche",
+        "foreign": "Déjà en marche"
+      },
+      "origin": {
+        "missing": "Pas installé",
+        "ours": "Installé ici",
+        "folder": "Dossier choisi",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Liste",
+        "grid": "Grille"
+      },
+      "sorts": {
+        "downloads": "Populaires",
+        "rating": "Mieux notes",
+        "newest": "Nouveaux"
+      },
+      "periods": {
+        "all": "Toute la periode",
+        "year": "Derniere annee",
+        "month": "Dernier mois",
+        "week": "Derniere semaine",
+        "day": "Dernier jour"
+      },
+      "notInFolder": "Le programme est introuvable dans ce dossier",
+      "log": "Journal de démarrage",
+      "logEmpty": "Le journal est vide. Il se remplit après un démarrage.",
+      "logFile": "Afficher le fichier",
+      "logCut": "Seule la fin du journal est affichée. Le fichier contient tout.",
+      "worksLocally": "Fonctionne sans ComfyUI",
+      "file": "Fichier"
+    },
+    "notSupportedYet": "Pas encore pris en charge"
   },
   "assistant": {
     "newChat": "Nouvelle discussion",
@@ -1041,7 +1148,15 @@
     "keyMissing": "Le serveur {host} demande une clé d’accès. Saisissez la clé dans le champ ci-dessous et réessayez.",
     "updatePortable": "La version portable se met à jour à la main",
     "builtinStyle": "Un style fourni ne peut pas être modifié ni supprimé.",
-    "emptyName": "Saisissez un nom."
+    "emptyName": "Saisissez un nom.",
+    "appAlreadyRunning": "Le programme tourne déjà, et ce n’est pas PixelIt qui l’a lancé",
+    "appLaunchFailed": "Le programme n’a pas pu démarrer",
+    "appMissing": "Choisissez ou installez d’abord le programme",
+    "appNotOurs": "PixelIt n’a pas lancé ce programme et ne l’arrêtera pas",
+    "noArchive": "Il n’y a pas d’archive figée de {id} pour cet ordinateur",
+    "noModelFolder": "Ajoutez d’abord un dossier pour ce type de modèle",
+    "upscaleModelFailed": "Le modèle d’agrandissement n’a pas pu s’exécuter : {model}",
+    "upscalerMissing": "Le modèle d’agrandissement est introuvable : {model}"
   },
   "native": {
     "tray": {

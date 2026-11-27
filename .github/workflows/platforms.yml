@@ -1,0 +1,155 @@
+name: Desktop builds
+
+# The window, for the Macs a release is offered on. A tag builds them through
+# the release workflow. This file can also be started by hand; then the disk
+# images are artifacts of the run and are not published.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  desktop:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: MacOS_Silicon
+            os: macos-latest
+            bundles: dmg
+            config: src-tauri/tauri.macos.conf.json
+          - name: MacOS_Intel
+            os: macos-15-intel
+            bundles: dmg
+            config: src-tauri/tauri.macos.conf.json
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      # MozJPEG and the AV1 encoder have assembly parts.
+      - uses: ilammy/setup-nasm@v1
+
+      - uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: macOS icon
+        run: |
+          set=src-tauri/icons/icon.iconset
+          mkdir -p "$set"
+          sips -z 16 16 src-tauri/icons/32x32.png --out "$set/icon_16x16.png"
+          sips -z 32 32 src-tauri/icons/32x32.png --out "$set/icon_16x16@2x.png"
+          sips -z 32 32 src-tauri/icons/32x32.png --out "$set/icon_32x32.png"
+          sips -z 64 64 src-tauri/icons/128x128.png --out "$set/icon_32x32@2x.png"
+          sips -z 128 128 src-tauri/icons/128x128.png --out "$set/icon_128x128.png"
+          sips -z 256 256 src-tauri/icons/128x128@2x.png --out "$set/icon_128x128@2x.png"
+          sips -z 256 256 src-tauri/icons/128x128@2x.png --out "$set/icon_256x256.png"
+          sips -z 512 512 src-tauri/icons/128x128@2x.png --out "$set/icon_256x256@2x.png"
+          sips -z 512 512 src-tauri/icons/128x128@2x.png --out "$set/icon_512x512.png"
+          sips -z 1024 1024 src-tauri/icons/128x128@2x.png --out "$set/icon_512x512@2x.png"
+          iconutil -c icns "$set" -o src-tauri/icons/icon.icns
+
+      - name: Build
+        shell: bash
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: sccache
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          build() {
+            npm run tauri -- build --bundles ${{ matrix.bundles }} --config ${{ matrix.config }}
+          }
+          # hdiutil often cannot eject the image it just made and reports
+          # "Resource busy". The application is already compiled, so the next
+          # attempt only repeats the disk image.
+          set +e
+          code=1
+          for attempt in 1 2 3; do
+            build
+            code=$?
+            if [ "$code" -eq 0 ]; then
+              exit 0
+            fi
+            echo "dmg attempt ${attempt} failed (${code})"
+            sleep 20
+          done
+          exit "$code"
+
+      - name: Collect disk images
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-out
+          # Tauri names the image by the processor (aarch64, x64). The release
+          # name says which Mac it is for: PixelIt_<version>_MacOS_Silicon.dmg.
+          # The workspace writes bundles under target/. src-tauri/target is
+          # only there when the window crate was built on its own.
+          found=0
+          for dir in target src-tauri/target; do
+            if [ ! -d "$dir" ]; then
+              continue
+            fi
+            while IFS= read -r -d '' file; do
+              base=$(basename "$file")
+              if [[ ! "$base" =~ _(aarch64|x64|x86_64|amd64)\.dmg$ ]]; then
+                echo "unexpected disk image name: $base"
+                exit 1
+              fi
+              cp "$file" "release-out/${base%_*}_${{ matrix.name }}.dmg"
+              found=1
+            done < <(find "$dir" -path '*/bundle/*' -type f -name '*.dmg' -print0)
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "no disk image was built"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pixelit-${{ matrix.name }}
+          path: release-out/
+          if-no-files-found: error
+
+      # The Windows job creates the release and writes its description. This
+      # step only adds the disk images, and waits until that release exists.
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          for attempt in $(seq 1 90); do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" release-out/* --clobber
+              exit 0
+            fi
+            echo "waiting for the release ${tag} (attempt ${attempt})"
+            sleep 60
+          done
+          echo "the release ${tag} was not created"
+          exit 1
+
+      - name: Cache statistics
+        if: always()
+        run: sccache --show-stats

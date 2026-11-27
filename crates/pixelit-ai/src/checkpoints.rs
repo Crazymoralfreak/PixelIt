@@ -6,7 +6,6 @@
 //! and nothing is sent.
 
 use std::fs;
-use std::path::Path;
 use std::time::Duration;
 
 use pixelit_core::Result;
@@ -34,8 +33,6 @@ pub struct ModelList {
     pub models: Vec<GenerationModel>,
     pub selectable: bool,
 }
-
-const MODEL_EXTENSIONS: &[&str] = &["safetensors", "gguf", "ckpt", "pth"];
 
 /// Lists the models of `provider`. `None` means the provider of the settings.
 pub fn list(
@@ -122,29 +119,13 @@ fn forge(net: &Net, settings: &AiSettings) -> Result<ModelList> {
 
 fn sdcpp(_paths: &Paths, settings: &AiSettings) -> ModelList {
     let current = settings.generation.sdcpp_model.trim();
-    let Some(folder) = Path::new(current).parent() else {
-        return ModelList {
-            models: Vec::new(),
-            selectable: true,
-        };
-    };
     let mut models = Vec::new();
-    if let Ok(entries) = fs::read_dir(folder) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let extension = path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .map_or_default(str::to_ascii_lowercase);
-            if !MODEL_EXTENSIONS.iter().any(|item| *item == extension) || !path.is_file() {
-                continue;
-            }
-            let id = path.display().to_string();
-            let name = path
-                .file_name()
-                .map_or_else(|| id.clone(), |name| name.to_string_lossy().into_owned());
-            models.push(GenerationModel { id, name });
-        }
+    for path in crate::apps::checkpoint_files(&settings.apps.models, current) {
+        let id = path.display().to_string();
+        let name = path
+            .file_name()
+            .map_or_else(|| id.clone(), |name| name.to_string_lossy().into_owned());
+        models.push(GenerationModel { id, name });
     }
     models.sort_by_key(|model| model.name.to_ascii_lowercase());
     ModelList {

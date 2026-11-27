@@ -740,7 +740,29 @@
       "sketch": "Esboço a lápis",
       "oil": "Pintura a óleo",
       "portrait": "Retrato"
-    }
+    },
+    "enlarge": "Ampliar",
+    "enlargeOff": "Não",
+    "enlargeHint": "Cada imagem é ampliada com o modelo escolhido logo após ser gerada.",
+    "upscaleInstallTitle": "Instalar o modelo de ampliação?",
+    "upscaleInstallText": "A ampliação precisa do modelo local {name} ({size}). Transferi-lo e instalá-lo?",
+    "upscaleInstall": "Instalar",
+    "upscaleInstalling": "O modelo de ampliação está a ser transferido. A imagem é ampliada logo a seguir.",
+    "upscaler": "Modelo de ampliação",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "precisa de um ComfyUI ou Forge em execução",
+    "upscalerMissing": "Este modelo não está disponível agora. Atualize a lista quando o programa estiver a correr.",
+    "upscaleMode": "Detalhe",
+    "upscaleFast": "Rápido",
+    "upscaleRefine": "Com detalhe",
+    "upscaleRefineHint": "O gerador volta a pintar a imagem ampliada para recuperar o detalhe fino. Demora cerca do mesmo que gerar a imagem.",
+    "upscaleFastHint": "Só o modelo de ampliação trabalha. Mais rápido e sem detalhe novo.",
+    "upscaleStrength": "Força do detalhe",
+    "upscaleStrengthHint": "Quanto o gerador pode afastar-se da imagem ampliada. Um valor baixo fica mais perto.",
+    "upscaleOptions": "Definições de ampliação",
+    "noticeNeedsGenerator": "O detalhe precisa de ComfyUI ou Forge. A imagem foi apenas ampliada.",
+    "noticeNoPrompt": "Esta imagem não tem um prompt guardado, por isso foi apenas ampliada.",
+    "noticeRefineFailed": "O gerador não respondeu, por isso a imagem foi apenas ampliada."
   },
   "vision": {
     "noModelTitle": "Nenhum modelo escolhido",
@@ -820,7 +842,7 @@
     "allowCloud": "Permitir serviços externos",
     "confirmCloud": "Perguntar antes de cada envio",
     "localServers": "Servidores locais",
-    "localServersText": "Procura Ollama, LM Studio, ComfyUI e Forge em execução neste computador.",
+    "localServersText": "Procura Ollama, LM Studio, ComfyUI, Forge e Fooocus em execução neste computador.",
     "discover": "Procurar",
     "noneFound": "Nenhum servidor em execução foi encontrado",
     "modelsCount": "Modelos: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "O servidor {host} está fora deste computador e os serviços externos estão desligados. Permitir o acesso a eles? As definições desta página serão guardadas.",
     "allowCloudYes": "Permitir",
     "forgeCheckpoint": "Modelo",
-    "forgeCheckpointHint": "O nome como o Forge o mostra. Vazio deixa o modelo já carregado."
+    "forgeCheckpointHint": "O nome como o Forge o mostra. Vazio deixa o modelo já carregado.",
+    "tabApps": "Aplicações",
+    "apps": {
+      "title": "Aplicações",
+      "text": "Instala o ComfyUI ou o Forge, inicia e para, e guarda pastas de modelos comuns.",
+      "install": "Instalar",
+      "useStability": "Usar o Stability Matrix",
+      "fillModels": "Pastas do Stability Matrix",
+      "start": "Iniciar",
+      "stop": "Parar",
+      "open": "Abrir",
+      "checkUpdates": "Procurar atualizações",
+      "update": "Atualizar",
+      "noHome": "Ainda sem pasta",
+      "nvidia": "compilação NVIDIA",
+      "foreignUpdate": "Esta cópia é atualizada por quem a instalou.",
+      "updateReady": "A versão {version} está disponível.",
+      "models": "Pastas de modelos",
+      "modelsText": "O ComfyUI recebe todas as pastas. O Forge recebe uma pasta de cada tipo.",
+      "search": "Procurar modelos",
+      "searchText": "Os mesmos catálogos do Stability Matrix. O ficheiro só é descarregado quando o pede, para a primeira pasta do seu tipo.",
+      "source": "Catálogo",
+      "query": "Pesquisa",
+      "modelKind": "Tipo",
+      "sort": "Ordem",
+      "period": "Período",
+      "baseModel": "Modelo base",
+      "hideInstalled": "Ocultar instalados",
+      "showNsfw": "Mostrar modelos para adultos",
+      "searchButton": "Procurar",
+      "download": "Descarregar",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Não instalado",
+        "stopped": "Parado",
+        "running": "A correr",
+        "foreign": "Já a correr"
+      },
+      "origin": {
+        "missing": "Não instalado",
+        "ours": "Instalado aqui",
+        "folder": "Pasta escolhida",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Lista",
+        "grid": "Grelha"
+      },
+      "sorts": {
+        "downloads": "Populares",
+        "rating": "Melhor avaliados",
+        "newest": "Novos"
+      },
+      "periods": {
+        "all": "Todo o tempo",
+        "year": "Ultimo ano",
+        "month": "Ultimo mes",
+        "week": "Ultima semana",
+        "day": "Ultimo dia"
+      },
+      "notInFolder": "O programa não foi encontrado nesta pasta",
+      "log": "Registo de arranque",
+      "logEmpty": "O registo está vazio. Preenche-se depois de um arranque.",
+      "logFile": "Mostrar ficheiro",
+      "logCut": "Só é mostrado o fim do registo. O ficheiro tem tudo.",
+      "worksLocally": "Funciona sem ComfyUI",
+      "file": "Arquivo"
+    },
+    "notSupportedYet": "Ainda não suportado"
   },
   "assistant": {
     "newChat": "Nova conversa",
@@ -1041,7 +1148,15 @@
     "keyMissing": "O servidor {host} pede uma chave de acesso. Introduza a chave no campo abaixo e tente novamente.",
     "updatePortable": "A versão portátil é atualizada à mão",
     "builtinStyle": "Um estilo incluído não pode ser alterado nem removido.",
-    "emptyName": "Escreva um nome."
+    "emptyName": "Escreva um nome.",
+    "appAlreadyRunning": "O programa já está a correr e não foi o PixelIt que o iniciou",
+    "appLaunchFailed": "Não foi possível iniciar o programa",
+    "appMissing": "Primeiro escolha ou instale o programa",
+    "appNotOurs": "O PixelIt não iniciou este programa e não o vai parar",
+    "noArchive": "Não há um arquivo fixo de {id} para este computador",
+    "noModelFolder": "Primeiro adicione uma pasta para este tipo de modelo",
+    "upscaleModelFailed": "O modelo de ampliação não conseguiu correr: {model}",
+    "upscalerMissing": "O modelo de ampliação não foi encontrado: {model}"
   },
   "native": {
     "tray": {

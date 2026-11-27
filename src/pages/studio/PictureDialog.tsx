@@ -8,6 +8,7 @@ import { fileName } from "../../lib/format";
 import type { GeneratedPicture, GeneratedRecord } from "../../types";
 import { Button, Modal } from "../../ui";
 import { Curtain } from "./Curtain";
+import { UpscaleMenu } from "./UpscaleOptions";
 
 export interface PictureItem {
   record: GeneratedRecord;
@@ -17,7 +18,6 @@ export interface PictureItem {
 export function PictureDialog({
   items,
   index,
-  upscaleReady,
   onIndex,
   onClose,
   onRepeat,
@@ -36,7 +36,6 @@ export function PictureDialog({
 }: {
   items: PictureItem[];
   index: number;
-  upscaleReady: boolean;
   onIndex: (index: number) => void;
   onClose: () => void;
   onRepeat: (record: GeneratedRecord) => void;
@@ -114,12 +113,13 @@ export function PictureDialog({
             <Button small onClick={() => onEdit(picture.file)}>
               {t("studio.editThis")}
             </Button>
-            <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(picture.file, 2)}>
+            <Button small onClick={() => onUpscale(picture.file, 2)}>
               {t("studio.upscale2")}
             </Button>
-            <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(picture.file, 4)}>
+            <Button small onClick={() => onUpscale(picture.file, 4)}>
               {t("studio.upscale4")}
             </Button>
+            <UpscaleMenu />
             <Button small onClick={() => onEditor(picture.file)}>
               {t("viewer.edit")}
             </Button>

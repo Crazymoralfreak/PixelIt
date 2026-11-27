@@ -5,6 +5,8 @@
 //! application works as an ordinary image tool; each AI step reports what is
 //! missing instead of failing in an unclear way.
 
+pub mod apps;
+pub mod browse;
 pub mod catalog;
 pub mod checkpoints;
 pub mod config;
@@ -23,6 +25,7 @@ pub mod parameters;
 pub mod progress;
 pub mod secrets;
 pub mod styles;
+pub mod upscale;
 pub mod vision;
 pub mod web;
 pub mod worker;
@@ -38,9 +41,12 @@ use pixelit_engine::Paths;
 
 use crate::edits::{Edits, Print};
 
+pub use crate::apps::Host;
+pub use crate::browse::{ModelHit, SearchSource};
 pub use crate::catalog::{Entry, Kind};
 pub use crate::checkpoints::{GenerationModel, ModelList};
 pub use crate::config::{AiSettings, DeviceChoice, Endpoint, Generation, GenerationProvider};
+pub use crate::config::{AppKind, AppOrigin, LocalApps, ModelKind, ModelLibrary};
 pub use crate::discover::Found;
 pub use crate::faces::Face;
 pub use crate::generate::{GenerateRequest, Outcome, Source};
@@ -77,6 +83,16 @@ pub struct Ai {
     settings: RwLock<AiSettings>,
     onnx: Onnx,
     edits: Edits,
+    /// ComfyUI and Forge processes this section started.
+    pub apps_host: apps::Host,
+}
+
+fn remember_comfy_url(settings: &mut config::AiSettings) {
+    let app = &settings.apps.comfy;
+    if app.home.is_empty() || app.origin == config::AppOrigin::Missing {
+        return;
+    }
+    settings.generation.comfy_url = format!("http://127.0.0.1:{}", app.port);
 }
 
 impl Ai {
@@ -92,6 +108,7 @@ impl Ai {
             settings: RwLock::new(settings),
             hardware,
             paths,
+            apps_host: apps::Host::default(),
         };
         ai.apply_device();
         ai
@@ -164,8 +181,75 @@ impl Ai {
         install::remove(&self.paths, id)
     }
 
+    fn save_apps(&self, apps: config::LocalApps) -> Result<AiSettings> {
+        let mut settings = self.settings();
+        settings.apps = apps;
+        self.set_settings(settings)
+    }
+
+    /// Points a card at a folder the user chose and reads the models already there.
+    pub fn set_app_home(&self, kind: config::AppKind, home: String) -> Result<AiSettings> {
+        let mut settings = self.settings();
+        {
+            let app = settings.apps.of_mut(kind);
+            home.trim().clone_into(&mut app.home);
+            app.origin = if app.home.is_empty() {
+                config::AppOrigin::Missing
+            } else {
+                config::AppOrigin::Folder
+            };
+            app.release.clear();
+            app.bytes = 0;
+        }
+        apps::link_folder(&mut settings.apps);
+        remember_comfy_url(&mut settings);
+        self.set_settings(settings)
+    }
+
+    /// Uses the Stability Matrix package for this program, when one was found.
+    pub fn use_stability(&self, kind: config::AppKind) -> Result<AiSettings> {
+        let offer = apps::detect_stability().ok_or_else(|| Error::new("notFound"))?;
+        let home = match kind {
+            config::AppKind::Comfy => offer.comfy,
+            config::AppKind::Forge => offer.forge,
+        };
+        if home.is_empty() {
+            return Err(Error::new("notFound"));
+        }
+        let mut settings = self.settings();
+        {
+            let app = settings.apps.of_mut(kind);
+            app.home = home;
+            app.origin = config::AppOrigin::StabilityMatrix;
+            app.release.clear();
+            app.bytes = 0;
+        }
+        apps::link_folder(&mut settings.apps);
+        remember_comfy_url(&mut settings);
+        self.set_settings(settings)
+    }
+
+    /// Reads model folders and the last port from a folder that was already chosen.
+    pub fn link_saved_apps(&self) -> bool {
+        let mut settings = self.settings();
+        if !apps::link_folder(&mut settings.apps) {
+            return false;
+        }
+        remember_comfy_url(&mut settings);
+        self.set_settings(settings).is_ok()
+    }
+
+    /// Copies the model folders Stability Matrix already uses.
+    pub fn fill_model_folders(&self) -> Result<AiSettings> {
+        let offer = apps::detect_stability().ok_or_else(|| Error::new("notFound"))?;
+        let mut apps = self.settings().apps;
+        apps.models = offer.models;
+        self.save_apps(apps)
+    }
+
     /// Frees the memory of the loaded models.
     pub fn release(&self) {
+        self.apps_host.stop_all();
         self.onnx.stop();
     }
 
@@ -324,7 +408,35 @@ impl Ai {
 
     /// Looks for AI servers on this computer.
     pub fn discover(&self) -> Vec<Found> {
-        discover::local_servers(&self.net)
+        discover::local_servers(&self.net, &self.settings())
+    }
+
+    /// Enlarges with the upscaler from the settings, and paints detail when
+    /// that is switched on and a local generator can do it.
+    pub fn enlarge(
+        &self,
+        image: &Image,
+        factor: u32,
+        notes: &upscale::Notes,
+        index: u32,
+        count: u32,
+        cancel: &CancelToken,
+        tick: &generate::Tick<'_>,
+    ) -> Result<upscale::Enlarged> {
+        let settings = self.settings();
+        upscale::enlarge(
+            &self.onnx,
+            &self.net,
+            &self.paths,
+            &settings,
+            image,
+            factor,
+            notes,
+            index,
+            count,
+            cancel,
+            tick,
+        )
     }
 
     /// Finds the faces of a picture.

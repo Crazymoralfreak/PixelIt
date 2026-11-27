@@ -17,6 +17,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Window, WindowEvent};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
+#[cfg(windows)]
 use windows::Win32::Globalization::GetUserDefaultUILanguage;
 
 use pixelit_ai::Ai;
@@ -107,14 +108,32 @@ pub fn with_core(app: &AppHandle, action: impl FnOnce(&Arc<Core>)) {
     }
 }
 
-/// Language of the Windows interface when PixelIt has a dictionary for it,
+/// A dictionary code, English when PixelIt has no dictionary for this one.
+fn dictionary(code: &str) -> &'static str {
+    match code {
+        "zh" => "zh",
+        "de" => "de",
+        "es" => "es",
+        "fr" => "fr",
+        "ja" => "ja",
+        "ko" => "ko",
+        "pl" => "pl",
+        "pt" => "pt",
+        "ru" => "ru",
+        "tr" => "tr",
+        _ => "en",
+    }
+}
+
+/// Language of the system interface when PixelIt has a dictionary for it,
 /// English for any other.
+#[cfg(windows)]
 pub fn system_language() -> &'static str {
     const PRIMARY_LANGUAGE_MASK: u16 = 0x3FF;
     // SAFETY: no preconditions.
     let language = unsafe { GetUserDefaultUILanguage() } & PRIMARY_LANGUAGE_MASK;
     // Primary language ids from WinNls.h.
-    match language {
+    let code = match language {
         0x04 => "zh",
         0x07 => "de",
         0x0A => "es",
@@ -126,7 +145,19 @@ pub fn system_language() -> &'static str {
         0x19 => "ru",
         0x1F => "tr",
         _ => "en",
-    }
+    };
+    dictionary(code)
+}
+
+/// Language of the system interface when PixelIt has a dictionary for it,
+/// English for any other. `LANG` looks like `ru_RU.UTF-8`.
+#[cfg(not(windows))]
+pub fn system_language() -> &'static str {
+    let raw = std::env::var("LC_ALL")
+        .or_else(|_| std::env::var("LANG"))
+        .unwrap_or_default();
+    let code = raw.split(['_', '.', '@']).next().unwrap_or("en");
+    dictionary(code)
 }
 
 /// Paths among the arguments of a launch: everything that is not a flag.

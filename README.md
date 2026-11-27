@@ -2,7 +2,7 @@
 
 [Русский](README.ru.md)
 
-An image toolkit for Windows: a viewer, a non-destructive editor, batch processing with recipes, set generators and local AI models. Everything runs on your computer. The same operations are available in the window, from the command line and to AI agents through MCP.
+An image toolkit for Windows and macOS: a viewer, a non-destructive editor, batch processing with recipes, set generators and local AI models. Everything runs on your computer. The same operations are available in the window, from the command line and to AI agents through MCP.
 
 The interface is available in German, English, Spanish, French, Japanese, Korean, Polish, Portuguese, Russian, Turkish and Simplified Chinese. The application has no account. It uses the network only for what you asked for: update checks, model downloads, and requests to the servers and services you set up yourself.
 
@@ -12,6 +12,8 @@ The latest version is on the [releases](https://github.com/Crazymoralfreak/Pixel
 
 - `PixelIt_<version>_x64-setup.exe` — the installer. It installs the application for the current user, no administrator rights needed.
 - `PixelIt_<version>_x64-portable.zip` — the portable version. Unpack the `PixelIt` folder anywhere and start `PixelIt.exe`. The `portable` file beside the program makes it keep all its data in the `data` folder next to itself.
+
+A tag also builds macOS disk images, `PixelIt_<version>_MacOS_Silicon.dmg` for Apple Silicon and `PixelIt_<version>_MacOS_Intel.dmg` for Intel. The image is signed locally, without an Apple certificate, so Gatekeeper asks before the first open. The Explorer menu, screen capture, HEIC and the local ONNX models stay on Windows. The installed Windows copy is the one that updates itself.
 
 The files are not signed with a code signing certificate, so Windows SmartScreen shows a warning on the first start.
 
@@ -92,7 +94,7 @@ PixelIt is an MCP client as well: the same tab connects external MCP servers (a 
 
 ## Requirements
 
-- Windows 10 version 1809 or newer, or Windows 11, x64.
+- Windows 10 version 1809 or newer, or Windows 11, x64. macOS 11 or newer, Apple Silicon or Intel.
 - The WebView2 runtime. Windows 11 always has it. On a machine without WebView2 the installer downloads it; the portable version does not start without it.
 - HEIC files are read by the Windows codecs: they need the "HEIF Image Extensions" and "HEVC Video Extensions" from the Microsoft Store.
 - PDF files are read by the PDFium component, downloaded on the "Models and AI" page.
@@ -136,7 +138,7 @@ npm run tauri dev
 2. Commit the changes and tag the commit `v<version>`, for example `v1.1.0`.
 3. Push the tag to GitHub.
 
-The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches three files to the release of the tag: the installer, the portable archive and `latest.json`. The description of the release is the section of the version in `CHANGELOG.md`.
+The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches them to the release of the tag together with `latest.json`. The same tag builds the macOS disk images. The description of the release is the section of the version in `CHANGELOG.md`. `latest.json` is what the installed Windows copy reads.
 
 `latest.json` describes the update: the version, the link to the installer and its signature. Installed copies read it from `releases/latest/download/latest.json`, so they see only a release that GitHub considers the latest: not a draft and not a pre-release.
 

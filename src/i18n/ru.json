@@ -740,7 +740,29 @@
       "sketch": "Карандашный набросок",
       "oil": "Масло",
       "portrait": "Портрет"
-    }
+    },
+    "enlarge": "Увеличение",
+    "enlargeOff": "Нет",
+    "enlargeHint": "Каждая картинка увеличивается выбранной моделью сразу после генерации.",
+    "upscaleInstallTitle": "Установить модель увеличения?",
+    "upscaleInstallText": "Для увеличения нужна локальная модель {name} ({size}). Скачать и установить её?",
+    "upscaleInstall": "Установить",
+    "upscaleInstalling": "Модель увеличения скачивается. Сразу после этого изображение будет увеличено.",
+    "upscaler": "Модель увеличения",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "нужен запущенный ComfyUI или Forge",
+    "upscalerMissing": "Сейчас эта модель недоступна. Обновите список, когда программа запущена.",
+    "upscaleMode": "Детали",
+    "upscaleFast": "Быстро",
+    "upscaleRefine": "С дорисовкой",
+    "upscaleRefineHint": "Генератор ещё раз рисует увеличенную картинку, поэтому появляются мелкие детали. Это занимает примерно столько же, сколько генерация.",
+    "upscaleFastHint": "Работает только модель увеличения. Быстрее и без новых деталей.",
+    "upscaleStrength": "Сила дорисовки",
+    "upscaleStrengthHint": "Насколько генератор может отойти от увеличенной картинки. Меньше — ближе к ней.",
+    "upscaleOptions": "Параметры увеличения",
+    "noticeNeedsGenerator": "Дорисовка нуждается в ComfyUI или Forge. Картинка только увеличена.",
+    "noticeNoPrompt": "У этой картинки не сохранён запрос, поэтому она только увеличена.",
+    "noticeRefineFailed": "Генератор не ответил, поэтому картинка только увеличена."
   },
   "vision": {
     "noModelTitle": "Модель не выбрана",
@@ -820,7 +842,7 @@
     "allowCloud": "Разрешить внешние сервисы",
     "confirmCloud": "Спрашивать перед каждой отправкой",
     "localServers": "Локальные серверы",
-    "localServersText": "Поиск запущенных на этом компьютере Ollama, LM Studio, ComfyUI и Forge.",
+    "localServersText": "Поиск запущенных на этом компьютере Ollama, LM Studio, ComfyUI, Forge и Fooocus.",
     "discover": "Найти",
     "noneFound": "Запущенные серверы не найдены",
     "modelsCount": "Моделей: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "Сервер {host} находится за пределами этого компьютера, а внешние сервисы сейчас выключены. Разрешить обращение к ним? Настройки на этой странице будут сохранены.",
     "allowCloudYes": "Разрешить",
     "forgeCheckpoint": "Модель",
-    "forgeCheckpointHint": "Имя, как его показывает Forge. Пустое поле оставляет уже загруженную модель."
+    "forgeCheckpointHint": "Имя, как его показывает Forge. Пустое поле оставляет уже загруженную модель.",
+    "tabApps": "Приложения",
+    "apps": {
+      "title": "Приложения",
+      "text": "Устанавливает ComfyUI или Forge, запускает и останавливает их и хранит общие папки моделей.",
+      "install": "Установить",
+      "useStability": "Взять из Stability Matrix",
+      "fillModels": "Папки из Stability Matrix",
+      "start": "Запустить",
+      "stop": "Остановить",
+      "open": "Открыть",
+      "checkUpdates": "Проверить обновления",
+      "update": "Обновить",
+      "noHome": "Папка ещё не выбрана",
+      "nvidia": "сборка NVIDIA",
+      "foreignUpdate": "Эту копию обновляет тот, кто её поставил.",
+      "updateReady": "Доступен выпуск {version}.",
+      "models": "Папки моделей",
+      "modelsText": "ComfyUI получает все папки. Forge получает по одной папке каждого вида.",
+      "search": "Найти модели",
+      "searchText": "Те же каталоги, что ищет Stability Matrix. Файл скачивается только по кнопке, в первую папку своего вида.",
+      "source": "Каталог",
+      "query": "Поиск",
+      "modelKind": "Вид",
+      "sort": "Порядок",
+      "period": "Период",
+      "baseModel": "Базовая модель",
+      "hideInstalled": "Скрыть установленные",
+      "showNsfw": "Показывать модели для взрослых",
+      "searchButton": "Искать",
+      "download": "Скачать",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Не установлено",
+        "stopped": "Остановлено",
+        "running": "Работает",
+        "foreign": "Уже запущено"
+      },
+      "origin": {
+        "missing": "Не установлено",
+        "ours": "Поставлено отсюда",
+        "folder": "Указанная папка",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Список",
+        "grid": "Сетка"
+      },
+      "sorts": {
+        "downloads": "Популярные",
+        "rating": "По оценке",
+        "newest": "Новые"
+      },
+      "periods": {
+        "all": "За всё время",
+        "year": "За год",
+        "month": "За месяц",
+        "week": "За неделю",
+        "day": "За сутки"
+      },
+      "notInFolder": "В этой папке программа не найдена",
+      "log": "Журнал запуска",
+      "logEmpty": "Журнал пуст. Он появится после запуска.",
+      "logFile": "Показать файл",
+      "logCut": "Показан только конец журнала. Весь журнал — в файле.",
+      "worksLocally": "Работает без ComfyUI",
+      "file": "Файл"
+    },
+    "notSupportedYet": "Пока не поддерживается"
   },
   "assistant": {
     "newChat": "Новый чат",
@@ -1041,7 +1148,15 @@
     "keyMissing": "Сервер {host} требует ключ доступа. Введите ключ в поле ниже и повторите запрос.",
     "updatePortable": "Переносная версия обновляется вручную",
     "builtinStyle": "Встроенный стиль нельзя изменить или удалить.",
-    "emptyName": "Введите название."
+    "emptyName": "Введите название.",
+    "appAlreadyRunning": "Программа уже запущена, и это сделал не PixelIt",
+    "appLaunchFailed": "Программу не удалось запустить",
+    "appMissing": "Сначала выберите или установите программу",
+    "appNotOurs": "PixelIt не запускал эту программу и не будет её останавливать",
+    "noArchive": "Для этого компьютера нет закреплённого архива {id}",
+    "noModelFolder": "Сначала добавьте папку для моделей этого вида",
+    "upscaleModelFailed": "Модель увеличения не запустилась: {model}",
+    "upscalerMissing": "Модель увеличения не найдена: {model}"
   },
   "native": {
     "tray": {

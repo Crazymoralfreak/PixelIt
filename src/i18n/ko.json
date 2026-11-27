@@ -740,7 +740,29 @@
       "sketch": "연필 스케치",
       "oil": "유화",
       "portrait": "초상"
-    }
+    },
+    "enlarge": "확대",
+    "enlargeOff": "안 함",
+    "enlargeHint": "각 그림은 생성된 직후 선택한 모델로 확대됩니다.",
+    "upscaleInstallTitle": "확대 모델을 설치할까요?",
+    "upscaleInstallText": "확대하려면 로컬 모델 {name}({size})이 필요합니다. 다운로드하여 설치할까요?",
+    "upscaleInstall": "설치",
+    "upscaleInstalling": "확대 모델을 다운로드하고 있습니다. 끝나면 바로 이미지를 확대합니다.",
+    "upscaler": "확대 모델",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "실행 중인 ComfyUI 또는 Forge가 필요",
+    "upscalerMissing": "이 모델은 지금 사용할 수 없습니다. 프로그램이 실행 중일 때 목록을 새로고침하세요.",
+    "upscaleMode": "디테일",
+    "upscaleFast": "빠르게",
+    "upscaleRefine": "디테일 포함",
+    "upscaleRefineHint": "생성기가 확대한 그림을 다시 그려 가는 디테일을 되돌립니다. 그림을 생성하는 것과 비슷한 시간이 걸립니다.",
+    "upscaleFastHint": "확대 모델만 실행됩니다. 더 빠르고 새 디테일은 더하지 않습니다.",
+    "upscaleStrength": "디테일 강도",
+    "upscaleStrengthHint": "생성기가 확대한 그림에서 얼마나 벗어날 수 있는지. 낮을수록 더 가깝게 유지됩니다.",
+    "upscaleOptions": "확대 설정",
+    "noticeNeedsGenerator": "디테일에는 ComfyUI 또는 Forge가 필요합니다. 그림은 확대만 되었습니다.",
+    "noticeNoPrompt": "이 그림에는 저장된 프롬프트가 없어 확대만 되었습니다.",
+    "noticeRefineFailed": "생성기가 응답하지 않아 그림은 확대만 되었습니다."
   },
   "vision": {
     "noModelTitle": "모델을 선택하지 않았습니다",
@@ -820,7 +842,7 @@
     "allowCloud": "외부 서비스 허용",
     "confirmCloud": "보낼 때마다 묻기",
     "localServers": "로컬 서버",
-    "localServersText": "이 컴퓨터에서 실행 중인 Ollama, LM Studio, ComfyUI, Forge를 찾습니다.",
+    "localServersText": "이 컴퓨터에서 실행 중인 Ollama, LM Studio, ComfyUI, Forge, Fooocus를 찾습니다.",
     "discover": "찾기",
     "noneFound": "실행 중인 서버를 찾지 못했습니다",
     "modelsCount": "모델: {count}",
@@ -888,7 +910,92 @@
     "allowCloudText": "서버 {host}은(는) 이 컴퓨터 밖에 있으며 외부 서비스는 현재 꺼져 있습니다. 사용을 허용할까요? 이 페이지의 설정이 저장됩니다.",
     "allowCloudYes": "허용",
     "forgeCheckpoint": "모델",
-    "forgeCheckpointHint": "Forge가 보여주는 이름입니다. 비우면 이미 불러 둔 모델을 둡니다."
+    "forgeCheckpointHint": "Forge가 보여주는 이름입니다. 비우면 이미 불러 둔 모델을 둡니다.",
+    "tabApps": "앱",
+    "apps": {
+      "title": "앱",
+      "text": "ComfyUI나 Forge를 설치하고 시작·중지하며 모델 폴더를 함께 씁니다.",
+      "install": "설치",
+      "useStability": "Stability Matrix 사용",
+      "fillModels": "Stability Matrix 폴더",
+      "start": "시작",
+      "stop": "중지",
+      "open": "열기",
+      "checkUpdates": "업데이트 확인",
+      "update": "업데이트",
+      "noHome": "폴더가 아직 없습니다",
+      "nvidia": "NVIDIA 빌드",
+      "foreignUpdate": "이 복사본은 설치한 쪽이 업데이트합니다.",
+      "updateReady": "버전 {version}이 있습니다.",
+      "models": "모델 폴더",
+      "modelsText": "ComfyUI는 모든 폴더를 받습니다. Forge는 종류마다 폴더 하나입니다.",
+      "search": "모델 찾기",
+      "searchText": "Stability Matrix와 같은 목록입니다. 파일은 요청할 때만 그 종류의 첫 폴더로 받습니다.",
+      "source": "목록",
+      "query": "검색",
+      "modelKind": "종류",
+      "sort": "순서",
+      "period": "기간",
+      "baseModel": "기본 모델",
+      "hideInstalled": "설치된 것 숨기기",
+      "showNsfw": "성인 모델 표시",
+      "searchButton": "검색",
+      "download": "다운로드",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "설치 안 됨",
+        "stopped": "중지됨",
+        "running": "실행 중",
+        "foreign": "이미 실행 중"
+      },
+      "origin": {
+        "missing": "설치 안 됨",
+        "ours": "여기서 설치",
+        "folder": "선택한 폴더",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "목록",
+        "grid": "격자"
+      },
+      "sorts": {
+        "downloads": "인기",
+        "rating": "평점 높은",
+        "newest": "최신"
+      },
+      "periods": {
+        "all": "전체 기간",
+        "year": "1년",
+        "month": "1개월",
+        "week": "1주",
+        "day": "1일"
+      },
+      "notInFolder": "이 폴더에서 프로그램을 찾지 못했습니다",
+      "log": "시작 로그",
+      "logEmpty": "로그가 비어 있습니다. 시작하면 기록됩니다.",
+      "logFile": "파일 표시",
+      "logCut": "로그의 끝부분만 표시됩니다. 전체는 파일에 있습니다.",
+      "worksLocally": "ComfyUI 없이 동작",
+      "file": "파일"
+    },
+    "notSupportedYet": "아직 지원하지 않음"
   },
   "assistant": {
     "newChat": "새 대화",
@@ -1041,7 +1148,15 @@
     "keyMissing": "서버 {host}에 액세스 키가 필요합니다. 아래 입력란에 키를 입력한 뒤 다시 시도하세요.",
     "updatePortable": "포터블 버전은 직접 업데이트해야 합니다",
     "builtinStyle": "기본 스타일은 고치거나 지울 수 없습니다.",
-    "emptyName": "이름을 입력하세요."
+    "emptyName": "이름을 입력하세요.",
+    "appAlreadyRunning": "프로그램이 이미 실행 중이며 PixelIt가 시작한 것이 아닙니다",
+    "appLaunchFailed": "프로그램을 시작하지 못했습니다",
+    "appMissing": "먼저 프로그램을 고르거나 설치하세요",
+    "appNotOurs": "PixelIt가 이 프로그램을 시작하지 않았으므로 중지하지 않습니다",
+    "noArchive": "이 컴퓨터용으로 고정된 {id} 압축 파일이 없습니다",
+    "noModelFolder": "먼저 이 종류의 모델 폴더를 추가하세요",
+    "upscaleModelFailed": "확대 모델을 실행하지 못했습니다: {model}",
+    "upscalerMissing": "확대 모델을 찾지 못했습니다: {model}"
   },
   "native": {
     "tray": {

@@ -699,6 +699,115 @@ export interface Generation {
   modelDefaults: Record<string, ModelDefaults>;
   /** Write the prompt into the PNG. */
   embedParameters: boolean;
+  /** Empty uses the built-in model. `onnx:`, `comfy:` and `forge:` name another. */
+  upscaler: string;
+  /** Paint detail back in after enlarging. */
+  upscaleRefine: boolean;
+  /** How far that pass may move from the enlarged picture, from 0 to 1. */
+  upscaleStrength: number;
+}
+
+export type AppKind = "comfy" | "forge";
+export type AppOrigin = "missing" | "ours" | "folder" | "stabilityMatrix";
+export type AppState = "missing" | "stopped" | "running" | "foreign";
+export type ModelKind = "checkpoints" | "loras" | "vaes" | "embeddings" | "controlNet" | "upscale";
+export type SearchSource = "civitai" | "civarchive" | "huggingface" | "openmodeldb";
+
+export interface ModelLibrary {
+  checkpoints: string[];
+  loras: string[];
+  vaes: string[];
+  embeddings: string[];
+  controlNet: string[];
+  upscale: string[];
+}
+
+export interface LocalApp {
+  home: string;
+  origin: AppOrigin;
+  release: string;
+  bytes: number;
+  port: number;
+}
+
+export interface LocalApps {
+  comfy: LocalApp;
+  forge: LocalApp;
+  models: ModelLibrary;
+  showNsfw: boolean;
+}
+
+export interface AppCard {
+  kind: AppKind;
+  home: string;
+  origin: AppOrigin;
+  port: number;
+  release: string;
+  bytes: number;
+  state: AppState;
+  nvidia: boolean;
+  canInstall: boolean;
+}
+
+/** What one program wrote since its last start. */
+export interface AppLog {
+  text: string;
+  /** The file; empty until a first start. */
+  path: string;
+  bytes: number;
+  /** True when `text` is only the end of the file. */
+  cut: boolean;
+}
+
+export interface AppsStatus {
+  comfy: AppCard;
+  forge: AppCard;
+  models: ModelLibrary;
+  showNsfw: boolean;
+  stability: boolean;
+  stabilityComfy: string;
+  stabilityForge: string;
+}
+
+export interface UpdateInfo {
+  owned: boolean;
+  newer: boolean;
+  release: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+}
+
+export interface ModelFile {
+  fileName: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+  format: string;
+}
+
+export interface ModelHit {
+  source: SearchSource;
+  name: string;
+  kind: ModelKind;
+  fileName: string;
+  url: string;
+  bytes: number;
+  sha256: string;
+  baseModel: string;
+  previews: string[];
+  /** Every file that can be downloaded. The fields above are the one offered first. */
+  files?: ModelFile[];
+}
+
+export interface SearchPage {
+  hits: ModelHit[];
+  cursor: string;
+}
+
+export interface PreviewImage {
+  mime: string;
+  data: string;
 }
 
 export interface AiSettings {
@@ -711,6 +820,7 @@ export interface AiSettings {
   vision: Endpoint;
   assistant: Endpoint;
   generation: Generation;
+  apps: LocalApps;
 }
 
 export type ComponentKind =
@@ -775,7 +885,17 @@ export interface AiStatus {
   visionRemote: boolean;
 }
 
-export type ServerKind = "ollama" | "lmStudio" | "llamaCpp" | "comfy" | "forge";
+export type ServerKind = "ollama" | "lmStudio" | "llamaCpp" | "comfy" | "forge" | "fooocus";
+
+export type UpscaleEngine = "builtin" | "onnx" | "comfy" | "forge" | "file";
+export type UpscaleNotice = "" | "needsGenerator" | "noPrompt" | "refineFailed";
+
+export interface Upscaler {
+  id: string;
+  name: string;
+  engine: UpscaleEngine;
+  available: boolean;
+}
 
 export interface FoundServer {
   kind: ServerKind;
@@ -850,6 +970,8 @@ export interface GeneratedRecord {
   source: string;
   kind: GeneratedKind;
   pictures: GeneratedPicture[];
+  /** Why the detail pass did not run. Absent when it ran or was not asked for. */
+  notice?: UpscaleNotice;
 }
 
 export interface Style {

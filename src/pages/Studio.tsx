@@ -14,7 +14,7 @@ import { Vision } from "./studio/Vision";
 
 export default function StudioPage() {
   const { t } = useT();
-  const { ai, studioDrop } = useApp();
+  const { studioDrop } = useApp();
   const { styles } = useStyles();
   const [tab, setTab] = useState<"generate" | "history" | "vision">("generate");
   const [handoff, setHandoff] = useState<StudioHandoff | null>(null);
@@ -53,7 +53,6 @@ export default function StudioPage() {
       <div hidden={tab !== "history"}>
         <History
           styles={styles}
-          upscaleReady={ai?.capabilities.upscale ?? false}
           onRepeat={(record: GeneratedRecord) => send({ token: fresh(), kind: "repeat", record })}
           onSeed={(seed) => send({ token: fresh(), kind: "seed", seed })}
           onVariants={(record) => send({ token: fresh(), kind: "variants", record })}

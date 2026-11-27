@@ -2,7 +2,8 @@ name: Release
 
 # A pushed tag "v<version>" builds the installer and the portable archive,
 # signs the installer for the updater and attaches the files and the update
-# manifest (latest.json) to the GitHub release of that tag.
+# manifest (latest.json) to the GitHub release of that tag. The same tag
+# also builds the macOS disk images, in .github/workflows/platforms.yml.
 #
 # A version with a suffix, such as v1.1.0-beta.1, becomes a pre-release. The
 # stable update address (releases/latest) does not see it. The beta channel
@@ -28,6 +29,10 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
+  desktop:
+    uses: ./.github/workflows/platforms.yml
+    secrets: inherit
+
   windows:
     runs-on: windows-latest
     defaults:
