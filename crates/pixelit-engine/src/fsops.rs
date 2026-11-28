@@ -112,8 +112,10 @@ pub fn keep_for_undo(paths: &Paths, path: &Path) -> Result<PathBuf> {
     let name = format!(
         "{:x}-{}",
         clock::unix_now(),
-        path.file_name()
-            .map_or_else(|| String::from("file"), |name| name.to_string_lossy().into_owned())
+        path.file_name().map_or_else(
+            || String::from("file"),
+            |name| name.to_string_lossy().into_owned()
+        )
     );
     let kept = folder.join(name);
     fs::rename(path, &kept).map_err(|error| Error::from(error).with("path", path.display()))?;
