@@ -4841,7 +4841,7 @@ checksum = "ad78bf43dcf80e8f950c92b84f938a0fc7590b7f6866fbcbeca781609c115590"
 
 [[package]]
 name = "pixelit"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "base64 0.22.1",
  "pixelit-ai",
@@ -4870,7 +4870,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-ai"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "base64 0.22.1",
  "fastrand",
@@ -4893,7 +4893,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-cli"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "clap",
  "pixelit-ai",
@@ -4909,7 +4909,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-codecs"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "avif-decode",
  "bytemuck",
@@ -4942,7 +4942,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-core"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "ab_glyph",
  "criterion",
@@ -4955,7 +4955,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-engine"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "blake3",
  "fastrand",
@@ -4978,7 +4978,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-mcp"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "fastrand",
  "pixelit-ai",
@@ -4993,7 +4993,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-tools"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "fastrand",
  "pixelit-ai",
@@ -5008,7 +5008,7 @@ dependencies = [
 
 [[package]]
 name = "pixelit-worker"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "ort",
  "serde",

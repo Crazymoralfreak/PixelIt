@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-11-28
+
 ### Applications
 
 - ComfyUI and Forge can be installed, started and stopped from Models and AI. A folder you already have, including one from Stability Matrix, is used as it is.
