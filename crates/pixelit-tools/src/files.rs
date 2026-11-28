@@ -365,7 +365,7 @@ fn undo(context: &ToolContext, arguments: &Value) -> Result<Value> {
         .created
         .iter()
         .map(|file| &file.path)
-        .chain(&record.trashed)
+        .chain(record.trashed.iter().map(|file| &file.path))
     {
         context.check_path(path)?;
     }

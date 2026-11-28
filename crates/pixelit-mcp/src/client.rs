@@ -19,6 +19,7 @@ use serde_json::{json, Value};
 use pixelit_ai::net::{self, Net};
 use pixelit_ai::secrets;
 use pixelit_core::{CancelToken, Error, Result};
+use pixelit_engine::environment;
 
 use crate::config::{ServerConfig, TransportKind};
 use crate::protocol::{
@@ -99,6 +100,8 @@ fn spawn(config: &ServerConfig, log: Option<&Path>) -> Result<Child> {
     let mut last = None;
     for name in names {
         let mut command = Command::new(&name);
+        // A Mac started from Finder does not know where `npx` or `uvx` are.
+        environment::with_search_path(&mut command);
         command
             .args(&config.args)
             .envs(&config.env)

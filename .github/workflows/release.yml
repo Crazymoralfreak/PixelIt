@@ -163,13 +163,14 @@ jobs:
           New-Item -ItemType File -Force -Path (Join-Path $portableFolder "portable") | Out-Null
           Compress-Archive -Path $portableFolder -DestinationPath $portable -Force
 
-          # The manifest that installed copies read to find out about this version.
+          # Windows half of the update manifest. The shared latest.json is
+          # written after the macOS files are on the release too.
           $signature = (Get-Content $signatureFile -Raw).Trim()
           $entry = [ordered]@{
             signature = $signature
             url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$tag/$installerName"
           }
-          $manifest = [ordered]@{
+          $windowsUpdate = [ordered]@{
             version = $env:VERSION
             notes = "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
             pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
@@ -178,9 +179,8 @@ jobs:
               "windows-x86_64-nsis" = $entry
             }
           }
-          # WriteAllText writes UTF-8 without a byte order mark, which a JSON reader may reject.
-          $manifestFile = Join-Path (Get-Location) "latest.json"
-          [System.IO.File]::WriteAllText($manifestFile, ($manifest | ConvertTo-Json -Depth 5))
+          $windowsUpdateFile = Join-Path (Get-Location) "windows-update.json"
+          [System.IO.File]::WriteAllText($windowsUpdateFile, ($windowsUpdate | ConvertTo-Json -Depth 5))
 
           # The description of the release: the section of this version in CHANGELOG.md.
           $notes = New-Object System.Collections.Generic.List[string]
@@ -218,46 +218,94 @@ jobs:
               throw "Could not create the release $tag"
             }
           }
-          gh release upload $tag $installer $portable --clobber
+          gh release upload $tag $installer $portable $windowsUpdateFile --clobber
           if ($LASTEXITCODE -ne 0) {
             throw "Could not upload the files to the release $tag"
-          }
-          # The manifest goes last: it must never point to an installer that is not there yet.
-          gh release upload $tag latest.json --clobber
-          if ($LASTEXITCODE -ne 0) {
-            throw "Could not upload latest.json to the release $tag"
-          }
-
-          # The beta channel. Its manifest lives in a permanent pre-release, so
-          # "releases/latest" never points to it. It moves forward only: a fix
-          # for an older stable line does not take beta users back.
-          $channel = "beta-channel"
-          if (@($existing) -notcontains $channel) {
-            gh release create $channel --prerelease --target $env:GITHUB_SHA --title "Beta channel" --notes "The update manifest of the beta channel of PixelIt. The files of every version are in its own release."
-            if ($LASTEXITCODE -ne 0) {
-              throw "Could not create the release $channel"
-            }
-          }
-          $previousFolder = Join-Path $env:RUNNER_TEMP "beta"
-          New-Item -ItemType Directory -Force -Path $previousFolder | Out-Null
-          # A channel without a manifest yet is not an error.
-          gh release download $channel --pattern latest.json --dir $previousFolder --clobber 2>$null
-          $global:LASTEXITCODE = 0
-          $previousFile = Join-Path $previousFolder "latest.json"
-          $newer = $true
-          if (Test-Path $previousFile) {
-            $previous = (Get-Content $previousFile -Raw | ConvertFrom-Json).version
-            $newer = [semver]$env:VERSION -gt [semver]$previous
-          }
-          if ($newer) {
-            gh release upload $channel latest.json --clobber
-            if ($LASTEXITCODE -ne 0) {
-              throw "Could not upload latest.json to the release $channel"
-            }
-          } else {
-            Write-Output "The beta channel already offers $previous; its manifest is left as it is."
           }
 
       - name: Cache statistics
         if: always()
         run: sccache --show-stats
+
+  # After Windows and macOS have uploaded their files, write the shared
+  # latest.json that installed copies of every system read.
+  manifest:
+    needs: [windows, desktop]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Build latest.json for Windows and macOS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          work=$(mktemp -d)
+          gh release download "$tag" --pattern 'windows-update.json' --dir "$work"
+          gh release download "$tag" --pattern '*.app.tar.gz' --dir "$work" || true
+          gh release download "$tag" --pattern '*.app.tar.gz.sig' --dir "$work" || true
+          python3 - "$work" "$tag" "$version" "$GITHUB_REPOSITORY" <<'PY'
+          import json, pathlib, sys
+          work = pathlib.Path(sys.argv[1])
+          tag = sys.argv[2]
+          version = sys.argv[3]
+          repo = sys.argv[4]
+          base = json.loads((work / "windows-update.json").read_text(encoding="utf-8"))
+          platforms = dict(base.get("platforms") or {})
+          for archive in sorted(work.glob("*.app.tar.gz")):
+              name = archive.name
+              key = None
+              for platform in ("darwin-aarch64", "darwin-x86_64"):
+                  if platform in name:
+                      key = platform
+                      break
+              if key is None:
+                  continue
+              sig = pathlib.Path(str(archive) + ".sig")
+              if not sig.is_file():
+                  print(f"missing signature for {name}", file=sys.stderr)
+                  continue
+              platforms[key] = {
+                  "signature": sig.read_text(encoding="utf-8").strip(),
+                  "url": f"https://github.com/{repo}/releases/download/{tag}/{name}",
+              }
+          manifest = {
+              "version": version,
+              "notes": base.get("notes") or f"https://github.com/{repo}/releases/tag/{tag}",
+              "pub_date": base.get("pub_date"),
+              "platforms": platforms,
+          }
+          out = work / "latest.json"
+          out.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+          print(out.read_text(encoding="utf-8"))
+          PY
+          gh release upload "$tag" "$work/latest.json" --clobber
+          # Beta channel: forward only.
+          channel=beta-channel
+          if ! gh release view "$channel" >/dev/null 2>&1; then
+            gh release create "$channel" --prerelease --target "$GITHUB_SHA" --title "Beta channel" --notes "The update manifest of the beta channel of PixelIt. The files of every version are in its own release."
+          fi
+          previous=$(mktemp -d)
+          gh release download "$channel" --pattern latest.json --dir "$previous" --clobber 2>/dev/null || true
+          newer=true
+          if [ -f "$previous/latest.json" ]; then
+            newer=$(python3 - "$version" "$previous/latest.json" <<'PY'
+          import json, sys
+          def parts(text):
+              out = []
+              for piece in text.replace("-", ".").split("."):
+                  out.append(int(piece) if piece.isdigit() else piece)
+              return out
+          current = sys.argv[1]
+          previous = json.load(open(sys.argv[2], encoding="utf-8"))["version"]
+          print("true" if parts(current) > parts(previous) else "false")
+          PY
+          )
+          fi
+          if [ "$newer" = "true" ]; then
+            gh release upload "$channel" "$work/latest.json" --clobber
+          else
+            echo "The beta channel already offers a newer or equal version; its manifest is left as it is."
+          fi

@@ -31,6 +31,7 @@
 - ComfyUI understands a prompt written for Forge: an embedding named by its file is passed as `embedding:name`, and `BREAK` splits the prompt into pieces that are encoded separately. Before, ComfyUI read both as plain words.
 - Embeddings are chosen where the sampler, the VAE and LoRA files are: each has a weight and a side, the prompt or the negative prompt. The chosen ones are written into the request by themselves, in the form the generator reads; an embedding the text already names is not added twice.
 - The negative prompt after the styles is shown with the final prompt and in the picture dialog.
+- The final prompt and the picture dialog show the chosen embeddings and LoRA files: an embedding in the form the generator reads, a LoRA file as `<lora:name:weight>`. This is the display only; a generation is sent what it was sent before.
 - A style of your own is saved under any name. A name without Latin letters, such as one in Russian or Japanese, or a name that matches a built-in style was refused with "A built-in style cannot be changed or removed".
 
 ### Editor
@@ -42,7 +43,9 @@
 
 ### macOS
 
-- A version tag also builds disk images `PixelIt_<version>_MacOS_Silicon.dmg` and `PixelIt_<version>_MacOS_Intel.dmg`. The image is signed locally, so Gatekeeper asks before the first open. The Explorer menu, screen capture, HEIC and the local ONNX models stay on Windows.
+- A version tag also builds disk images `PixelIt_<version>_MacOS_Silicon.dmg` and `PixelIt_<version>_MacOS_Intel.dmg`, with the model worker inside the app. The image is signed locally (ad-hoc), so Gatekeeper asks before the first open; notarization can be switched on later with Apple secrets.
+- Local ONNX models use Core ML on Apple Silicon. PDFium, HEIC (via `sips`), screen capture (with Screen Recording permission), undo of replaced files, hardware detection, Metal stable-diffusion.cpp, Finder open/reopen, the menu bar Quit path, Command shortcuts and Keychain texts work on Mac. The Explorer context menu stays on Windows. Intel Macs hide components that have no build for that CPU.
+- Installed copies under Applications can update themselves; `latest.json` lists Windows and both Mac architectures.
 - The Windows installer and uninstaller carry the application icon.
 
 ## [0.0.3] - 2026-11-25

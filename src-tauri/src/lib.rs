@@ -1,4 +1,4 @@
-//! PixelIt: a desktop image toolkit for Windows.
+//! PixelIt: a desktop image toolkit for Windows and macOS.
 //!
 //! One program has two faces. Started without arguments, or with files to
 //! open, it shows its window. Started with a command (`convert`, `run`,
@@ -226,7 +226,11 @@ fn run_window() -> i32 {
     match built {
         Ok(built) => {
             // Closing the last window is not a reason to quit: PixelIt lives in the tray.
-            built.run(|_, event| {
+            built.run(|handle, event| {
+                #[cfg(target_os = "macos")]
+                app::mac_event(handle, &event);
+                #[cfg(not(target_os = "macos"))]
+                let _ = handle;
                 if let RunEvent::ExitRequested {
                     api, code: None, ..
                 } = event

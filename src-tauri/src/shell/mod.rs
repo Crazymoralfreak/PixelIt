@@ -1,6 +1,7 @@
-//! What PixelIt shows outside its main window: the tray icon and
-//! notifications, with texts from the dictionaries of the interface.
+//! What PixelIt shows outside its main window: the tray icon, the menu bar of
+//! macOS and notifications, with texts from the dictionaries of the interface.
 
+pub mod menu;
 pub mod text;
 pub mod tray;
 pub mod window;

@@ -39,6 +39,97 @@ export function modelTitle(name: string): string {
   return file.replace(/\.(safetensors|ckpt|pt|pth|sft)$/i, "");
 }
 
+/** Marks that end a word of a prompt: lists, weights and groups. */
+const PROMPT_MARKS = /[\s,()[\]{}:|<>]+/;
+
+/** A weight the way the generator writes it: `1`, `0.8`, `1.25`. */
+function trimWeight(value: number): string {
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+/** The file of a listed name, without the folder it lies in. */
+function fileOf(name: string): string {
+  return name.split(/[\\/]/).pop() ?? name;
+}
+
+/** Whether `word` names the file a generator lists as `name`. */
+function isNamed(name: string, word: string): boolean {
+  const wanted = word.toLowerCase();
+  return fileOf(name).toLowerCase() === wanted || name.toLowerCase() === wanted;
+}
+
+/** Whether the text already names this file as a word of its own. */
+function alreadyNamed(text: string, name: string): boolean {
+  return text.split(PROMPT_MARKS).some((word) => word !== "" && isNamed(name, word));
+}
+
+function appendWord(text: string, word: string): string {
+  const trimmed = text.replace(/[\s,]+$/, "");
+  return trimmed === "" ? word : `${trimmed}, ${word}`;
+}
+
+/**
+ * The prompt and the negative prompt as the final-prompt line shows them.
+ * ComfyUI and Forge name the chosen embeddings in the text they read, and a
+ * LoRA is shown as `<lora:name:weight>`. A generator that takes none of this
+ * is left as it is. Nothing here is sent: the generator is given the tuning
+ * itself.
+ */
+export function shownRequest(prompt: string, negative: string, tuning: Tuning, provider: GenerationProvider): [string, string] {
+  const syntax = embeddingSyntax(provider);
+  if (syntax === "plain") {
+    return [prompt, negative];
+  }
+  let text = prompt;
+  let avoided = negative;
+  for (const embedding of tuning.embeddings) {
+    const target = embedding.negative ? avoided : text;
+    if (embedding.name.trim() === "" || alreadyNamed(target, embedding.name)) {
+      continue;
+    }
+    const word = embeddingWord(embedding.name, embedding.weight, syntax === "comfy");
+    if (embedding.negative) {
+      avoided = appendWord(avoided, word);
+    } else {
+      text = appendWord(text, word);
+    }
+  }
+  for (const lora of tuning.loras) {
+    const name = modelTitle(lora.name);
+    if (name === "" || text.toLowerCase().includes(`<lora:${name.toLowerCase()}:`)) {
+      continue;
+    }
+    const tag = `<lora:${name}:${trimWeight(lora.weight)}>`;
+    text = text.trimEnd() === "" ? tag : `${text.trimEnd()} ${tag}`;
+  }
+  return [text, avoided];
+}
+
+/** How a generator names an embedding. `plain` means the generator takes none. */
+function embeddingSyntax(provider: GenerationProvider): "comfy" | "forge" | "plain" {
+  switch (provider) {
+    case "comfy":
+      return "comfy";
+    case "forge":
+      return "forge";
+    case "none":
+    case "sdCpp":
+    case "cloud":
+      return "plain";
+    default: {
+      const unreachable: never = provider;
+      return unreachable;
+    }
+  }
+}
+
+/** An embedding as a word of the prompt. A weight of 1 is a plain word. */
+function embeddingWord(name: string, weight: number, comfy: boolean): string {
+  const body = comfy ? `embedding:${name}` : fileOf(name);
+  const strength = trimWeight(weight);
+  return strength === "1" ? body : `(${body}:${strength})`;
+}
+
 const SEPARATOR = "\u0001";
 
 export function defaultsKey(provider: GenerationProvider, model: string): string {

@@ -10,6 +10,7 @@ import { thumbUrl } from "../api/urls";
 import { useApp } from "../app/context";
 import { JobRow } from "../components/JobsPanel";
 import { useT } from "../i18n";
+import { isMac, keyLabel } from "../lib/platform";
 import { WEB_SOURCES, type WebDownloaded, type WebImage, type WebSource } from "../types";
 import { Button, cx, EmptyState, PageFrame, Section, Select, TextInput } from "../ui";
 
@@ -394,7 +395,7 @@ export default function WebPage() {
 
       {found === null ? (
         saved.length === 0 ? (
-          <EmptyState title={t("web.emptyTitle")} text={t("web.emptyText")} />
+          <EmptyState title={t("web.emptyTitle")} text={t("web.emptyText", { keys: keyLabel("Mod+V") })} />
         ) : null
       ) : found.images.length === 0 ? (
         <EmptyState title={t("web.nothingTitle")} text={t("web.nothingText")} />
@@ -484,7 +485,7 @@ export default function WebPage() {
                     {t("viewer.toBatch")}
                   </Button>
                   <Button small onClick={() => api.revealPath(path).catch(showError)}>
-                    {t("common.reveal")}
+                    {isMac() ? t("common.revealMac") : t("common.reveal")}
                   </Button>
                 </div>
               </div>

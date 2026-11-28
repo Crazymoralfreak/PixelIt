@@ -1,5 +1,6 @@
 //! Texts shown outside the web view: the tray, notifications, the context
-//! menu of Explorer. They come from the same dictionaries as the interface.
+//! menu of Explorer, the menu bar of macOS. They come from the same
+//! dictionaries as the interface.
 
 use std::sync::LazyLock;
 
@@ -94,6 +95,23 @@ mod tests {
         "native.tray.open",
         "native.tray.capture",
         "native.tray.quit",
+        "native.menu.about",
+        "native.menu.services",
+        "native.menu.hide",
+        "native.menu.hideOthers",
+        "native.menu.showAll",
+        "native.menu.quit",
+        "native.menu.edit",
+        "native.menu.undo",
+        "native.menu.redo",
+        "native.menu.cut",
+        "native.menu.copy",
+        "native.menu.paste",
+        "native.menu.selectAll",
+        "native.menu.window",
+        "native.menu.minimize",
+        "native.menu.zoom",
+        "native.menu.close",
         "native.contextMenu",
         "native.notify.updateAvailable",
         "native.notify.updateAvailableText",
@@ -140,6 +158,7 @@ mod tests {
         "cannotEncode",
         "captionUnsupported",
         "captureFailed",
+        "capturePermission",
         "chatBusy",
         "chatMissing",
         "checksumMismatch",
@@ -155,6 +174,7 @@ mod tests {
         "fontNotFound",
         "generationFailed",
         "heicCodecMissing",
+        "heicCodecMissingMac",
         "hotkeyInvalid",
         "hotkeyTaken",
         "httpStatus",

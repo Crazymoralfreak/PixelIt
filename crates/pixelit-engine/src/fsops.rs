@@ -3,7 +3,9 @@
 //! A result is written into a temporary file first and renamed into place, so
 //! a crash never leaves a half-written picture. A file that gets replaced or
 //! removed goes to the Recycle Bin, and every batch records what it created
-//! and what it moved there, which makes the batch reversible.
+//! and what it moved there, which makes the batch reversible. On macOS the
+//! system Trash cannot be listed, so a replaced original is kept under the
+//! data folder until the undo entry ages out.
 
 #[cfg(windows)]
 use std::collections::HashMap;
@@ -13,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use pixelit_core::pipeline::Conflict;
 use pixelit_core::{Error, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::clock;
 use crate::paths::Paths;
@@ -33,8 +35,12 @@ const RENAME_ATTEMPTS: u32 = 10_000;
 pub enum Written {
     /// A new file was created at the path.
     Created(PathBuf),
-    /// The file at the path was replaced; the old one is in the Recycle Bin.
-    Replaced(PathBuf),
+    /// The file at the path was replaced. `kept` is where the old file is
+    /// when it was not sent to the Recycle Bin (the undo folder on macOS).
+    Replaced {
+        path: PathBuf,
+        kept: Option<PathBuf>,
+    },
     /// The file at the path exists and was left alone.
     Skipped(PathBuf),
 }
@@ -42,7 +48,50 @@ pub enum Written {
 impl Written {
     pub fn path(&self) -> &Path {
         match self {
-            Self::Created(path) | Self::Replaced(path) | Self::Skipped(path) => path,
+            Self::Created(path) | Self::Skipped(path) | Self::Replaced { path, .. } => path,
+        }
+    }
+}
+
+/// A file a batch removed from its place.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashedFile {
+    /// Where the file belonged.
+    pub path: PathBuf,
+    /// Copy kept for undo when the system Trash cannot be read back.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept: Option<PathBuf>,
+}
+
+impl TrashedFile {
+    pub fn removed(path: PathBuf) -> Self {
+        Self { path, kept: None }
+    }
+
+    pub fn kept_at(path: PathBuf, kept: PathBuf) -> Self {
+        Self {
+            path,
+            kept: Some(kept),
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for TrashedFile {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Form {
+            Path(PathBuf),
+            Full {
+                path: PathBuf,
+                #[serde(default)]
+                kept: Option<PathBuf>,
+            },
+        }
+        match Form::deserialize(deserializer)? {
+            Form::Path(path) => Ok(Self::removed(path)),
+            Form::Full { path, kept } => Ok(Self { path, kept }),
         }
     }
 }
@@ -54,6 +103,34 @@ pub fn to_trash(path: &Path) -> Result<()> {
             .with("path", path.display())
             .detail(error)
     })
+}
+
+/// Moves `path` into the undo folder and returns the place it was kept.
+pub fn keep_for_undo(paths: &Paths, path: &Path) -> Result<PathBuf> {
+    let folder = paths.undo_files();
+    fs::create_dir_all(&folder)?;
+    let name = format!(
+        "{:x}-{}",
+        clock::unix_now(),
+        path.file_name()
+            .map_or_else(|| String::from("file"), |name| name.to_string_lossy().into_owned())
+    );
+    let kept = folder.join(name);
+    fs::rename(path, &kept).map_err(|error| Error::from(error).with("path", path.display()))?;
+    Ok(kept)
+}
+
+/// Removes a file from its place: on macOS into the undo folder when one is
+/// given, otherwise into the Recycle Bin.
+pub fn remove_for_undo(path: &Path, stash: Option<&Paths>) -> Result<TrashedFile> {
+    if cfg!(target_os = "macos") {
+        if let Some(paths) = stash {
+            let kept = keep_for_undo(paths, path)?;
+            return Ok(TrashedFile::kept_at(path.to_path_buf(), kept));
+        }
+    }
+    to_trash(path)?;
+    Ok(TrashedFile::removed(path.to_path_buf()))
 }
 
 fn numbered(path: &Path, number: u32) -> PathBuf {
@@ -117,6 +194,17 @@ fn write_temp(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
 
 /// Writes `bytes` to `path` according to the conflict rule.
 pub fn write_file(path: &Path, bytes: &[u8], conflict: Conflict) -> Result<Written> {
+    write_file_in(path, bytes, conflict, None)
+}
+
+/// Like [`write_file`], and on macOS keeps a replaced original under `paths`
+/// so the batch can still be undone.
+pub fn write_file_in(
+    path: &Path,
+    bytes: &[u8],
+    conflict: Conflict,
+    paths: Option<&Paths>,
+) -> Result<Written> {
     let folder = path
         .parent()
         .filter(|folder| !folder.as_os_str().is_empty())
@@ -148,13 +236,18 @@ pub fn write_file(path: &Path, bytes: &[u8], conflict: Conflict) -> Result<Writt
             }
             Conflict::Overwrite => {
                 let existed = path.exists();
-                if existed {
-                    to_trash(path)?;
-                }
+                let kept = if existed {
+                    Some(remove_for_undo(path, paths)?.kept)
+                } else {
+                    None
+                };
                 fs::rename(&temp, path)
                     .map_err(|error| Error::from(error).with("path", path.display()))?;
                 Ok(if existed {
-                    Written::Replaced(path.to_path_buf())
+                    Written::Replaced {
+                        path: path.to_path_buf(),
+                        kept: kept.flatten(),
+                    }
                 } else {
                     Written::Created(path.to_path_buf())
                 })
@@ -179,8 +272,8 @@ pub struct UndoRecord {
     pub title: String,
     /// Files the batch created, with their sizes.
     pub created: Vec<CreatedFile>,
-    /// Files the batch moved to the Recycle Bin.
-    pub trashed: Vec<PathBuf>,
+    /// Files the batch removed from their place.
+    pub trashed: Vec<TrashedFile>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -213,8 +306,11 @@ impl UndoRecord {
                 path: path.clone(),
                 bytes,
             }),
-            Written::Replaced(path) => {
-                self.trashed.push(path.clone());
+            Written::Replaced { path, kept } => {
+                self.trashed.push(TrashedFile {
+                    path: path.clone(),
+                    kept: kept.clone(),
+                });
                 self.created.push(CreatedFile {
                     path: path.clone(),
                     bytes,
@@ -262,7 +358,9 @@ impl UndoLog {
         let mut log = Self::load(paths);
         log.records.push(record);
         let extra = log.records.len().saturating_sub(UNDO_LIMIT);
-        log.records.drain(..extra);
+        for dropped in log.records.drain(..extra) {
+            forget_kept(&dropped);
+        }
         log.save(paths)
     }
 
@@ -282,7 +380,7 @@ impl UndoLog {
 }
 
 #[cfg(windows)]
-fn restore(wanted: &[PathBuf], since: i64) -> Result<(u32, u32)> {
+fn restore(wanted: &[TrashedFile], since: i64) -> Result<(u32, u32)> {
     let failed = |error: trash::Error| Error::new("trashFailed").detail(error);
     let items = trash::os_limited::list().map_err(failed)?;
     // The first copy of every wanted path deleted since the batch began: the
@@ -295,8 +393,8 @@ fn restore(wanted: &[PathBuf], since: i64) -> Result<(u32, u32)> {
         let original = item.original_path();
         let Some(path) = wanted
             .iter()
-            .find(|path| same_path(path, &original))
-            .cloned()
+            .find(|file| same_path(&file.path, &original))
+            .map(|file| file.path.clone())
         else {
             continue;
         };
@@ -316,14 +414,46 @@ fn restore(wanted: &[PathBuf], since: i64) -> Result<(u32, u32)> {
 }
 
 #[cfg(not(windows))]
-fn restore(wanted: &[PathBuf], _since: i64) -> Result<(u32, u32)> {
-    Ok((0, wanted.len() as u32))
+fn restore(wanted: &[TrashedFile], _since: i64) -> Result<(u32, u32)> {
+    let mut restored = 0u32;
+    let mut missing = 0u32;
+    for file in wanted {
+        let Some(kept) = &file.kept else {
+            missing += 1;
+            continue;
+        };
+        if !kept.is_file() {
+            missing += 1;
+            continue;
+        }
+        if file.path.exists() {
+            missing += 1;
+            continue;
+        }
+        if let Some(parent) = file.path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        match fs::rename(kept, &file.path) {
+            Ok(()) => restored += 1,
+            Err(error) => return Err(Error::from(error).with("path", file.path.display())),
+        }
+    }
+    Ok((restored, missing))
 }
 
 #[cfg_attr(not(windows), allow(dead_code))]
 fn same_path(a: &Path, b: &Path) -> bool {
     a.to_string_lossy()
         .eq_ignore_ascii_case(b.to_string_lossy().as_ref())
+}
+
+/// Sends kept originals of a dropped undo entry to the Recycle Bin.
+fn forget_kept(record: &UndoRecord) {
+    for file in &record.trashed {
+        if let Some(kept) = &file.kept {
+            let _ = to_trash(kept);
+        }
+    }
 }
 
 fn revert(record: &UndoRecord) -> Result<UndoReport> {
@@ -426,10 +556,16 @@ mod tests {
         let mut record = UndoRecord::new("batch");
         assert!(record.is_empty());
         record.note(&Written::Created(PathBuf::from("a")), 3);
-        record.note(&Written::Replaced(PathBuf::from("b")), 4);
+        record.note(
+            &Written::Replaced {
+                path: PathBuf::from("b"),
+                kept: None,
+            },
+            4,
+        );
         record.note(&Written::Skipped(PathBuf::from("c")), 5);
         assert_eq!(record.created.len(), 2);
-        assert_eq!(record.trashed, [PathBuf::from("b")]);
+        assert_eq!(record.trashed, [TrashedFile::removed(PathBuf::from("b"))]);
     }
 
     #[test]

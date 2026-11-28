@@ -12,7 +12,7 @@ use crate::net::Checksum;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Kind {
-    /// ONNX Runtime with DirectML: needed by every local model.
+    /// ONNX Runtime (DirectML on Windows, Core ML on macOS): needed by every local model.
     Runtime,
     /// PDFium: opens PDF files.
     Pdf,
@@ -100,10 +100,32 @@ impl Entry {
         self.downloads.iter().map(|download| download.bytes).sum()
     }
 
+    /// Whether this entry has a download for this computer.
+    pub fn is_offered(&self) -> bool {
+        !self.downloads.is_empty()
+    }
+
+    /// Whether this entry and everything it needs can be installed here.
+    pub fn is_available(&self) -> bool {
+        self.is_offered()
+            && self.requires.iter().all(|required| {
+                ENTRIES
+                    .iter()
+                    .find(|entry| entry.id == *required)
+                    .is_some_and(Entry::is_offered)
+            })
+    }
+
     /// Name of the main file: the model, the library or the program.
     pub fn main_file(&self) -> &'static str {
         match self.kind {
-            Kind::Generator => "sd-cli.exe",
+            Kind::Generator => {
+                if cfg!(windows) {
+                    "sd-cli.exe"
+                } else {
+                    "sd-cli"
+                }
+            }
             Kind::Runtime
             | Kind::Pdf
             | Kind::Background
@@ -129,37 +151,132 @@ const UNIT_STD: [f32; 3] = [1.0, 1.0, 1.0];
 
 const NEEDS_RUNTIME: &[&str] = &[RUNTIME];
 
+#[cfg(windows)]
+const RUNTIME_NAME: &str = "ONNX Runtime 1.24.4 + DirectML 1.15.4";
+#[cfg(windows)]
+const RUNTIME_LICENSE: &str = "MIT; DirectML redistributable licence";
+#[cfg(not(windows))]
+const RUNTIME_NAME: &str = "ONNX Runtime 1.24.4";
+#[cfg(not(windows))]
+const RUNTIME_LICENSE: &str = "MIT";
+
+#[cfg(windows)]
+const RUNTIME_DOWNLOADS: &[Download] = &[
+    Download {
+        url: "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime.directml/1.24.4/microsoft.ml.onnxruntime.directml.1.24.4.nupkg",
+        bytes: 12_458_649,
+        checksum: Checksum::Sha512(
+            "ZjOyv495vhfVXoTJp2utRyn8ir1TFIvCj0B9JP8QZGBXS0oFx+lY7ZCZqSdnVShQX6EtxYi2T3VOtYXcmBTV4A==",
+        ),
+        unpack: Unpack::Entries(&[
+            ("runtimes/win-x64/native/onnxruntime.dll", "onnxruntime.dll"),
+            (
+                "runtimes/win-x64/native/onnxruntime_providers_shared.dll",
+                "onnxruntime_providers_shared.dll",
+            ),
+        ]),
+    },
+    Download {
+        url: "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.4/microsoft.ai.directml.1.15.4.nupkg",
+        bytes: 202_292_617,
+        checksum: Checksum::Sha512(
+            "/edn9WkEq8kP1T9l2HKckYq39uPF4ezdR5kI/AK0U1zysIYPerKsubcx1suAm3LD1dTQKFP7j16gIqR7xE7yhQ==",
+        ),
+        unpack: Unpack::Entries(&[("bin/x64-win/DirectML.dll", "DirectML.dll")]),
+    },
+];
+
+/// The NuGet package of 1.24.4 ships `libonnxruntime.dylib` for Apple Silicon only.
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const RUNTIME_DOWNLOADS: &[Download] = &[Download {
+    url: "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime/1.24.4/microsoft.ml.onnxruntime.1.24.4.nupkg",
+    bytes: 125_194_303,
+    checksum: Checksum::Sha512(
+        "9d1BXfyvyzp0YfEKCPAzfqIsG6j4r4Exbaq/dJYHWt0YGuyw3jyr6+vbn12jr75QdICq80t24RiUCQiMzFwurA==",
+    ),
+    unpack: Unpack::Entries(&[(
+        "runtimes/osx-arm64/native/libonnxruntime.dylib",
+        "libonnxruntime.dylib",
+    )]),
+}];
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const RUNTIME_DOWNLOADS: &[Download] = &[];
+
+#[cfg(not(any(windows, target_os = "macos")))]
+const RUNTIME_DOWNLOADS: &[Download] = &[];
+
+#[cfg(windows)]
+const PDFIUM_DOWNLOADS: &[Download] = &[Download {
+    url: "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/158.0.8125/bblanchon.pdfium.win32.158.0.8125.nupkg",
+    bytes: 11_023_573,
+    checksum: Checksum::Sha512(
+        "uMXm2JZPv4KQ8l82y84OGnq3nmjBs2TIHIHoxIEpuQgCw3DhgawrHZ64B4EVJgJTLJEyAq27oYrF4C8wAsssxw==",
+    ),
+    unpack: Unpack::Entries(&[("runtimes/win-x64/native/pdfium.dll", "pdfium.dll")]),
+}];
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const PDFIUM_DOWNLOADS: &[Download] = &[Download {
+    url: "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/158.0.8125/bblanchon.pdfium.macos.158.0.8125.nupkg",
+    bytes: 7_132_903,
+    checksum: Checksum::Sha512(
+        "2Dkm2LqpQBG/R0c+mh9nfRg+ykolfvrnQkSsEjUhY4SZwIJEnveWxyVjfH0vAhOWhxQmwMLg83uq1G/fl1xSkw==",
+    ),
+    unpack: Unpack::Entries(&[("runtimes/osx-arm64/native/libpdfium.dylib", "libpdfium.dylib")]),
+}];
+
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const PDFIUM_DOWNLOADS: &[Download] = &[Download {
+    url: "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.macos/158.0.8125/bblanchon.pdfium.macos.158.0.8125.nupkg",
+    bytes: 7_132_903,
+    checksum: Checksum::Sha512(
+        "2Dkm2LqpQBG/R0c+mh9nfRg+ykolfvrnQkSsEjUhY4SZwIJEnveWxyVjfH0vAhOWhxQmwMLg83uq1G/fl1xSkw==",
+    ),
+    unpack: Unpack::Entries(&[("runtimes/osx-x64/native/libpdfium.dylib", "libpdfium.dylib")]),
+}];
+
+#[cfg(not(any(windows, target_os = "macos")))]
+const PDFIUM_DOWNLOADS: &[Download] = &[];
+
+#[cfg(windows)]
+const SDCPP_VULKAN_DOWNLOADS: &[Download] = &[Download {
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1122-3b12781/sd-master-3b12781-bin-win-vulkan-x64.zip",
+    bytes: 30_956_351,
+    checksum: Checksum::Sha256("efcc3785bcae2d1b2e70e1cee54fa163fa40e65185369f06ab8ff3e0c880b3aa"),
+    unpack: Unpack::All,
+}];
+#[cfg(not(windows))]
+const SDCPP_VULKAN_DOWNLOADS: &[Download] = &[];
+
+#[cfg(windows)]
+const SDCPP_CPU_DOWNLOADS: &[Download] = &[Download {
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1122-3b12781/sd-master-3b12781-bin-win-cpu-x64.zip",
+    bytes: 19_005_519,
+    checksum: Checksum::Sha256("8f77526a3e2768ed710ab0050c57dc4e1c6bac9ab163a63f899721e785def6aa"),
+    unpack: Unpack::All,
+}];
+#[cfg(not(windows))]
+const SDCPP_CPU_DOWNLOADS: &[Download] = &[];
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const SDCPP_METAL_DOWNLOADS: &[Download] = &[Download {
+    url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1122-3b12781/sd-master-3b12781-bin-Darwin-macOS-26.7.2-arm64.zip",
+    bytes: 39_644_163,
+    checksum: Checksum::Sha256("efb501ec271393e43b08d25eed37ab26c154134fa495501923a5c17417b8782a"),
+    unpack: Unpack::All,
+}];
+#[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+const SDCPP_METAL_DOWNLOADS: &[Download] = &[];
+
 pub const ENTRIES: &[Entry] = &[
     Entry {
         id: RUNTIME,
         kind: Kind::Runtime,
-        name: "ONNX Runtime 1.24.4 + DirectML 1.15.4",
-        license: "MIT; DirectML redistributable licence",
+        name: RUNTIME_NAME,
+        license: RUNTIME_LICENSE,
         source: "https://onnxruntime.ai",
-        downloads: &[
-            Download {
-                url: "https://api.nuget.org/v3-flatcontainer/microsoft.ml.onnxruntime.directml/1.24.4/microsoft.ml.onnxruntime.directml.1.24.4.nupkg",
-                bytes: 12_458_649,
-                checksum: Checksum::Sha512(
-                    "ZjOyv495vhfVXoTJp2utRyn8ir1TFIvCj0B9JP8QZGBXS0oFx+lY7ZCZqSdnVShQX6EtxYi2T3VOtYXcmBTV4A==",
-                ),
-                unpack: Unpack::Entries(&[
-                    ("runtimes/win-x64/native/onnxruntime.dll", "onnxruntime.dll"),
-                    (
-                        "runtimes/win-x64/native/onnxruntime_providers_shared.dll",
-                        "onnxruntime_providers_shared.dll",
-                    ),
-                ]),
-            },
-            Download {
-                url: "https://api.nuget.org/v3-flatcontainer/microsoft.ai.directml/1.15.4/microsoft.ai.directml.1.15.4.nupkg",
-                bytes: 202_292_617,
-                checksum: Checksum::Sha512(
-                    "/edn9WkEq8kP1T9l2HKckYq39uPF4ezdR5kI/AK0U1zysIYPerKsubcx1suAm3LD1dTQKFP7j16gIqR7xE7yhQ==",
-                ),
-                unpack: Unpack::Entries(&[("bin/x64-win/DirectML.dll", "DirectML.dll")]),
-            },
-        ],
+        downloads: RUNTIME_DOWNLOADS,
         requires: &[],
         spec: Spec::None,
     },
@@ -169,14 +286,7 @@ pub const ENTRIES: &[Entry] = &[
         name: "PDFium 158.0.8125",
         license: "Apache-2.0",
         source: "https://github.com/bblanchon/pdfium-binaries",
-        downloads: &[Download {
-            url: "https://api.nuget.org/v3-flatcontainer/bblanchon.pdfium.win32/158.0.8125/bblanchon.pdfium.win32.158.0.8125.nupkg",
-            bytes: 11_023_573,
-            checksum: Checksum::Sha512(
-                "uMXm2JZPv4KQ8l82y84OGnq3nmjBs2TIHIHoxIEpuQgCw3DhgawrHZ64B4EVJgJTLJEyAq27oYrF4C8wAsssxw==",
-            ),
-            unpack: Unpack::Entries(&[("runtimes/win-x64/native/pdfium.dll", "pdfium.dll")]),
-        }],
+        downloads: PDFIUM_DOWNLOADS,
         requires: &[],
         spec: Spec::None,
     },
@@ -186,14 +296,7 @@ pub const ENTRIES: &[Entry] = &[
         name: "stable-diffusion.cpp (Vulkan)",
         license: "MIT",
         source: "https://github.com/leejet/stable-diffusion.cpp",
-        downloads: &[Download {
-            url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1122-3b12781/sd-master-3b12781-bin-win-vulkan-x64.zip",
-            bytes: 30_956_351,
-            checksum: Checksum::Sha256(
-                "efcc3785bcae2d1b2e70e1cee54fa163fa40e65185369f06ab8ff3e0c880b3aa",
-            ),
-            unpack: Unpack::All,
-        }],
+        downloads: SDCPP_VULKAN_DOWNLOADS,
         requires: &[],
         spec: Spec::None,
     },
@@ -203,14 +306,17 @@ pub const ENTRIES: &[Entry] = &[
         name: "stable-diffusion.cpp (CPU)",
         license: "MIT",
         source: "https://github.com/leejet/stable-diffusion.cpp",
-        downloads: &[Download {
-            url: "https://github.com/leejet/stable-diffusion.cpp/releases/download/master-1122-3b12781/sd-master-3b12781-bin-win-cpu-x64.zip",
-            bytes: 19_005_519,
-            checksum: Checksum::Sha256(
-                "8f77526a3e2768ed710ab0050c57dc4e1c6bac9ab163a63f899721e785def6aa",
-            ),
-            unpack: Unpack::All,
-        }],
+        downloads: SDCPP_CPU_DOWNLOADS,
+        requires: &[],
+        spec: Spec::None,
+    },
+    Entry {
+        id: "sdcpp-metal",
+        kind: Kind::Generator,
+        name: "stable-diffusion.cpp (Metal)",
+        license: "MIT",
+        source: "https://github.com/leejet/stable-diffusion.cpp",
+        downloads: SDCPP_METAL_DOWNLOADS,
         requires: &[],
         spec: Spec::None,
     },
@@ -390,11 +496,15 @@ pub const ENTRIES: &[Entry] = &[
 ];
 
 pub fn find(id: &str) -> Option<&'static Entry> {
-    ENTRIES.iter().find(|entry| entry.id == id)
+    ENTRIES
+        .iter()
+        .find(|entry| entry.id == id && entry.is_available())
 }
 
 pub fn of_kind(kind: Kind) -> impl Iterator<Item = &'static Entry> {
-    ENTRIES.iter().filter(move |entry| entry.kind == kind)
+    ENTRIES
+        .iter()
+        .filter(move |entry| entry.kind == kind && entry.is_available())
 }
 
 #[cfg(test)]
@@ -411,21 +521,33 @@ mod tests {
         let mut seen = HashSet::new();
         for entry in ENTRIES {
             assert!(seen.insert(entry.id), "duplicate id {}", entry.id);
-            assert!(!entry.downloads.is_empty(), "{} has no downloads", entry.id);
             for required in entry.requires {
                 assert!(
-                    find(required).is_some(),
+                    ENTRIES.iter().any(|other| other.id == *required),
                     "{} needs unknown {required}",
                     entry.id
                 );
                 assert_ne!(*required, entry.id);
             }
+            if entry.is_offered() {
+                assert!(!entry.downloads.is_empty(), "{} has no downloads", entry.id);
+                for required in entry.requires {
+                    assert!(
+                        find(required).is_some()
+                            || ENTRIES
+                                .iter()
+                                .any(|other| { other.id == *required && !other.is_offered() }),
+                        "{} needs unknown {required}",
+                        entry.id
+                    );
+                }
+            }
         }
     }
 
     #[test]
-    fn downloads_are_pinned() {
-        for entry in ENTRIES {
+    fn offered_downloads_are_pinned() {
+        for entry in ENTRIES.iter().filter(|entry| entry.is_offered()) {
             for download in entry.downloads {
                 assert!(download.url.starts_with("https://"), "{}", download.url);
                 assert!(download.bytes > 0);
@@ -443,8 +565,8 @@ mod tests {
     }
 
     #[test]
-    fn every_entry_has_a_main_file() {
-        for entry in ENTRIES {
+    fn every_offered_entry_has_a_main_file() {
+        for entry in ENTRIES.iter().filter(|entry| entry.is_offered()) {
             assert!(!entry.main_file().is_empty(), "{}", entry.id);
         }
     }

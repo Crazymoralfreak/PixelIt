@@ -8,6 +8,7 @@
     "clear": "비우기",
     "remove": "제거",
     "reveal": "탐색기에서 보기",
+    "revealMac": "Finder에서 보기",
     "delete": "삭제",
     "yes": "예",
     "no": "아니요",
@@ -82,7 +83,7 @@
       "failed": "업데이트를 확인하지 못했습니다"
     },
     "askTitle": "버전 {version}을(를) 사용할 수 있습니다",
-    "askText": "현재 설치된 버전은 {current}입니다. PixelIt을 버전 {version}(으)로 업데이트할까요? 설치 프로그램을 내려받아 검증하고, 실행 중인 작업이 끝난 뒤 앱이 다시 시작됩니다.",
+    "askText": "현재 설치된 버전은 {current}입니다. PixelIt을 버전 {version}(으)로 업데이트할까요? 업데이트를 내려받아 검증하고, 실행 중인 작업이 끝난 뒤 앱이 다시 시작됩니다.",
     "skip": "이 버전 건너뛰기",
     "later": "나중에",
     "install": "업데이트",
@@ -105,7 +106,7 @@
     "paste": "붙여넣기",
     "capture": "화면 캡처",
     "emptyTitle": "폴더를 열거나 이미지를 여기로 끌어다 놓으세요",
-    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD 등의 형식을 지원합니다. Ctrl+V로 클립보드의 이미지를 붙여넣을 수 있습니다.",
+    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD 등의 형식을 지원합니다. {keys}로 클립보드의 이미지를 붙여넣을 수 있습니다.",
     "recent": "최근 폴더",
     "up": "위로",
     "looseFiles": "열린 파일: {count}",
@@ -120,7 +121,7 @@
     "edit": "편집",
     "pasteHint": "클립보드에 이미지가 없습니다",
     "trashTitle": "휴지통으로 옮길까요?",
-    "trashText": "파일: {count}. Windows 휴지통에서 복원할 수 있습니다.",
+    "trashText": "파일: {count}. 휴지통에서 복원할 수 있습니다.",
     "addedToBatch": "일괄 처리에 추가했습니다: {count}",
     "sort": {
       "name": "이름순",
@@ -142,7 +143,8 @@
       "alpha": "투명도",
       "metadata": "메타데이터",
       "frames": "프레임 수"
-    }
+    },
+    "trashTextMac": "파일 수: {count}. 휴지통에서 복원할 수 있습니다."
   },
   "output": {
     "format": "형식",
@@ -615,7 +617,9 @@
     "defaultOutput": "기본 저장 설정",
     "system": "Windows",
     "closeToTray": "닫을 때 알림 영역으로 최소화",
+    "closeToTrayMac": "창을 닫아도 메뉴 막대에 남기기",
     "autostart": "Windows 시작 시 실행",
+    "autostartMac": "로그인 시 열기",
     "startMinimized": "최소화된 상태로 시작",
     "contextMenu": "탐색기 상황에 맞는 메뉴에 PixelIt 항목 표시",
     "captureHotkey": "화면 캡처",
@@ -630,6 +634,7 @@
     "channelBeta": "베타",
     "version": "버전 {version}",
     "updatePortable": "포터블 버전은 직접 업데이트합니다. 릴리스 페이지에서 새 압축 파일을 내려받으세요.",
+    "updatePortableMac": "이 복사본은 직접 업데이트해야 합니다. PixelIt을 응용 프로그램 폴더로 옮기면 스스로 업데이트할 수 있습니다.",
     "checkNow": "지금 확인",
     "data": "데이터",
     "dataFolder": "데이터 폴더",
@@ -864,7 +869,7 @@
     "nothingTitle": "찾은 항목이 없습니다",
     "nothingText": "다른 검색어나 다른 출처를 시도해 보세요.",
     "emptyTitle": "웹 이미지",
-    "emptyText": "링크를 붙여 넣거나 검색어를 입력하면 찾은 이미지가 여기에 표시됩니다. 링크는 프로그램 어디에서나 Ctrl+V로 붙여 넣을 수 있습니다.",
+    "emptyText": "링크를 붙여 넣거나 검색어를 입력하면 찾은 이미지가 여기에 표시됩니다. 링크는 프로그램 어디에서나 {keys}로 붙여 넣을 수 있습니다.",
     "downloaded": "다운로드됨"
   },
   "ai": {
@@ -910,6 +915,7 @@
     "urlHint": "예: http://127.0.0.1:11434/v1",
     "key": "키",
     "keyHint": "{host}용으로 Windows 자격 증명 관리자에 보관됩니다.",
+    "keyHintMac": "{host}용으로 macOS 키체인에 보관됩니다.",
     "keyStored": "키가 저장되어 있습니다",
     "keySaved": "키를 저장했습니다",
     "listModels": "모델 목록",
@@ -1104,6 +1110,7 @@
     "argsHint": "한 줄에 하나씩.",
     "env": "환경 변수",
     "envHint": "한 줄에 하나씩: 이름=값. Windows 자격 증명 관리자에 보관됩니다.",
+    "envHintMac": "한 줄에 하나씩: 이름=값. macOS 키체인에 보관됩니다.",
     "urlHint": "Streamable HTTP 전송을 사용하는 서버의 주소.",
     "defaultPermission": "도구",
     "defaultPermissionHint": "따로 규칙이 없는 도구에 적용됩니다.",
@@ -1128,7 +1135,7 @@
     "aiModelFailed": "모델이 이미지를 처리하지 못했습니다",
     "aiUnavailable": "모델 실행 환경을 사용할 수 없습니다",
     "aiWorkerFailed": "모델 프로세스가 오류로 종료되었습니다",
-    "aiWorkerMissing": "pixelit-worker.exe 파일을 찾을 수 없습니다",
+    "aiWorkerMissing": "{file} 파일을 찾을 수 없습니다",
     "assistantLoop": "어시스턴트가 연속으로 너무 많은 단계를 실행하여 중지되었습니다",
     "autostartFailed": "자동 시작 설정을 변경하지 못했습니다",
     "badArchive": "다운로드한 압축 파일이 손상되었습니다",
@@ -1146,6 +1153,7 @@
     "cannotEncode": "이 형식으로는 저장할 수 없습니다",
     "captionUnsupported": "설명은 JPEG와 PNG에만 기록할 수 있습니다",
     "captureFailed": "화면을 캡처하지 못했습니다",
+    "capturePermission": "PixelIt에 화면 기록 권한이 없습니다. 시스템 설정의 “개인정보 보호 및 보안” → “화면 기록”에서 허용한 뒤 PixelIt을 다시 시작하세요.",
     "chatBusy": "어시스턴트가 아직 응답 중입니다",
     "chatMissing": "대화를 찾을 수 없습니다",
     "checksumMismatch": "다운로드한 파일이 무결성 검사를 통과하지 못했습니다",
@@ -1165,7 +1173,7 @@
     "httpStatus": "서버가 오류로 응답했습니다",
     "internal": "내부 오류",
     "io": "파일을 읽거나 쓰지 못했습니다",
-    "keyStoreFailed": "Windows 자격 증명 관리자를 사용할 수 없습니다",
+    "keyStoreFailed": "시스템 키 저장소를 사용할 수 없습니다",
     "localAddress": "이 컴퓨터나 로컬 네트워크로 연결되는 주소이며 에이전트에 허용되지 않습니다: {url}",
     "mcpBadServer": "MCP 서버 “{name}”의 설정이 올바르지 않습니다",
     "mcpDisconnected": "MCP 서버와의 연결이 끊어졌습니다",
@@ -1214,13 +1222,33 @@
     "upscalerMissing": "확대 모델을 찾지 못했습니다: {model}",
     "refineNeedsGenerator": "디테일은 ComfyUI 또는 Forge로 더합니다. 둘 중 하나를 생성기로 선택하세요.",
     "refineNoPrompt": "이 그림에는 저장된 프롬프트가 없어 디테일을 더할 수 없습니다.",
-    "refineTooLarge": "디테일을 더하기에는 그림이 너무 큽니다: 긴 변 {side} px, 최대 {limit} px까지 가능합니다."
+    "refineTooLarge": "디테일을 더하기에는 그림이 너무 큽니다: 긴 변 {side} px, 최대 {limit} px까지 가능합니다.",
+    "heicCodecMissingMac": "시스템에서 HEIC를 읽을 수 없습니다"
   },
   "native": {
     "tray": {
       "open": "PixelIt 열기",
       "capture": "화면 캡처",
       "quit": "끝내기"
+    },
+    "menu": {
+      "about": "PixelIt에 관하여",
+      "services": "서비스",
+      "hide": "PixelIt 가리기",
+      "hideOthers": "기타 가리기",
+      "showAll": "모두 보기",
+      "quit": "PixelIt 종료",
+      "edit": "편집",
+      "undo": "실행 취소",
+      "redo": "실행 복귀",
+      "cut": "오려두기",
+      "copy": "복사하기",
+      "paste": "붙여넣기",
+      "selectAll": "전체 선택",
+      "window": "윈도우",
+      "minimize": "최소화",
+      "zoom": "확대/축소",
+      "close": "윈도우 닫기"
     },
     "contextMenu": "PixelIt에서 열기",
     "notify": {

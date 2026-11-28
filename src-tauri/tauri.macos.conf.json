@@ -1,8 +1,11 @@
 {
   "bundle": {
-    "targets": ["dmg"],
+    "targets": ["app", "dmg"],
+    "createUpdaterArtifacts": true,
+    "externalBin": ["binaries/pixelit-worker"],
     "macOS": {
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "entitlements": "entitlements.plist"
     },
     "icon": [
       "icons/32x32.png",

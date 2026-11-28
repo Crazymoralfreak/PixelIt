@@ -10,6 +10,7 @@ import { OutputEditor } from "../components/OutputEditor";
 import { StepsEditor } from "../components/StepsEditor";
 import { useT, type Translator } from "../i18n";
 import { extensionOf, fileName, folderOf, formatBytes, formatSaving, newId, stemOf } from "../lib/format";
+import { hasMod, isMac, isRemoveKey, keyLabel } from "../lib/platform";
 import {
   extensionOfFormat,
   FORMAT_NAMES,
@@ -780,22 +781,22 @@ export default function EditorPage({ active }: { active: boolean }) {
       if (document.querySelector(".modal-backdrop")) {
         return;
       }
-      if (event.ctrlKey && event.code === "KeyO") {
+      if (hasMod(event) && event.code === "KeyO") {
         event.preventDefault();
         void chooseFile();
-      } else if (event.ctrlKey && event.code === "KeyS") {
+      } else if (hasMod(event) && event.code === "KeyS") {
         event.preventDefault();
         void (event.shiftKey ? saveAs() : exportWith(output, true));
       } else if (isTyping(event.target)) {
         return;
-      } else if (event.ctrlKey && event.code === "KeyZ") {
+      } else if (hasMod(event) && event.code === "KeyZ") {
         event.preventDefault();
         if (event.shiftKey) {
           redo();
         } else {
           undo();
         }
-      } else if (event.ctrlKey && event.code === "KeyY") {
+      } else if (hasMod(event) && event.code === "KeyY") {
         event.preventDefault();
         redo();
       } else if (event.code === "Backslash") {
@@ -811,7 +812,7 @@ export default function EditorPage({ active }: { active: boolean }) {
       } else if (event.key === "Escape") {
         setSelected(null);
         setPainting(null);
-      } else if (event.key === "Delete" && selected) {
+      } else if (isRemoveKey(event) && selected) {
         lastCommit.current = 0;
         commit(steps.filter((step) => step.id !== selected));
         setSelected(null);
@@ -866,10 +867,15 @@ export default function EditorPage({ active }: { active: boolean }) {
       title={fileName(session.path)}
       actions={
         <>
-          <Button small disabled={cursor === 0} onClick={undo} title="Ctrl+Z">
+          <Button small disabled={cursor === 0} onClick={undo} title={keyLabel("Mod+Z")}>
             {t("editor.undo")}
           </Button>
-          <Button small disabled={cursor >= history.length - 1} onClick={redo} title="Ctrl+Y">
+          <Button
+            small
+            disabled={cursor >= history.length - 1}
+            onClick={redo}
+            title={keyLabel(isMac() ? "Mod+Shift+Z" : "Mod+Y")}
+          >
             {t("editor.redo")}
           </Button>
           <Button small onClick={() => addQuick({ type: "rotate", angle: -90, expand: true, background: "#00000000" })}>
@@ -893,7 +899,7 @@ export default function EditorPage({ active }: { active: boolean }) {
           <Button small onClick={() => setActual((current) => !current)} title="0 / 1">
             {actual ? t("editor.zoomFit") : "100%"}
           </Button>
-          <Button small onClick={() => void chooseFile()} title="Ctrl+O">
+          <Button small onClick={() => void chooseFile()} title={keyLabel("Mod+O")}>
             {t("editor.open")}
           </Button>
         </>
@@ -1037,10 +1043,10 @@ export default function EditorPage({ active }: { active: boolean }) {
             )}
           </div>
           <div className="editor-panel-foot">
-            <Button disabled={exporting} onClick={() => void saveAs()} title="Ctrl+Shift+S">
+            <Button disabled={exporting} onClick={() => void saveAs()} title={keyLabel("Mod+Shift+S")}>
               {t("editor.saveAs")}
             </Button>
-            <Button variant="primary" disabled={exporting} onClick={() => void exportWith(output, true)} title="Ctrl+S">
+            <Button variant="primary" disabled={exporting} onClick={() => void exportWith(output, true)} title={keyLabel("Mod+S")}>
               {exporting ? t("common.working") : t("editor.export")}
             </Button>
           </div>

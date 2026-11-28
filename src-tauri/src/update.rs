@@ -32,6 +32,7 @@ const IDLE_POLL: Duration = Duration::from_secs(2);
 /// Time for the main window to save what is being edited before the process ends.
 const SAVE_DELAY: Duration = Duration::from_millis(1500);
 /// The installer leaves this file next to the program; a portable copy has none.
+#[cfg(windows)]
 const UNINSTALLER: &str = "uninstall.exe";
 
 /// The description of the newest release, pre-releases included. It is kept
@@ -70,7 +71,8 @@ pub struct UpdateStatus {
     pub portable: bool,
 }
 
-/// True for a copy that was put in place by the installer.
+/// True for a copy that was put in place by the installer and can update itself.
+#[cfg(windows)]
 pub fn installed_copy() -> bool {
     std::env::current_exe()
         .ok()
@@ -79,6 +81,26 @@ pub fn installed_copy() -> bool {
                 .map(|folder| folder.join(UNINSTALLER).is_file())
         })
         .unwrap_or(false)
+}
+
+/// True when PixelIt runs from a `.app` that is not on a disk image.
+#[cfg(target_os = "macos")]
+pub fn installed_copy() -> bool {
+    let Ok(exe) = std::env::current_exe() else {
+        return false;
+    };
+    let Some(app) = exe
+        .ancestors()
+        .find(|path| path.extension().is_some_and(|ext| ext == "app"))
+    else {
+        return false;
+    };
+    !app.starts_with("/Volumes/")
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
+pub fn installed_copy() -> bool {
+    false
 }
 
 /// What is known about updates in this session.

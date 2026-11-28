@@ -8,6 +8,7 @@
     "clear": "清空",
     "remove": "移除",
     "reveal": "在资源管理器中显示",
+    "revealMac": "在访达中显示",
     "delete": "删除",
     "yes": "是",
     "no": "否",
@@ -82,7 +83,7 @@
       "failed": "无法检查更新"
     },
     "askTitle": "版本 {version} 可用",
-    "askText": "当前安装的版本是 {current}。是否将 PixelIt 更新到版本 {version}？安装程序将被下载并校验，正在运行的任务完成后应用会重新启动。",
+    "askText": "当前安装的版本是 {current}。是否将 PixelIt 更新到版本 {version}？更新将被下载并校验，正在运行的任务完成后应用会重新启动。",
     "skip": "跳过此版本",
     "later": "稍后",
     "install": "更新",
@@ -105,7 +106,7 @@
     "paste": "粘贴",
     "capture": "截屏",
     "emptyTitle": "打开文件夹或将图像拖到此处",
-    "emptyText": "支持 JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD 等格式。按 Ctrl+V 可粘贴剪贴板中的图像。",
+    "emptyText": "支持 JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD 等格式。按 {keys} 可粘贴剪贴板中的图像。",
     "recent": "最近的文件夹",
     "up": "上一级",
     "looseFiles": "已打开的文件：{count}",
@@ -120,7 +121,7 @@
     "edit": "编辑",
     "pasteHint": "剪贴板中没有图像",
     "trashTitle": "移到回收站？",
-    "trashText": "文件：{count}。可以从 Windows 回收站还原。",
+    "trashText": "文件：{count}。可以从 回收站还原。",
     "addedToBatch": "已加入批处理：{count}",
     "sort": {
       "name": "按名称",
@@ -142,7 +143,8 @@
       "alpha": "透明度",
       "metadata": "元数据",
       "frames": "帧数"
-    }
+    },
+    "trashTextMac": "文件数：{count}。可从废纸篓恢复。"
   },
   "output": {
     "format": "格式",
@@ -615,7 +617,9 @@
     "defaultOutput": "默认保存设置",
     "system": "Windows",
     "closeToTray": "关闭时最小化到通知区域",
+    "closeToTrayMac": "关闭窗口后保留在菜单栏中",
     "autostart": "随 Windows 启动",
+    "autostartMac": "登录时打开",
     "startMinimized": "启动时最小化",
     "contextMenu": "在资源管理器右键菜单中显示 PixelIt",
     "captureHotkey": "截屏",
@@ -630,6 +634,7 @@
     "channelBeta": "测试版",
     "version": "版本 {version}",
     "updatePortable": "便携版需要手动更新：请从发布页面下载新的压缩包。",
+    "updatePortableMac": "此副本需要手动更新。将 PixelIt 移到“应用程序”文件夹后即可自行更新。",
     "checkNow": "立即检查",
     "data": "数据",
     "dataFolder": "数据文件夹",
@@ -864,7 +869,7 @@
     "nothingTitle": "未找到任何内容",
     "nothingText": "请尝试其他查询或其他来源。",
     "emptyTitle": "来自网络的图像",
-    "emptyText": "粘贴链接或输入查询，找到的图像会显示在这里。在程序的任何位置都可以用 Ctrl+V 粘贴链接。",
+    "emptyText": "粘贴链接或输入查询，找到的图像会显示在这里。在程序的任何位置都可以用 {keys} 粘贴链接。",
     "downloaded": "已下载"
   },
   "ai": {
@@ -910,6 +915,7 @@
     "urlHint": "例如：http://127.0.0.1:11434/v1",
     "key": "密钥",
     "keyHint": "保存在 Windows 凭据管理器中，对应 {host}。",
+    "keyHintMac": "保存在 macOS 钥匙串中，对应 {host}。",
     "keyStored": "已保存密钥",
     "keySaved": "密钥已保存",
     "listModels": "模型列表",
@@ -1104,6 +1110,7 @@
     "argsHint": "每行一个。",
     "env": "环境变量",
     "envHint": "每行一个：名称=值。保存在 Windows 凭据管理器中。",
+    "envHintMac": "每行一个：名称=值。保存在 macOS 钥匙串中。",
     "urlHint": "使用 Streamable HTTP 传输的服务器地址。",
     "defaultPermission": "工具",
     "defaultPermissionHint": "适用于没有单独规则的工具。",
@@ -1128,7 +1135,7 @@
     "aiModelFailed": "模型无法处理该图像",
     "aiUnavailable": "模型运行环境不可用",
     "aiWorkerFailed": "模型进程异常退出",
-    "aiWorkerMissing": "找不到文件 pixelit-worker.exe",
+    "aiWorkerMissing": "找不到文件 {file}",
     "assistantLoop": "助手连续执行的步骤过多，已被停止",
     "autostartFailed": "无法更改开机启动设置",
     "badArchive": "下载的压缩包已损坏",
@@ -1146,6 +1153,7 @@
     "cannotEncode": "无法保存为该格式",
     "captionUnsupported": "说明只能写入 JPEG 和 PNG",
     "captureFailed": "截屏失败",
+    "capturePermission": "PixelIt 没有录制屏幕的权限。请在“系统设置”中允许：“隐私与安全性”→“屏幕录制”，然后重新启动 PixelIt。",
     "chatBusy": "助手仍在回复",
     "chatMissing": "找不到该对话",
     "checksumMismatch": "下载的文件未通过完整性校验",
@@ -1165,7 +1173,7 @@
     "httpStatus": "服务器返回了错误",
     "internal": "内部错误",
     "io": "无法读取或写入文件",
-    "keyStoreFailed": "Windows 凭据管理器不可用",
+    "keyStoreFailed": "系统密钥存储不可用",
     "localAddress": "该地址指向本机或本地网络，不对代理开放：{url}",
     "mcpBadServer": "MCP 服务器“{name}”配置不正确",
     "mcpDisconnected": "与 MCP 服务器的连接已断开",
@@ -1214,13 +1222,33 @@
     "upscalerMissing": "找不到放大模型：{model}",
     "refineNeedsGenerator": "补细节需要 ComfyUI 或 Forge。请选择其中一个作为生成器。",
     "refineNoPrompt": "这张图片没有保存提示词，所以无法补细节。",
-    "refineTooLarge": "图片太大，无法补细节：长边为 {side} px，最多允许 {limit} px。"
+    "refineTooLarge": "图片太大，无法补细节：长边为 {side} px，最多允许 {limit} px。",
+    "heicCodecMissingMac": "系统无法解码 HEIC"
   },
   "native": {
     "tray": {
       "open": "打开 PixelIt",
       "capture": "截屏",
       "quit": "退出"
+    },
+    "menu": {
+      "about": "关于 PixelIt",
+      "services": "服务",
+      "hide": "隐藏 PixelIt",
+      "hideOthers": "隐藏其他",
+      "showAll": "全部显示",
+      "quit": "退出 PixelIt",
+      "edit": "编辑",
+      "undo": "撤销",
+      "redo": "重做",
+      "cut": "剪切",
+      "copy": "拷贝",
+      "paste": "粘贴",
+      "selectAll": "全选",
+      "window": "窗口",
+      "minimize": "最小化",
+      "zoom": "缩放",
+      "close": "关闭窗口"
     },
     "contextMenu": "在 PixelIt 中打开",
     "notify": {

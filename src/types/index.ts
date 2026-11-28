@@ -348,11 +348,15 @@ export interface Settings {
   recentFolders: string[];
 }
 
+/** The operating system PixelIt runs on. */
+export type Platform = "windows" | "macos" | "linux";
+
 export interface AppInfo {
   version: string;
   dataDir: string;
   portable: boolean;
   installed: boolean;
+  platform: Platform;
   systemLanguage: Language;
   language: Language;
 }

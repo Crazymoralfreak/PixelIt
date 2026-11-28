@@ -12,18 +12,28 @@ repository.workspace = true
 name = "pixelit-worker"
 path = "src/main.rs"
 
-[dependencies]
-serde.workspace = true
-serde_json.workspace = true
-
-[dependencies.ort]
+[target.'cfg(windows)'.dependencies.ort]
 version = "=2.0.0-rc.15"
 default-features = false
 features = ["std", "load-dynamic", "directml", "api-22"]
 
+[target.'cfg(target_os = "macos")'.dependencies.ort]
+version = "=2.0.0-rc.15"
+default-features = false
+features = ["std", "load-dynamic", "coreml", "api-22"]
+
+[target.'cfg(not(any(windows, target_os = "macos")))'.dependencies.ort]
+version = "=2.0.0-rc.15"
+default-features = false
+features = ["std", "load-dynamic", "api-22"]
+
 [target.'cfg(windows)'.dependencies.windows]
 workspace = true
 features = ["Win32_Foundation", "Win32_System_LibraryLoader"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

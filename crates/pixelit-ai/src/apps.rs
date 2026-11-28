@@ -18,7 +18,7 @@ use serde_json::Value;
 
 use pixelit_core::{CancelToken, Error, Result};
 use pixelit_engine::clock::LocalTime;
-use pixelit_engine::Paths;
+use pixelit_engine::{environment, Paths};
 
 use crate::browse::{self, ModelHit, SearchPage, SearchQuery, SearchSource};
 use crate::config::{
@@ -1119,17 +1119,21 @@ pub fn link_folder(apps: &mut LocalApps) -> bool {
 fn launch_of(kind: AppKind, home: &Path) -> Option<PathBuf> {
     match kind {
         AppKind::Comfy => find_named(home, &["main.py"], 5),
-        AppKind::Forge => find_named(
-            home,
-            &[
-                "webui.sh",
-                "webui.bat",
-                "webui-user.sh",
-                "webui-user.bat",
-                "launch.py",
-            ],
-            4,
-        ),
+        AppKind::Forge => {
+            // A Mac must not pick a Windows `.bat` that happens to sit in the folder.
+            let names: &[&str] = if cfg!(windows) {
+                &[
+                    "webui.bat",
+                    "webui-user.bat",
+                    "webui.sh",
+                    "webui-user.sh",
+                    "launch.py",
+                ]
+            } else {
+                &["webui.sh", "webui-user.sh", "launch.py"]
+            };
+            find_named(home, names, 4)
+        }
     }
 }
 
@@ -1189,6 +1193,8 @@ pub fn start(host: &Host, net: &Net, paths: &Paths, apps: &LocalApps, kind: AppK
         fs::create_dir_all(parent)?;
     }
     let mut command = launch_command(kind, &home, app.port, paths, &apps.models)?;
+    // A Mac started from Finder does not know where Python and git are.
+    environment::with_search_path(&mut command);
     keep_previous_log(&log);
     let mut file = OpenOptions::new().create(true).append(true).open(&log)?;
     file.write_all(launch_header(&command).as_bytes())?;

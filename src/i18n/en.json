@@ -8,6 +8,7 @@
     "clear": "Clear",
     "remove": "Remove",
     "reveal": "Show in Explorer",
+    "revealMac": "Show in Finder",
     "delete": "Delete",
     "yes": "Yes",
     "no": "No",
@@ -82,7 +83,7 @@
       "failed": "Could not check for updates"
     },
     "askTitle": "Version {version} is available",
-    "askText": "Version {current} is installed now. Update PixelIt to version {version}? The installer is downloaded and verified, running jobs finish first, and then the application restarts.",
+    "askText": "Version {current} is installed now. Update PixelIt to version {version}? The update is downloaded and verified, running jobs finish first, and then the application restarts.",
     "skip": "Skip this version",
     "later": "Later",
     "install": "Update",
@@ -105,7 +106,7 @@
     "paste": "Paste",
     "capture": "Screenshot",
     "emptyTitle": "Open a folder or drop images here",
-    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD and other formats are supported. Ctrl+V pastes an image from the clipboard.",
+    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD and other formats are supported. {keys} pastes an image from the clipboard.",
     "recent": "Recent folders",
     "up": "Up",
     "looseFiles": "Open files: {count}",
@@ -120,7 +121,7 @@
     "edit": "Edit",
     "pasteHint": "There is no image in the clipboard",
     "trashTitle": "Move to the Recycle Bin?",
-    "trashText": "Files: {count}. You can restore them from the Windows Recycle Bin.",
+    "trashText": "Files: {count}. You can restore them from the Recycle Bin.",
     "addedToBatch": "Added to batch: {count}",
     "sort": {
       "name": "By name",
@@ -142,7 +143,8 @@
       "alpha": "Transparency",
       "metadata": "Metadata",
       "frames": "Frames"
-    }
+    },
+    "trashTextMac": "Files: {count}. You can restore them from the Trash."
   },
   "output": {
     "format": "Format",
@@ -615,7 +617,9 @@
     "defaultOutput": "Default saving",
     "system": "Windows",
     "closeToTray": "Minimize to the notification area on close",
+    "closeToTrayMac": "Stay in the menu bar when the window is closed",
     "autostart": "Start with Windows",
+    "autostartMac": "Open at login",
     "startMinimized": "Start minimized",
     "contextMenu": "PixelIt item in the Explorer context menu",
     "captureHotkey": "Screenshot",
@@ -630,6 +634,7 @@
     "channelBeta": "Beta",
     "version": "Version {version}",
     "updatePortable": "The portable version is updated by hand: download the new archive from the releases page.",
+    "updatePortableMac": "This copy is updated by hand. Move PixelIt to the Applications folder to let it update itself.",
     "checkNow": "Check now",
     "data": "Data",
     "dataFolder": "Data folder",
@@ -864,7 +869,7 @@
     "nothingTitle": "Nothing found",
     "nothingText": "Try another query or another source.",
     "emptyTitle": "Images from the web",
-    "emptyText": "Paste a link or type a query, and the images found appear here. A link can be pasted with Ctrl+V from anywhere in the application.",
+    "emptyText": "Paste a link or type a query, and the images found appear here. A link can be pasted with {keys} from anywhere in the application.",
     "downloaded": "Downloaded"
   },
   "ai": {
@@ -910,6 +915,7 @@
     "urlHint": "For example: http://127.0.0.1:11434/v1",
     "key": "Key",
     "keyHint": "Kept in Windows Credential Manager for {host}.",
+    "keyHintMac": "Kept in the macOS Keychain for {host}.",
     "keyStored": "A key is stored",
     "keySaved": "The key is saved",
     "listModels": "List models",
@@ -1104,6 +1110,7 @@
     "argsHint": "One per line.",
     "env": "Environment variables",
     "envHint": "One per line: NAME=value. Kept in Windows Credential Manager.",
+    "envHintMac": "One per line: NAME=value. Kept in the macOS Keychain.",
     "urlHint": "Address of a server with the Streamable HTTP transport.",
     "defaultPermission": "Tools",
     "defaultPermissionHint": "Applies to tools without a rule of their own.",
@@ -1128,7 +1135,7 @@
     "aiModelFailed": "The model could not process the image",
     "aiUnavailable": "The model runtime is not available",
     "aiWorkerFailed": "The model process ended with an error",
-    "aiWorkerMissing": "The file pixelit-worker.exe was not found",
+    "aiWorkerMissing": "The file {file} was not found",
     "assistantLoop": "The assistant made too many steps in a row and was stopped",
     "autostartFailed": "Could not change the autostart setting",
     "badArchive": "The downloaded archive is damaged",
@@ -1146,6 +1153,7 @@
     "cannotEncode": "This format cannot be saved",
     "captionUnsupported": "A description can be written only into JPEG and PNG",
     "captureFailed": "Could not take a screenshot",
+    "capturePermission": "PixelIt has no permission to record the screen. Allow it in System Settings: Privacy & Security → Screen Recording, then restart PixelIt.",
     "chatBusy": "The assistant is still answering",
     "chatMissing": "The chat was not found",
     "checksumMismatch": "The downloaded file failed the integrity check",
@@ -1165,7 +1173,7 @@
     "httpStatus": "The server answered with an error",
     "internal": "Internal error",
     "io": "Could not read or write the file",
-    "keyStoreFailed": "Windows Credential Manager is not available",
+    "keyStoreFailed": "The system key store is not available",
     "localAddress": "The address leads to this computer or the local network and is closed to agents: {url}",
     "mcpBadServer": "The MCP server “{name}” is set up incorrectly",
     "mcpDisconnected": "The connection to the MCP server was lost",
@@ -1214,13 +1222,33 @@
     "upscalerMissing": "The upscaler was not found: {model}",
     "refineNeedsGenerator": "Adding detail works with ComfyUI or Forge. Choose one of them as the generator.",
     "refineNoPrompt": "This picture has no prompt stored, so detail cannot be added.",
-    "refineTooLarge": "The picture is too large for adding detail: {side} px on the long side, up to {limit} px is allowed."
+    "refineTooLarge": "The picture is too large for adding detail: {side} px on the long side, up to {limit} px is allowed.",
+    "heicCodecMissingMac": "HEIC could not be decoded by the system"
   },
   "native": {
     "tray": {
       "open": "Open PixelIt",
       "capture": "Screenshot",
       "quit": "Quit"
+    },
+    "menu": {
+      "about": "About PixelIt",
+      "services": "Services",
+      "hide": "Hide PixelIt",
+      "hideOthers": "Hide Others",
+      "showAll": "Show All",
+      "quit": "Quit PixelIt",
+      "edit": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "selectAll": "Select All",
+      "window": "Window",
+      "minimize": "Minimize",
+      "zoom": "Zoom",
+      "close": "Close Window"
     },
     "contextMenu": "Open in PixelIt",
     "notify": {

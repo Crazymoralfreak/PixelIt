@@ -8,6 +8,7 @@
     "clear": "Temizle",
     "remove": "Kaldır",
     "reveal": "Gezgin’de göster",
+    "revealMac": "Finder’da göster",
     "delete": "Sil",
     "yes": "Evet",
     "no": "Hayır",
@@ -82,7 +83,7 @@
       "failed": "Güncellemeler denetlenemedi"
     },
     "askTitle": "{version} sürümü kullanılabilir",
-    "askText": "Şu anda {current} sürümü kurulu. PixelIt {version} sürümüne güncellensin mi? Kurulum dosyası indirilip doğrulanır, çalışan işler biter, ardından uygulama yeniden başlar.",
+    "askText": "Şu anda {current} sürümü kurulu. PixelIt {version} sürümüne güncellensin mi? Güncelleme indirilip doğrulanır, çalışan işler biter, ardından uygulama yeniden başlar.",
     "skip": "Bu sürümü atla",
     "later": "Daha sonra",
     "install": "Güncelle",
@@ -105,7 +106,7 @@
     "paste": "Yapıştır",
     "capture": "Ekran görüntüsü",
     "emptyTitle": "Bir klasör açın veya görüntüleri buraya sürükleyin",
-    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD ve başka biçimler desteklenir. Ctrl+V panodaki görüntüyü yapıştırır.",
+    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD ve başka biçimler desteklenir. {keys} panodaki görüntüyü yapıştırır.",
     "recent": "Son klasörler",
     "up": "Yukarı",
     "looseFiles": "Açık dosyalar: {count}",
@@ -120,7 +121,7 @@
     "edit": "Düzenle",
     "pasteHint": "Panoda görüntü yok",
     "trashTitle": "Geri dönüşüm kutusuna taşınsın mı?",
-    "trashText": "Dosya: {count}. Windows Geri Dönüşüm Kutusu’ndan geri yükleyebilirsiniz.",
+    "trashText": "Dosya: {count}. Geri Dönüşüm Kutusu’ndan geri yükleyebilirsiniz.",
     "addedToBatch": "Toplu işleme eklendi: {count}",
     "sort": {
       "name": "Ada göre",
@@ -142,7 +143,8 @@
       "alpha": "Saydamlık",
       "metadata": "Üst veriler",
       "frames": "Kare sayısı"
-    }
+    },
+    "trashTextMac": "Dosya: {count}. Cop Kutusundan geri yukleyebilirsiniz."
   },
   "output": {
     "format": "Biçim",
@@ -615,7 +617,9 @@
     "defaultOutput": "Varsayılan kaydetme",
     "system": "Windows",
     "closeToTray": "Kapatınca bildirim alanına küçült",
+    "closeToTrayMac": "Pencere kapatılınca menü çubuğunda kal",
     "autostart": "Windows ile başlat",
+    "autostartMac": "Oturum açılınca aç",
     "startMinimized": "Küçültülmüş başlat",
     "contextMenu": "Gezgin bağlam menüsünde PixelIt ögesi",
     "captureHotkey": "Ekran görüntüsü",
@@ -630,6 +634,7 @@
     "channelBeta": "Beta",
     "version": "Sürüm {version}",
     "updatePortable": "Taşınabilir sürüm elle güncellenir: yeni arşivi sürümler sayfasından indirin.",
+    "updatePortableMac": "Bu kopya elle güncellenir. Kendini güncelleyebilmesi için PixelIt’i Uygulamalar klasörüne taşıyın.",
     "checkNow": "Şimdi denetle",
     "data": "Veriler",
     "dataFolder": "Veri klasörü",
@@ -864,7 +869,7 @@
     "nothingTitle": "Hiçbir şey bulunamadı",
     "nothingText": "Başka bir sorgu veya başka bir kaynak deneyin.",
     "emptyTitle": "Web’den görüntüler",
-    "emptyText": "Bir bağlantı yapıştırın veya bir sorgu yazın; bulunan görüntüler burada görünür. Bağlantı, programın herhangi bir yerinden Ctrl+V ile yapıştırılabilir.",
+    "emptyText": "Bir bağlantı yapıştırın veya bir sorgu yazın; bulunan görüntüler burada görünür. Bağlantı, programın herhangi bir yerinden {keys} ile yapıştırılabilir.",
     "downloaded": "İndirilenler"
   },
   "ai": {
@@ -910,6 +915,7 @@
     "urlHint": "Örneğin: http://127.0.0.1:11434/v1",
     "key": "Anahtar",
     "keyHint": "{host} için Windows Kimlik Bilgileri Yöneticisi’nde saklanır.",
+    "keyHintMac": "{host} için macOS Anahtar Zinciri’nde saklanır.",
     "keyStored": "Bir anahtar kayıtlı",
     "keySaved": "Anahtar kaydedildi",
     "listModels": "Modelleri listele",
@@ -1104,6 +1110,7 @@
     "argsHint": "Her satıra bir tane.",
     "env": "Ortam değişkenleri",
     "envHint": "Her satıra bir tane: AD=değer. Windows Kimlik Bilgileri Yöneticisi’nde saklanır.",
+    "envHintMac": "Her satıra bir tane: AD=değer. macOS Anahtar Zinciri’nde saklanır.",
     "urlHint": "Streamable HTTP aktarımını kullanan sunucunun adresi.",
     "defaultPermission": "Araçlar",
     "defaultPermissionHint": "Kendi kuralı olmayan araçlar için geçerlidir.",
@@ -1128,7 +1135,7 @@
     "aiModelFailed": "Model görüntüyü işleyemedi",
     "aiUnavailable": "Modellerin çalışma ortamı kullanılamıyor",
     "aiWorkerFailed": "Model süreci hatayla sonlandı",
-    "aiWorkerMissing": "pixelit-worker.exe dosyası bulunamadı",
+    "aiWorkerMissing": "{file} dosyası bulunamadı",
     "assistantLoop": "Asistan art arda çok fazla adım attı ve durduruldu",
     "autostartFailed": "Otomatik başlatma değiştirilemedi",
     "badArchive": "İndirilen arşiv bozuk",
@@ -1146,6 +1153,7 @@
     "cannotEncode": "Bu biçimde kaydedilemez",
     "captionUnsupported": "Açıklama yalnızca JPEG ve PNG dosyalarına yazılabilir",
     "captureFailed": "Ekran görüntüsü alınamadı",
+    "capturePermission": "PixelIt’in ekranı kaydetme izni yok. Sistem Ayarları’nda izin verin: “Gizlilik ve Güvenlik” → “Ekran Kaydı”, ardından PixelIt’i yeniden başlatın.",
     "chatBusy": "Asistan hâlâ yanıt veriyor",
     "chatMissing": "Sohbet bulunamadı",
     "checksumMismatch": "İndirilen dosya bütünlük denetiminden geçemedi",
@@ -1165,7 +1173,7 @@
     "httpStatus": "Sunucu hatayla yanıt verdi",
     "internal": "İç hata",
     "io": "Dosya okunamadı veya yazılamadı",
-    "keyStoreFailed": "Windows Kimlik Bilgileri Yöneticisi kullanılamıyor",
+    "keyStoreFailed": "Sistemin anahtar deposu kullanılamıyor",
     "localAddress": "Adres bu bilgisayara veya yerel ağa gidiyor ve ajanlara kapalı: {url}",
     "mcpBadServer": "“{name}” MCP sunucusu hatalı ayarlanmış",
     "mcpDisconnected": "MCP sunucusuyla bağlantı kesildi",
@@ -1214,13 +1222,33 @@
     "upscalerMissing": "Büyütme modeli bulunamadı: {model}",
     "refineNeedsGenerator": "Ayrıntı, ComfyUI veya Forge ile eklenir. Üretici olarak bunlardan birini seçin.",
     "refineNoPrompt": "Bu resimde kayıtlı bir istem yok, bu yüzden ayrıntı eklenemiyor.",
-    "refineTooLarge": "Resim ayrıntı eklemek için çok büyük: uzun kenarı {side} px, en fazla {limit} px olabilir."
+    "refineTooLarge": "Resim ayrıntı eklemek için çok büyük: uzun kenarı {side} px, en fazla {limit} px olabilir.",
+    "heicCodecMissingMac": "Sistem HEIC dosyasini okuyamadi"
   },
   "native": {
     "tray": {
       "open": "PixelIt’i aç",
       "capture": "Ekran görüntüsü",
       "quit": "Çıkış"
+    },
+    "menu": {
+      "about": "PixelIt Hakkında",
+      "services": "Servisler",
+      "hide": "PixelIt’i Gizle",
+      "hideOthers": "Diğerlerini Gizle",
+      "showAll": "Tümünü Göster",
+      "quit": "PixelIt’ten Çık",
+      "edit": "Düzen",
+      "undo": "Geri Al",
+      "redo": "Yinele",
+      "cut": "Kes",
+      "copy": "Kopyala",
+      "paste": "Yapıştır",
+      "selectAll": "Tümünü Seç",
+      "window": "Pencere",
+      "minimize": "Küçült",
+      "zoom": "Büyüt",
+      "close": "Pencereyi Kapat"
     },
     "contextMenu": "PixelIt’te aç",
     "notify": {

@@ -166,8 +166,76 @@ pub fn screen() -> Result<Image> {
     gdi::screen()
 }
 
-/// Screen capture uses the Windows desktop. Elsewhere the editor reports it.
-#[cfg(not(windows))]
+/// Screen Recording permission on macOS 10.15 and later.
+#[cfg(target_os = "macos")]
+mod permission {
+    #[link(name = "CoreGraphics", kind = "framework")]
+    unsafe extern "C" {
+        fn CGPreflightScreenCaptureAccess() -> bool;
+        fn CGRequestScreenCaptureAccess() -> bool;
+    }
+
+    pub fn granted() -> bool {
+        // SAFETY: plain CoreGraphics calls with no arguments.
+        unsafe { CGPreflightScreenCaptureAccess() }
+    }
+
+    pub fn ask() -> bool {
+        // SAFETY: plain CoreGraphics calls with no arguments.
+        unsafe { CGRequestScreenCaptureAccess() }
+    }
+}
+
+/// Takes a picture of every display with the system tool.
+#[cfg(target_os = "macos")]
+pub fn screen() -> Result<Image> {
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use pixelit_codecs::{decode_bytes, DecodeOptions};
+    use pixelit_core::{CancelToken, ImageFormat, Media};
+    use pixelit_engine::Paths;
+
+    if !permission::granted() && !permission::ask() {
+        return Err(Error::new("capturePermission"));
+    }
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let path = Paths::detect().temp().join(format!("capture-{stamp}.png"));
+    if let Some(folder) = path.parent() {
+        fs::create_dir_all(folder)?;
+    }
+    let status = Command::new("screencapture")
+        .args(["-x", &path.display().to_string()])
+        .status()
+        .map_err(|error| Error::new("captureFailed").detail(error))?;
+    let bytes = fs::read(&path);
+    let _ = fs::remove_file(&path);
+    if !status.success() {
+        return Err(if permission::granted() {
+            Error::new("captureFailed")
+        } else {
+            Error::new("capturePermission")
+        });
+    }
+    let bytes = bytes.map_err(|error| Error::new("captureFailed").detail(error))?;
+    let decoded = decode_bytes(
+        &bytes,
+        Some(ImageFormat::Png),
+        &DecodeOptions::default(),
+        &CancelToken::new(),
+    )
+    .map_err(|error| Error::new("captureFailed").detail(error))?;
+    match decoded.media {
+        Media::Still(image) => Ok(image),
+        Media::Animated(_) => Err(Error::new("captureFailed")),
+    }
+}
+
+/// Screen capture is only built for Windows and macOS.
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn screen() -> Result<Image> {
     Err(Error::new("captureFailed"))
 }

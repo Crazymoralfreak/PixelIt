@@ -23,7 +23,10 @@ const MARKER: &str = "installed.json";
 const MAX_UNPACKED: u64 = 2 * 1024 * 1024 * 1024;
 
 /// Names stable-diffusion.cpp has used for its command line program.
+#[cfg(windows)]
 const GENERATOR_PROGRAMS: [&str; 2] = ["sd-cli.exe", "sd.exe"];
+#[cfg(not(windows))]
+const GENERATOR_PROGRAMS: [&str; 3] = ["sd-cli", "sd", "sd.exe"];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -99,6 +102,7 @@ pub fn main_path(paths: &Paths, id: &str) -> Result<PathBuf> {
 pub fn list(paths: &Paths) -> Vec<Status> {
     catalog::ENTRIES
         .iter()
+        .filter(|entry| entry.is_available())
         .map(|entry| Status {
             id: entry.id,
             kind: entry.kind,
@@ -157,6 +161,19 @@ fn copy_entry(reader: &mut impl io::Read, target: &Path, budget: &mut u64) -> Re
     Ok(())
 }
 
+/// Keeps the execute bit a zip entry had on Unix; without it a generator
+/// program of a Mac archive cannot be started.
+#[cfg(unix)]
+fn keep_mode(target: &Path, mode: Option<u32>) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Some(mode) = mode {
+        let _ = fs::set_permissions(target, fs::Permissions::from_mode(mode));
+    }
+}
+
+#[cfg(not(unix))]
+fn keep_mode(_target: &Path, _mode: Option<u32>) {}
+
 fn bad_archive(error: zip::result::ZipError) -> Error {
     Error::new("badArchive").detail(error)
 }
@@ -170,7 +187,10 @@ fn unpack(archive: &Path, download: &Download, folder: &Path, cancel: &CancelTok
             for (inside, outside) in entries {
                 cancel.check()?;
                 let mut file = zip.by_name(inside).map_err(bad_archive)?;
-                copy_entry(&mut file, &folder.join(outside), &mut budget)?;
+                let mode = file.unix_mode();
+                let target = folder.join(outside);
+                copy_entry(&mut file, &target, &mut budget)?;
+                keep_mode(&target, mode);
             }
         }
         Unpack::All => {
@@ -182,10 +202,12 @@ fn unpack(archive: &Path, download: &Download, folder: &Path, cancel: &CancelTok
                     continue;
                 };
                 let target = folder.join(name);
+                let mode = file.unix_mode();
                 if file.is_dir() {
                     fs::create_dir_all(&target)?;
                 } else {
                     copy_entry(&mut file, &target, &mut budget)?;
+                    keep_mode(&target, mode);
                 }
             }
         }

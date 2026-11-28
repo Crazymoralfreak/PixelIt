@@ -8,6 +8,7 @@
     "clear": "Vider",
     "remove": "Retirer",
     "reveal": "Afficher dans l’Explorateur",
+    "revealMac": "Afficher dans le Finder",
     "delete": "Supprimer",
     "yes": "Oui",
     "no": "Non",
@@ -82,7 +83,7 @@
       "failed": "Impossible de vérifier les mises à jour"
     },
     "askTitle": "La version {version} est disponible",
-    "askText": "La version {current} est installée. Mettre PixelIt à jour vers la version {version} ? Le programme d’installation est téléchargé et vérifié, les tâches en cours se terminent, puis l’application redémarre.",
+    "askText": "La version {current} est installée. Mettre PixelIt à jour vers la version {version} ? La mise à jour est téléchargée et vérifiée, les tâches en cours se terminent, puis l’application redémarre.",
     "skip": "Ignorer cette version",
     "later": "Plus tard",
     "install": "Mettre à jour",
@@ -105,7 +106,7 @@
     "paste": "Coller",
     "capture": "Capture d’écran",
     "emptyTitle": "Ouvrez un dossier ou déposez des images ici",
-    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD et d’autres formats sont pris en charge. Ctrl+V colle une image du presse-papiers.",
+    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD et d’autres formats sont pris en charge. {keys} colle une image du presse-papiers.",
     "recent": "Dossiers récents",
     "up": "Remonter",
     "looseFiles": "Fichiers ouverts : {count}",
@@ -120,7 +121,7 @@
     "edit": "Retoucher",
     "pasteHint": "Le presse-papiers ne contient pas d’image",
     "trashTitle": "Déplacer vers la corbeille ?",
-    "trashText": "Fichiers : {count}. Vous pourrez les restaurer depuis la Corbeille de Windows.",
+    "trashText": "Fichiers : {count}. Vous pourrez les restaurer depuis la Corbeille.",
     "addedToBatch": "Ajoutées au lot : {count}",
     "sort": {
       "name": "Par nom",
@@ -142,7 +143,8 @@
       "alpha": "Transparence",
       "metadata": "Métadonnées",
       "frames": "Images de l’animation"
-    }
+    },
+    "trashTextMac": "Fichiers : {count}. Vous pourrez les recuperer depuis la Corbeille."
   },
   "output": {
     "format": "Format",
@@ -615,7 +617,9 @@
     "defaultOutput": "Enregistrement par défaut",
     "system": "Windows",
     "closeToTray": "Réduire dans la zone de notification à la fermeture",
+    "closeToTrayMac": "Rester dans la barre des menus à la fermeture de la fenêtre",
     "autostart": "Démarrer avec Windows",
+    "autostartMac": "Ouvrir à l’ouverture de session",
     "startMinimized": "Démarrer en mode réduit",
     "contextMenu": "Entrée PixelIt dans le menu contextuel de l’Explorateur",
     "captureHotkey": "Capture d’écran",
@@ -630,6 +634,7 @@
     "channelBeta": "Bêta",
     "version": "Version {version}",
     "updatePortable": "La version portable se met à jour à la main : téléchargez la nouvelle archive depuis la page des versions.",
+    "updatePortableMac": "Cette copie se met à jour à la main. Déplacez PixelIt dans le dossier Applications pour qu’il se mette à jour lui-même.",
     "checkNow": "Vérifier maintenant",
     "data": "Données",
     "dataFolder": "Dossier des données",
@@ -864,7 +869,7 @@
     "nothingTitle": "Rien trouvé",
     "nothingText": "Essayez une autre recherche ou une autre source.",
     "emptyTitle": "Images du web",
-    "emptyText": "Collez un lien ou saisissez une recherche : les images trouvées s’afficheront ici. Un lien peut être collé avec Ctrl+V depuis n’importe où dans l’application.",
+    "emptyText": "Collez un lien ou saisissez une recherche : les images trouvées s’afficheront ici. Un lien peut être collé avec {keys} depuis n’importe où dans l’application.",
     "downloaded": "Téléchargées"
   },
   "ai": {
@@ -910,6 +915,7 @@
     "urlHint": "Par exemple : http://127.0.0.1:11434/v1",
     "key": "Clé",
     "keyHint": "Conservée dans le Gestionnaire d’identification de Windows pour {host}.",
+    "keyHintMac": "Conservée dans le Trousseau de macOS pour {host}.",
     "keyStored": "Une clé est enregistrée",
     "keySaved": "La clé est enregistrée",
     "listModels": "Liste des modèles",
@@ -1104,6 +1110,7 @@
     "argsHint": "Un par ligne.",
     "env": "Variables d’environnement",
     "envHint": "Une par ligne : NOM=valeur. Conservées dans le Gestionnaire d’identification de Windows.",
+    "envHintMac": "Une par ligne : NOM=valeur. Conservées dans le Trousseau de macOS.",
     "urlHint": "Adresse d’un serveur utilisant le transport Streamable HTTP.",
     "defaultPermission": "Outils",
     "defaultPermissionHint": "S’applique aux outils sans règle propre.",
@@ -1128,7 +1135,7 @@
     "aiModelFailed": "Le modèle n’a pas pu traiter l’image",
     "aiUnavailable": "L’environnement d’exécution des modèles est indisponible",
     "aiWorkerFailed": "Le processus des modèles s’est terminé sur une erreur",
-    "aiWorkerMissing": "Le fichier pixelit-worker.exe est introuvable",
+    "aiWorkerMissing": "Le fichier {file} est introuvable",
     "assistantLoop": "L’assistant a enchaîné trop d’étapes et a été arrêté",
     "autostartFailed": "Impossible de modifier le démarrage automatique",
     "badArchive": "L’archive téléchargée est endommagée",
@@ -1146,6 +1153,7 @@
     "cannotEncode": "L’enregistrement dans ce format est impossible",
     "captionUnsupported": "La description ne peut être écrite que dans les JPEG et les PNG",
     "captureFailed": "Impossible de faire la capture d’écran",
+    "capturePermission": "PixelIt n’a pas l’autorisation d’enregistrer l’écran. Accordez-la dans Réglages Système : « Confidentialité et sécurité » → « Enregistrement de l’écran », puis relancez PixelIt.",
     "chatBusy": "L’assistant est encore en train de répondre",
     "chatMissing": "La discussion est introuvable",
     "checksumMismatch": "Le fichier téléchargé a échoué au contrôle d’intégrité",
@@ -1165,7 +1173,7 @@
     "httpStatus": "Le serveur a répondu par une erreur",
     "internal": "Erreur interne",
     "io": "Impossible de lire ou d’écrire le fichier",
-    "keyStoreFailed": "Le Gestionnaire d’identification de Windows est indisponible",
+    "keyStoreFailed": "Le magasin de clés du système est indisponible",
     "localAddress": "L’adresse mène à cet ordinateur ou au réseau local et elle est fermée aux agents : {url}",
     "mcpBadServer": "Le serveur MCP « {name} » est mal configuré",
     "mcpDisconnected": "La connexion au serveur MCP a été perdue",
@@ -1214,13 +1222,33 @@
     "upscalerMissing": "Le modèle d’agrandissement est introuvable : {model}",
     "refineNeedsGenerator": "L’ajout de détail fonctionne avec ComfyUI ou Forge. Choisissez l’un d’eux comme générateur.",
     "refineNoPrompt": "Aucun prompt n’est enregistré pour cette image, on ne peut donc pas y ajouter de détail.",
-    "refineTooLarge": "L’image est trop grande pour y ajouter du détail : {side} px sur le grand côté, {limit} px au maximum."
+    "refineTooLarge": "L’image est trop grande pour y ajouter du détail : {side} px sur le grand côté, {limit} px au maximum.",
+    "heicCodecMissingMac": "Le systeme n a pas pu lire le HEIC"
   },
   "native": {
     "tray": {
       "open": "Ouvrir PixelIt",
       "capture": "Capture d’écran",
       "quit": "Quitter"
+    },
+    "menu": {
+      "about": "À propos de PixelIt",
+      "services": "Services",
+      "hide": "Masquer PixelIt",
+      "hideOthers": "Masquer les autres",
+      "showAll": "Tout afficher",
+      "quit": "Quitter PixelIt",
+      "edit": "Édition",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "cut": "Couper",
+      "copy": "Copier",
+      "paste": "Coller",
+      "selectAll": "Tout sélectionner",
+      "window": "Fenêtre",
+      "minimize": "Réduire",
+      "zoom": "Réduire/agrandir",
+      "close": "Fermer la fenêtre"
     },
     "contextMenu": "Ouvrir dans PixelIt",
     "notify": {

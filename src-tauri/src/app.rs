@@ -33,7 +33,7 @@ use pixelit_mcp::Hub;
 use crate::capture;
 use crate::integration;
 use crate::shell::text::{error_text, known_language, text};
-use crate::shell::{notify, tray, window};
+use crate::shell::{menu, notify, tray, window};
 use crate::update::Tracker;
 
 /// Passed by the autostart entry: start in the tray, without the window.
@@ -41,6 +41,9 @@ pub const AUTOSTART_FLAG: &str = "--autostart";
 
 /// Time for the main window to leave the screen before the screen is captured.
 const HIDE_DELAY: Duration = Duration::from_millis(250);
+
+/// Files the system asked to open before the core was there.
+static EARLY_FILES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 /// A picture encoded for the interface, with its MIME type.
 pub type Encoded = (Vec<u8>, &'static str);
@@ -75,6 +78,8 @@ pub struct AppInfo {
     pub portable: bool,
     /// The copy was put in place by the installer and can update itself.
     pub installed: bool,
+    /// The operating system: `windows`, `macos` or `linux`.
+    pub platform: &'static str,
     pub system_language: String,
     /// Language of the interface: the setting, or the system language.
     pub language: String,
@@ -93,6 +98,8 @@ pub struct Core {
     capture_key: Mutex<Option<Shortcut>>,
     /// Files given on the command line that the window has not taken yet.
     opened: Mutex<Vec<String>>,
+    /// The window has taken those files: later ones go to it as an event.
+    window_asked: AtomicBool,
     quitting: AtomicBool,
     /// An update is being installed: nothing new starts.
     updating: AtomicBool,
@@ -181,6 +188,8 @@ impl Core {
                 let _ = app.emit("jobs:changed", info);
             })
         });
+        let mut opened = files_of(&std::env::args().collect::<Vec<_>>());
+        opened.append(&mut lock(&EARLY_FILES));
         let core = Arc::new(Core {
             app: app.clone(),
             engine,
@@ -192,7 +201,8 @@ impl Core {
             next_editor: AtomicU64::new(1),
             watch: Mutex::new(None),
             capture_key: Mutex::new(None),
-            opened: Mutex::new(files_of(&std::env::args().collect::<Vec<_>>())),
+            opened: Mutex::new(opened),
+            window_asked: AtomicBool::new(false),
             quitting: AtomicBool::new(false),
             updating: AtomicBool::new(false),
         });
@@ -223,6 +233,7 @@ impl Core {
             data_dir: self.paths().root.display().to_string(),
             portable: self.paths().portable,
             installed: crate::update::installed_copy(),
+            platform: std::env::consts::OS,
             system_language: system_language().to_owned(),
             language: self.lang(),
         }
@@ -230,7 +241,21 @@ impl Core {
 
     /// Files from the command line, handed to the window once.
     pub fn take_opened(&self) -> Vec<String> {
-        std::mem::take(&mut *lock(&self.opened))
+        let mut opened = lock(&self.opened);
+        self.window_asked.store(true, Ordering::SeqCst);
+        std::mem::take(&mut *opened)
+    }
+
+    /// Files the system asked to open while PixelIt runs. They wait for the
+    /// window when it has not started yet, and go to it as an event after.
+    fn add_opened(&self, files: Vec<String>) {
+        let mut opened = lock(&self.opened);
+        if self.window_asked.load(Ordering::SeqCst) {
+            drop(opened);
+            let _ = self.app.emit("open:files", &files);
+        } else {
+            opened.extend(files);
+        }
     }
 
     // Settings
@@ -293,8 +318,12 @@ impl Core {
         Ok(())
     }
 
+    /// Shows the menus outside the window in the language of the interface.
     pub fn refresh_tray(&self) {
         tray::set_menu(&self.app, self.lang());
+        if cfg!(target_os = "macos") {
+            menu::set(&self.app, self.lang());
+        }
     }
 
     // Folders that are watched
@@ -484,6 +513,9 @@ pub fn setup(
     let core = Core::create(app, engine, ai);
     tracing::info!(version = %app.package_info().version, "PixelIt started");
     tray::create(app, &core.lang(), tray_menu)?;
+    if cfg!(target_os = "macos") {
+        menu::set(app, core.lang());
+    }
 
     let hotkey = core.engine.settings().capture_hotkey;
     if let Err(error) = core.bind_capture(&hotkey) {
@@ -530,6 +562,40 @@ pub fn second_instance(app: &AppHandle, arguments: &[String]) {
     window::show_main(app);
 }
 
+/// The system asked the running copy to open files: on macOS Finder does
+/// that instead of passing them on the command line.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn files_opened(app: &AppHandle, files: Vec<String>) {
+    if files.is_empty() {
+        return;
+    }
+    let Some(core) = app.try_state::<Arc<Core>>() else {
+        // Sent before `setup`: the core takes them when it is created.
+        lock(&EARLY_FILES).extend(files);
+        return;
+    };
+    core.add_opened(files);
+    window::show_main(app);
+}
+
+/// What only macOS sends: files to open, and a click on the icon in the Dock
+/// while the window is hidden.
+#[cfg(target_os = "macos")]
+pub fn mac_event(app: &AppHandle, event: &tauri::RunEvent) {
+    match event {
+        tauri::RunEvent::Opened { urls } => {
+            let files = urls
+                .iter()
+                .filter_map(|url| url.to_file_path().ok())
+                .map(|path| path.display().to_string())
+                .collect();
+            files_opened(app, files);
+        }
+        tauri::RunEvent::Reopen { .. } => window::show_main(app),
+        _ => {}
+    }
+}
+
 /// A global hotkey was pressed. Runs on the main thread, so the work goes to another one.
 pub fn hotkey_pressed(app: &AppHandle, shortcut: &Shortcut) {
     with_core(app, |core| {
@@ -544,7 +610,8 @@ pub fn hotkey_pressed(app: &AppHandle, shortcut: &Shortcut) {
     });
 }
 
-/// An item of the tray menu was chosen. Runs on the main thread.
+/// An item of the tray menu, or of the menu bar of macOS, was chosen. Runs
+/// on the main thread.
 fn tray_menu(app: &AppHandle, id: &str) {
     with_core(app, |core| {
         if id == tray::OPEN {

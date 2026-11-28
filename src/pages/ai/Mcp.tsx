@@ -8,6 +8,7 @@ import { useApp } from "../../app/context";
 import { PathField } from "../../components/PathField";
 import { useT } from "../../i18n";
 import { copyText } from "../../lib/clipboard";
+import { isMac } from "../../lib/platform";
 import type { Permission, ServerConfig, ServerStatus } from "../../types";
 import { Button, Checkbox, EmptyState, Field, Modal, Section, Segmented, Select, Tag, TextArea, TextInput } from "../../ui";
 
@@ -99,7 +100,7 @@ function ServerDialog({
           <Field label={t("mcp.args")} hint={t("mcp.argsHint")}>
             <TextArea value={args} onChange={setArgs} rows={3} />
           </Field>
-          <Field label={t("mcp.env")} hint={t("mcp.envHint")}>
+          <Field label={t("mcp.env")} hint={isMac() ? t("mcp.envHintMac") : t("mcp.envHint")}>
             <TextArea value={env} onChange={setEnv} rows={3} placeholder="API_KEY=..." />
           </Field>
         </>

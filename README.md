@@ -33,7 +33,7 @@ The files are not signed with a code signing certificate, so Windows SmartScreen
 
 Nothing of this is installed with the application. Models and components are downloaded on the "Models and AI" page when you ask for them, each one checked against its checksum.
 
-- **Local models** (ONNX Runtime with DirectML, on the video card or the processor): background removal, upscaling, object removal, face restoration. They run in a separate process, `pixelit-worker.exe`, so a failure inside a model or a video driver does not take the application down.
+- **Local models** (ONNX Runtime with DirectML on Windows and Core ML on Apple Silicon, on the video card or the processor): background removal, upscaling, object removal, face restoration. They run in a separate process, `pixelit-worker`, so a failure inside a model or a video driver does not take the application down.
 - **Image generation** through a ComfyUI or Forge / AUTOMATIC1111 server, the built-in stable-diffusion.cpp with your model file, or an external service with an OpenAI-compatible API and your key. In the Studio you choose the generator and the model, turn on styles, make one to four pictures, change a picture (the whole one, a painted area, or past its edges) and keep them in a history.
 - **Understanding images** through a model with an OpenAI-compatible API (Ollama, LM Studio or an external service): descriptions, alt text, keywords, file names, text recognition. The answer can be written into the metadata of the file.
 - **Assistant.** A chat that calls the tools of PixelIt and of the external MCP servers you connect.
@@ -138,9 +138,9 @@ npm run tauri dev
 2. Commit the changes and tag the commit `v<version>`, for example `v1.1.0`.
 3. Push the tag to GitHub.
 
-The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches them to the release of the tag together with `latest.json`. The same tag builds the macOS disk images. The description of the release is the section of the version in `CHANGELOG.md`. `latest.json` is what the installed Windows copy reads.
+The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches them to the release of the tag. The same tag builds the macOS disk images (with the model worker inside the app) and then writes `latest.json` for Windows and both Mac architectures. The description of the release is the section of the version in `CHANGELOG.md`.
 
-`latest.json` describes the update: the version, the link to the installer and its signature. Installed copies read it from `releases/latest/download/latest.json`, so they see only a release that GitHub considers the latest: not a draft and not a pre-release.
+`latest.json` describes the update: the version, the link to each platform package and its signature. Installed copies read it from `releases/latest/download/latest.json`, so they see only a release that GitHub considers the latest: not a draft and not a pre-release. A macOS disk image is signed ad-hoc; Gatekeeper asks before the first open until Apple notarization secrets are configured.
 
 A tag with a suffix, such as `v1.1.0-beta.1`, makes a pre-release. Copies on the "beta" channel read the manifest of the permanent release `beta-channel`, which every release refreshes.
 

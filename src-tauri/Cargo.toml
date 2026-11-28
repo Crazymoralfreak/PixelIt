@@ -1,6 +1,6 @@
 [package]
 name = "pixelit"
-description = "PixelIt - desktop image toolkit for Windows"
+description = "PixelIt - desktop image toolkit for Windows and macOS"
 version.workspace = true
 authors.workspace = true
 license.workspace = true

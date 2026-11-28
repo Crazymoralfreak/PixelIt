@@ -11,7 +11,7 @@ import { PathField } from "../../components/PathField";
 import { TuningFields } from "../../components/TuningFields";
 import { useT } from "../../i18n";
 import { copyText } from "../../lib/clipboard";
-import { NO_TUNING, defaultsKey, modelOf, tuningEmpty, tuningOf } from "../../lib/generation";
+import { NO_TUNING, defaultsKey, modelOf, shownRequest, tuningEmpty, tuningOf } from "../../lib/generation";
 import type { Expand, GeneratePreview, GenerateRequest, GeneratedRecord, Generation, GenerationProvider, Stroke } from "../../types";
 import { Button, EmptyState, Field, Section, Segmented, Slider, Tag, TextArea } from "../../ui";
 import { Advanced } from "./Advanced";
@@ -234,7 +234,8 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
   const chosenStyles = request.styles
     .map((id) => styles.find((style) => style.id === id))
     .filter((style): style is NonNullable<typeof style> => style !== undefined);
-  const [finalPrompt, finalNegative] = applyStyles(request.prompt, request.negative || generation.negative, chosenStyles);
+  const [styledPrompt, styledNegative] = applyStyles(request.prompt, request.negative || generation.negative, chosenStyles);
+  const [finalPrompt, finalNegative] = shownRequest(styledPrompt, styledNegative, request.tuning, provider);
   const job = jobId === null ? undefined : jobs.find((item) => item.id === jobId);
   const items: PictureItem[] = record ? record.pictures.map((picture) => ({ record, picture })) : [];
 

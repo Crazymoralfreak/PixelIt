@@ -24,12 +24,16 @@ jobs:
         include:
           - name: MacOS_Silicon
             os: macos-latest
-            bundles: dmg
+            bundles: app,dmg
             config: src-tauri/tauri.macos.conf.json
+            triple: aarch64-apple-darwin
+            updater: darwin-aarch64
           - name: MacOS_Intel
             os: macos-15-intel
-            bundles: dmg
+            bundles: app,dmg
             config: src-tauri/tauri.macos.conf.json
+            triple: x86_64-apple-darwin
+            updater: darwin-x86_64
     steps:
       - uses: actions/checkout@v7
 
@@ -67,6 +71,17 @@ jobs:
           sips -z 1024 1024 src-tauri/icons/128x128@2x.png --out "$set/icon_512x512@2x.png"
           iconutil -c icns "$set" -o src-tauri/icons/icon.icns
 
+      - name: Build the model worker
+        shell: bash
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: sccache
+        run: |
+          set -euo pipefail
+          cargo build --release --locked -p pixelit-worker
+          mkdir -p src-tauri/binaries
+          cp target/release/pixelit-worker "src-tauri/binaries/pixelit-worker-${{ matrix.triple }}"
+
       - name: Build
         shell: bash
         env:
@@ -94,7 +109,11 @@ jobs:
           done
           exit "$code"
 
-      - name: Collect disk images
+      # Notarization is not run here while signingIdentity is "-". With a
+      # Developer ID and APPLE_ID / APPLE_PASSWORD / APPLE_TEAM_ID secrets,
+      # add notarytool submit + staple after the build.
+
+      - name: Collect disk images and updater files
         shell: bash
         run: |
           set -euo pipefail
@@ -122,6 +141,24 @@ jobs:
             echo "no disk image was built"
             exit 1
           fi
+          # Updater archive next to the disk image: PixelIt.app.tar.gz and its signature.
+          updater=0
+          for dir in target src-tauri/target; do
+            if [ ! -d "$dir" ]; then
+              continue
+            fi
+            while IFS= read -r -d '' file; do
+              dest="release-out/PixelIt_${{ matrix.updater }}.app.tar.gz"
+              cp "$file" "$dest"
+              if [ -f "${file}.sig" ]; then
+                cp "${file}.sig" "${dest}.sig"
+              fi
+              updater=1
+            done < <(find "$dir" -path '*/bundle/macos/*' -type f -name '*.app.tar.gz' -print0)
+          done
+          if [ "$updater" -eq 0 ]; then
+            echo "::warning title=Updater::No PixelIt.app.tar.gz was built; the macOS updater entry will be missing."
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
@@ -130,7 +167,8 @@ jobs:
           if-no-files-found: error
 
       # The Windows job creates the release and writes its description. This
-      # step only adds the disk images, and waits until that release exists.
+      # step only adds the disk images and updater archives, and waits until
+      # that release exists. The shared latest.json is written afterwards.
       - name: Publish
         if: startsWith(github.ref, 'refs/tags/v')
         env:

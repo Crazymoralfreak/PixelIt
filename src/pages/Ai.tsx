@@ -8,6 +8,7 @@ import { JobRow } from "../components/JobsPanel";
 import { PathField } from "../components/PathField";
 import { useT } from "../i18n";
 import { formatBytes } from "../lib/format";
+import { isMac } from "../lib/platform";
 import type {
   AiSettings,
   AiStatus,
@@ -194,7 +195,10 @@ function KeyField({ serverKey }: { serverKey: ServerKey }) {
     return null;
   }
   return (
-    <Field label={t("ai.key")} hint={t("ai.keyHint", { host })}>
+    <Field
+      label={t("ai.key")}
+      hint={isMac() ? t("ai.keyHintMac", { host }) : t("ai.keyHint", { host })}
+    >
       {stored ? (
         <>
           <Tag tone="ok">{t("ai.keyStored")}</Tag>

@@ -8,6 +8,7 @@ import { useAppEvent } from "../../api/events";
 import { useApp } from "../../app/context";
 import { useT } from "../../i18n";
 import { copyText } from "../../lib/clipboard";
+import { hasMod, isMac } from "../../lib/platform";
 import type { GeneratedPicture, GeneratedRecord, HistoryView, Style } from "../../types";
 import { Button, Checkbox, EmptyState, Field, Segmented, TextInput } from "../../ui";
 import { PictureDialog, type PictureItem } from "./PictureDialog";
@@ -28,7 +29,13 @@ function promptOf(record: GeneratedRecord): string {
 }
 
 type Keys = { ctrlKey: boolean; shiftKey: boolean; metaKey: boolean };
-const ADD: Keys = { ctrlKey: true, shiftKey: false, metaKey: false };
+
+/** The modifier a click on the checkbox stands for: Command on a Mac, Ctrl elsewhere. */
+function addKeys(): Keys {
+  return isMac()
+    ? { ctrlKey: false, shiftKey: false, metaKey: true }
+    : { ctrlKey: true, shiftKey: false, metaKey: false };
+}
 
 export function History({
   styles,
@@ -103,7 +110,7 @@ export function History({
         return;
       }
     }
-    if (event.ctrlKey || event.metaKey) {
+    if (hasMod(event)) {
       setPicked((current) => (current.includes(file) ? current.filter((item) => item !== file) : [...current, file]));
       return;
     }
@@ -188,7 +195,7 @@ export function History({
   );
 
   const check = (picture: GeneratedPicture) => (
-    <Checkbox checked={picked.includes(picture.file)} onChange={() => toggle(picture.file, ADD)} label="" />
+    <Checkbox checked={picked.includes(picture.file)} onChange={() => toggle(picture.file, addKeys())} label="" />
   );
 
   /** A picture with its buttons; `record` adds the button that copies the request. */

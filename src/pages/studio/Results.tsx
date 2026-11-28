@@ -3,6 +3,7 @@
 
 import { previewUrl } from "../../api/urls";
 import { useT } from "../../i18n";
+import { isMac } from "../../lib/platform";
 import type { GeneratePreview, GeneratedPicture, GeneratedRecord } from "../../types";
 import { Button } from "../../ui";
 import { madeFrom } from "./format";
@@ -168,7 +169,7 @@ function ResultTile({
             {t("viewer.toBatch")}
           </Button>
           <Button small onClick={onReveal}>
-            {t("common.reveal")}
+            {isMac() ? t("common.revealMac") : t("common.reveal")}
           </Button>
         </div>
       ) : null}

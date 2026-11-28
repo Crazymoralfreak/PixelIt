@@ -1,6 +1,6 @@
 //! Client of the worker process that hosts ONNX Runtime.
 //!
-//! Models run in `pixelit-worker.exe`, so a crash inside a model or a video
+//! Models run in `pixelit-worker`, a program of its own, so a crash inside a model or a video
 //! driver ends the worker and the application reports an error and carries on.
 //! Messages are a 4-byte little-endian length, a JSON header and tensor bytes.
 
@@ -120,7 +120,7 @@ pub fn worker_program() -> Result<PathBuf> {
         .and_then(|program| program.parent().map(|folder| folder.join(WORKER_NAME)));
     match beside {
         Some(program) if program.is_file() => Ok(program),
-        _ => Err(Error::new("aiWorkerMissing")),
+        _ => Err(Error::new("aiWorkerMissing").with("file", WORKER_NAME)),
     }
 }
 

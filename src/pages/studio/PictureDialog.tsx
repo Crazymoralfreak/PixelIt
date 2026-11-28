@@ -4,7 +4,8 @@
 import { useEffect } from "react";
 import { useT } from "../../i18n";
 import { fileName } from "../../lib/format";
-import { modelTitle } from "../../lib/generation";
+import { modelTitle, shownRequest } from "../../lib/generation";
+import { isMac } from "../../lib/platform";
 import type { GeneratedPicture, GeneratedRecord, Tuning } from "../../types";
 import { Button, Modal } from "../../ui";
 import { madeFrom } from "./format";
@@ -14,13 +15,11 @@ import { UpscaleMenu } from "./UpscaleOptions";
 /** The longest side of the picture in the dialog: enough to zoom into the detail. */
 const SIDE = 4096;
 
-/** The sampler, the schedule, the VAE, the LoRA files and the embeddings as one line; empty when none was set. */
+/** The sampler, the schedule and the VAE as one line. LoRA files and embeddings are part of the prompt. */
 function tuningLine(tuning: Tuning): string {
   return [
     [tuning.sampler, tuning.scheduler].filter((part) => part !== "").join(" / "),
     tuning.vae ? `VAE ${modelTitle(tuning.vae)}` : "",
-    ...tuning.loras.map((lora) => `${modelTitle(lora.name)} ${lora.weight}`),
-    ...tuning.embeddings.map((embedding) => `${embedding.negative ? "−" : "+"}${modelTitle(embedding.name)}`),
   ]
     .filter((part) => part !== "")
     .join(" · ");
@@ -92,10 +91,16 @@ export function PictureDialog({
     return null;
   }
   const { record, picture } = item;
-  const prompt = record.prompt || record.finalPrompt;
+  const written = record.prompt || record.finalPrompt;
   // What the generator was told to avoid: the styles add to it, so the
-  // request alone may show nothing.
-  const negative = record.finalNegative || record.negative;
+  // request alone may show nothing. LoRA files and embeddings are shown in
+  // the same words the final-prompt line uses.
+  const [prompt, negative] = shownRequest(
+    written,
+    record.finalNegative || record.negative,
+    record.tuning,
+    record.provider,
+  );
   const tuned = tuningLine(record.tuning);
 
   return (
@@ -123,7 +128,7 @@ export function PictureDialog({
             <Button small onClick={() => onFavorite(picture.file, !picture.favorite)}>
               {picture.favorite ? t("studio.unfavorite") : t("studio.favorite")}
             </Button>
-            <Button small disabled={prompt === ""} onClick={() => onRepeat(record)}>
+            <Button small disabled={written === ""} onClick={() => onRepeat(record)}>
               {t("studio.repeat")}
             </Button>
             <Button small onClick={() => onSeed(picture.seed)}>
@@ -155,7 +160,7 @@ export function PictureDialog({
               {t("viewer.toBatch")}
             </Button>
             <Button small onClick={() => onReveal(picture.file)}>
-              {t("common.reveal")}
+              {isMac() ? t("common.revealMac") : t("common.reveal")}
             </Button>
             <Button small disabled={prompt === ""} onClick={() => onCopy(prompt)}>
               {t("studio.copyPrompt")}
