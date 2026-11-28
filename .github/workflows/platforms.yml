@@ -91,7 +91,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           build() {
-            npm run tauri -- build --bundles ${{ matrix.bundles }} --config ${{ matrix.config }}
+            # The worker is named in the release config, not in the file macOS
+            # loads for every compile: clippy has no binary to attach.
+            npm run tauri -- build --bundles ${{ matrix.bundles }} --config ${{ matrix.config }} --config src-tauri/tauri.release.conf.json
           }
           # hdiutil often cannot eject the image it just made and reports
           # "Resource busy". The application is already compiled, so the next

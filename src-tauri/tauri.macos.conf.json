@@ -2,7 +2,6 @@
   "bundle": {
     "targets": ["app", "dmg"],
     "createUpdaterArtifacts": true,
-    "externalBin": ["binaries/pixelit-worker"],
     "macOS": {
       "signingIdentity": "-",
       "entitlements": "entitlements.plist"
