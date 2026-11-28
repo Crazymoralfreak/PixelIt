@@ -284,9 +284,13 @@ interface ModalProps {
   /** Buttons at the bottom, right aligned. */
   footer?: ReactNode;
   wide?: boolean;
+  /** Takes the whole window: for a picture that should be seen large. */
+  full?: boolean;
+  /** Puts a close button beside the title, named with this text. */
+  closeLabel?: string;
 }
 
-export function Modal({ title, onClose, children, footer, wide }: ModalProps) {
+export function Modal({ title, onClose, children, footer, wide, full, closeLabel }: ModalProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -299,8 +303,15 @@ export function Modal({ title, onClose, children, footer, wide }: ModalProps) {
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className={cx("modal", wide && "modal-wide")} role="dialog" aria-modal="true" aria-label={title}>
-        <div className="modal-title">{title}</div>
+      <div className={cx("modal", wide && "modal-wide", full && "modal-full")} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="modal-title">
+          <span className="modal-title-text">{title}</span>
+          {closeLabel ? (
+            <Button small title={closeLabel} aria-label={closeLabel} onClick={onClose}>
+              ×
+            </Button>
+          ) : null}
+        </div>
         <div className="modal-body">{children}</div>
         {footer ? <div className="modal-footer">{footer}</div> : null}
       </div>

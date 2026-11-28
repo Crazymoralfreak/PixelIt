@@ -11,6 +11,7 @@ pub mod clock;
 pub mod compose;
 pub mod compress;
 pub mod duplicates;
+pub mod environment;
 pub mod fonts;
 pub mod fsops;
 pub mod generators;
@@ -106,6 +107,7 @@ impl Engine {
                 .clone(),
             limits: Limits::default(),
             pdfium: self.settings().pdfium(),
+            paths: Some(self.paths.clone()),
         }
     }
 }

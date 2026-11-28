@@ -6,7 +6,6 @@
 //! and nothing is sent.
 
 use std::fs;
-use std::path::Path;
 use std::time::Duration;
 
 use pixelit_core::Result;
@@ -14,6 +13,7 @@ use pixelit_engine::Paths;
 use serde::Serialize;
 
 use crate::config::{AiSettings, GenerationProvider};
+use crate::generate;
 use crate::llm;
 use crate::net::Net;
 
@@ -34,8 +34,6 @@ pub struct ModelList {
     pub models: Vec<GenerationModel>,
     pub selectable: bool,
 }
-
-const MODEL_EXTENSIONS: &[&str] = &["safetensors", "gguf", "ckpt", "pth"];
 
 /// Lists the models of `provider`. `None` means the provider of the settings.
 pub fn list(
@@ -76,14 +74,11 @@ fn comfy(net: &Net, settings: &AiSettings) -> Result<ModelList> {
         key.as_deref(),
         Some(Duration::from_secs(20)),
     )?;
-    let models = answer["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
-        .as_array()
+    let models = generate::comfy_choices(&answer, "CheckpointLoaderSimple", "ckpt_name")
         .into_iter()
-        .flatten()
-        .filter_map(|name| name.as_str())
         .map(|name| GenerationModel {
-            id: name.to_owned(),
-            name: name.to_owned(),
+            id: name.clone(),
+            name,
         })
         .collect();
     Ok(ModelList {
@@ -122,29 +117,13 @@ fn forge(net: &Net, settings: &AiSettings) -> Result<ModelList> {
 
 fn sdcpp(_paths: &Paths, settings: &AiSettings) -> ModelList {
     let current = settings.generation.sdcpp_model.trim();
-    let Some(folder) = Path::new(current).parent() else {
-        return ModelList {
-            models: Vec::new(),
-            selectable: true,
-        };
-    };
     let mut models = Vec::new();
-    if let Ok(entries) = fs::read_dir(folder) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let extension = path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .map_or_default(str::to_ascii_lowercase);
-            if !MODEL_EXTENSIONS.iter().any(|item| *item == extension) || !path.is_file() {
-                continue;
-            }
-            let id = path.display().to_string();
-            let name = path
-                .file_name()
-                .map_or_else(|| id.clone(), |name| name.to_string_lossy().into_owned());
-            models.push(GenerationModel { id, name });
-        }
+    for path in crate::apps::checkpoint_files(&settings.apps.models, current) {
+        let id = path.display().to_string();
+        let name = path
+            .file_name()
+            .map_or_else(|| id.clone(), |name| name.to_string_lossy().into_owned());
+        models.push(GenerationModel { id, name });
     }
     models.sort_by_key(|model| model.name.to_ascii_lowercase());
     ModelList {
@@ -191,6 +170,124 @@ fn cloud(net: &Net, settings: &AiSettings) -> Result<ModelList> {
     })
 }
 
+/// What a generator offers besides checkpoints, in the names it uses itself.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Options {
+    /// False when the generator takes none of this: stable-diffusion.cpp, a
+    /// cloud service, or a ComfyUI workflow of the user's own.
+    pub supported: bool,
+    pub samplers: Vec<String>,
+    pub schedulers: Vec<String>,
+    pub vaes: Vec<String>,
+    pub loras: Vec<String>,
+    pub embeddings: Vec<String>,
+    /// The sampler and the schedule used when none is chosen; empty when the
+    /// generator decides that itself.
+    pub sampler: String,
+    pub scheduler: String,
+}
+
+/// Asks `provider` for its samplers, schedules, VAE and LoRA files.
+/// `None` means the provider of the settings.
+pub fn options(net: &Net, settings: &AiSettings, provider: GenerationProvider) -> Result<Options> {
+    let provider = match provider {
+        GenerationProvider::None => settings.generation.provider,
+        chosen => chosen,
+    };
+    if !generate::takes_tuning(settings, provider) {
+        return Ok(Options::default());
+    }
+    match provider {
+        GenerationProvider::Comfy => comfy_options(net, settings),
+        GenerationProvider::Forge => forge_options(net, settings),
+        GenerationProvider::None | GenerationProvider::SdCpp | GenerationProvider::Cloud => {
+            Ok(Options::default())
+        }
+    }
+}
+
+const ASK: Duration = Duration::from_secs(20);
+
+fn comfy_options(net: &Net, settings: &AiSettings) -> Result<Options> {
+    let base = settings.generation.comfy_url.as_str();
+    let key = generate::access(settings, base)?;
+    let ask = |node: &str| {
+        net.get_json(
+            &format!("{base}/object_info/{node}"),
+            key.as_deref(),
+            Some(ASK),
+        )
+    };
+    // The sampler node is in every ComfyUI: when it does not answer, nothing does.
+    let sampler = ask("KSampler")?;
+    let choices = |node: &str, input: &str| {
+        ask(node).map_or_default(|answer| generate::comfy_choices(&answer, node, input))
+    };
+    Ok(Options {
+        supported: true,
+        samplers: generate::comfy_choices(&sampler, "KSampler", "sampler_name"),
+        schedulers: generate::comfy_choices(&sampler, "KSampler", "scheduler"),
+        vaes: choices("VAELoader", "vae_name"),
+        loras: choices("LoraLoader", "lora_name"),
+        embeddings: generate::comfy_embeddings(net, base, key.as_deref()),
+        sampler: generate::COMFY_SAMPLER.to_owned(),
+        scheduler: generate::COMFY_SCHEDULER.to_owned(),
+    })
+}
+
+fn forge_options(net: &Net, settings: &AiSettings) -> Result<Options> {
+    let base = settings.generation.forge_url.as_str();
+    let key = generate::access(settings, base)?;
+    let ask = |path: &str| {
+        net.get_json(
+            &format!("{base}/sdapi/v1/{path}"),
+            key.as_deref(),
+            Some(ASK),
+        )
+    };
+    let samplers = ask("samplers")?;
+    let list =
+        |path: &str, fields: &[&str]| ask(path).map_or_default(|answer| named(&answer, fields));
+    Ok(Options {
+        supported: true,
+        samplers: named(&samplers, &["name"]),
+        // Older versions have no list of schedules; the field is then not shown.
+        schedulers: list("schedulers", &["label", "name"]),
+        // Forge versions disagree on how a VAE is named in a request.
+        vaes: Vec::new(),
+        loras: list("loras", &["name"]),
+        embeddings: ask("embeddings").map_or_default(|answer| forge_embeddings(&answer)),
+        sampler: String::new(),
+        scheduler: String::new(),
+    })
+}
+
+/// The embeddings Forge has loaded for the model it holds now. Its answer is
+/// `{"loaded": {name: {..}}, "skipped": {..}}`; the skipped ones do not fit
+/// that model and would be read as plain words.
+fn forge_embeddings(answer: &serde_json::Value) -> Vec<String> {
+    answer["loaded"]
+        .as_object()
+        .into_iter()
+        .flat_map(|loaded| loaded.keys())
+        .filter(|name| !name.is_empty())
+        .cloned()
+        .collect()
+}
+
+/// The first of `fields` every item of a list has.
+fn named(answer: &serde_json::Value, fields: &[&str]) -> Vec<String> {
+    answer
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|item| fields.iter().find_map(|field| item[*field].as_str()))
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
 /// The model a request uses: the one it names, or the one in the settings.
 pub fn chosen_model<'a>(
     settings: &'a AiSettings,
@@ -232,6 +329,46 @@ mod tests {
             "forge.safetensors"
         );
         assert_eq!(chosen_model(&settings, GenerationProvider::SdCpp, ""), "");
+    }
+
+    #[test]
+    fn forge_lists_are_read_by_name() {
+        let samplers =
+            serde_json::json!([{ "name": "Euler a" }, { "name": "DPM++ 2M" }, { "name": "" }]);
+        assert_eq!(named(&samplers, &["name"]), ["Euler a", "DPM++ 2M"]);
+        let schedules =
+            serde_json::json!([{ "name": "karras", "label": "Karras" }, { "name": "sgm_uniform" }]);
+        assert_eq!(
+            named(&schedules, &["label", "name"]),
+            ["Karras", "sgm_uniform"]
+        );
+        assert!(named(&serde_json::json!({ "detail": "Not Found" }), &["name"]).is_empty());
+    }
+
+    #[test]
+    fn forge_offers_the_embeddings_it_has_loaded() {
+        let answer = serde_json::json!({
+            "loaded": { "negativeXL_D": { "step": null }, "zPDXL-neg": {} },
+            "skipped": { "EasyNegative": {} },
+        });
+        assert_eq!(forge_embeddings(&answer), ["negativeXL_D", "zPDXL-neg"]);
+        assert!(forge_embeddings(&serde_json::json!({ "detail": "Not Found" })).is_empty());
+    }
+
+    #[test]
+    fn a_generator_without_tuning_offers_none() {
+        let mut settings = AiSettings::default();
+        settings.generation.provider = GenerationProvider::SdCpp;
+        let net = Net::new();
+        let none = options(&net, &settings, GenerationProvider::None).unwrap();
+        assert!(!none.supported);
+        assert!(none.samplers.is_empty());
+        settings.generation.comfy_workflow = String::from("flow.json");
+        assert!(
+            !options(&net, &settings, GenerationProvider::Comfy)
+                .unwrap()
+                .supported
+        );
     }
 
     #[test]

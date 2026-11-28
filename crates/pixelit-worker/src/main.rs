@@ -249,14 +249,26 @@ impl Worker {
             builder = builder.with_intra_threads(threads)?;
         }
         if device == Device::Gpu {
-            // DirectML needs sequential execution without memory patterns.
-            builder = builder
-                .with_memory_pattern(false)?
-                .with_parallel_execution(false)?
-                .with_execution_providers([ep::DirectML::default()
-                    .with_device_id(gpu)
-                    .build()
-                    .error_on_failure()])?;
+            #[cfg(windows)]
+            {
+                // DirectML needs sequential execution without memory patterns.
+                builder = builder
+                    .with_memory_pattern(false)?
+                    .with_parallel_execution(false)?
+                    .with_execution_providers([ep::DirectML::default()
+                        .with_device_id(gpu)
+                        .build()
+                        .error_on_failure()])?;
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let _ = gpu;
+                builder = builder.with_execution_providers([ep::CoreML::default().build()])?;
+            }
+            #[cfg(not(any(windows, target_os = "macos")))]
+            {
+                let _ = gpu;
+            }
         }
         builder.commit_from_file(path)
     }

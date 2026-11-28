@@ -1,7 +1,9 @@
-//! HEIC/HEIF decoding with the Windows Imaging Component.
+//! HEIC/HEIF decoding.
 //!
-//! Windows decodes HEIC when the HEIF Image Extensions and the HEVC Video
-//! Extensions are installed; without them the decoder reports a missing codec.
+//! On Windows the Imaging Component decodes HEIC when the HEIF Image Extensions
+//! and the HEVC Video Extensions are installed; without them the decoder
+//! reports a missing codec. On macOS the system `sips` tool turns the file
+//! into a TIFF that the ordinary decoder then reads.
 
 use pixelit_core::Result;
 
@@ -155,7 +157,56 @@ pub(super) fn decode(bytes: &[u8], options: &DecodeOptions) -> Result<Loaded> {
     wic::decode(bytes, options)
 }
 
-#[cfg(not(windows))]
+/// Turns HEIC into TIFF with the system tool, then reads the TIFF.
+#[cfg(target_os = "macos")]
+mod sips {
+    use std::fs;
+    use std::process::Command;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use pixelit_core::{Error, ImageFormat, Result};
+
+    use super::super::{generic, Loaded};
+    use crate::info::DecodeOptions;
+
+    pub(super) fn decode(bytes: &[u8], options: &DecodeOptions) -> Result<Loaded> {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |duration| duration.as_nanos());
+        let folder = std::env::temp_dir().join(format!("pixelit-heic-{stamp}"));
+        fs::create_dir_all(&folder)?;
+        let input = folder.join("in.heic");
+        let output = folder.join("out.tiff");
+        let result = (|| -> Result<Loaded> {
+            fs::write(&input, bytes)?;
+            let status = Command::new("sips")
+                .args([
+                    "-s",
+                    "format",
+                    "tiff",
+                    &input.display().to_string(),
+                    "--out",
+                    &output.display().to_string(),
+                ])
+                .status()
+                .map_err(|error| Error::new("heicCodecMissingMac").detail(error))?;
+            if !status.success() || !output.is_file() {
+                return Err(Error::new("heicCodecMissingMac"));
+            }
+            let tiff = fs::read(&output)?;
+            generic::decode(&tiff, ImageFormat::Tiff, options)
+        })();
+        let _ = fs::remove_dir_all(&folder);
+        result
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub(super) fn decode(bytes: &[u8], options: &DecodeOptions) -> Result<Loaded> {
+    sips::decode(bytes, options)
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub(super) fn decode(_bytes: &[u8], _options: &DecodeOptions) -> Result<Loaded> {
     Err(pixelit_core::Error::new("unsupportedFormat").detail("HEIC"))
 }

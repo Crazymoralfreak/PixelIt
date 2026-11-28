@@ -8,6 +8,7 @@
     "clear": "クリア",
     "remove": "取り除く",
     "reveal": "エクスプローラーで表示",
+    "revealMac": "Finder で表示",
     "delete": "削除",
     "yes": "はい",
     "no": "いいえ",
@@ -52,7 +53,9 @@
       "vision": "認識",
       "cli": "コマンドライン",
       "agent": "アシスタント",
-      "edit": "エディター"
+      "edit": "エディター",
+      "upscale": "拡大",
+      "refine": "ディテールの追加"
     },
     "state": {
       "queued": "待機中",
@@ -80,7 +83,7 @@
       "failed": "更新を確認できませんでした"
     },
     "askTitle": "バージョン {version} を利用できます",
-    "askText": "現在のバージョンは {current} です。PixelIt をバージョン {version} に更新しますか？インストーラーをダウンロードして検証し、実行中のジョブが終わってからアプリを再起動します。",
+    "askText": "現在のバージョンは {current} です。PixelIt をバージョン {version} に更新しますか？更新をダウンロードして検証し、実行中のジョブが終わってからアプリを再起動します。",
     "skip": "このバージョンをスキップ",
     "later": "後で",
     "install": "更新",
@@ -103,7 +106,7 @@
     "paste": "貼り付け",
     "capture": "スクリーンショット",
     "emptyTitle": "フォルダーを開くか、画像をここにドラッグしてください",
-    "emptyText": "JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD などに対応しています。Ctrl+V でクリップボードの画像を貼り付けられます。",
+    "emptyText": "JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD などに対応しています。{keys} でクリップボードの画像を貼り付けられます。",
     "recent": "最近のフォルダー",
     "up": "上へ",
     "looseFiles": "開いているファイル: {count}",
@@ -118,7 +121,7 @@
     "edit": "編集",
     "pasteHint": "クリップボードに画像がありません",
     "trashTitle": "ごみ箱に移動しますか？",
-    "trashText": "ファイル: {count}。Windows のごみ箱から元に戻せます。",
+    "trashText": "ファイル: {count}。ごみ箱から元に戻せます。",
     "addedToBatch": "一括処理に追加しました: {count}",
     "sort": {
       "name": "名前順",
@@ -140,7 +143,8 @@
       "alpha": "透明度",
       "metadata": "メタデータ",
       "frames": "フレーム数"
-    }
+    },
+    "trashTextMac": "ファイル数: {count}。ゴミ箱から復元できます。"
   },
   "output": {
     "format": "形式",
@@ -231,7 +235,8 @@
     "upscale": "拡大",
     "restoreFaces": "顔の復元",
     "inpaint": "オブジェクトの削除",
-    "aiEdit": "AI 編集"
+    "aiEdit": "AI 編集",
+    "aiDetail": "AI ディテール"
   },
   "op": {
     "mode": "モード",
@@ -346,7 +351,17 @@
     "editStrength": "変更の強さ",
     "editStrengthHint": "値が大きいほど、結果は元の画像から離れます。",
     "generatorMissing": "このステップには画像生成器が必要です。",
-    "editModelDefault": "既定"
+    "editModelDefault": "既定",
+    "detailAbout": "ジェネレーターが画像をなぞって細かなディテールを足します。写っている内容は変わりません。保存時にはファイルを実寸で描き直します。",
+    "detailAreaHint": "ディテールを足したい部分をブラシで塗ってください。何も塗らない場合は画像全体が対象になります。",
+    "detailPrompt": "画像の内容",
+    "detailPromptHint": "画像をそのまま説明してください。この文章をもとにディテールを描き足します。空のままでは「{prompt}」が送られます。",
+    "promptFromFile": "ファイルのプロンプトを使う",
+    "promptFromFileHint": "ファイルに残っていれば、その画像を生成したときのプロンプトです。",
+    "promptFromFileNone": "ファイルにプロンプトが残っていません。",
+    "detailStrengthHint": "ジェネレーターが画像からどこまで離れてよいか。ディテールには通常 25〜45 で十分です。",
+    "asInStudio": "スタジオと同じ",
+    "asInStudioHint": "このモデル用にスタジオが覚えているステップ数、プロンプトへの忠実度、サンプラー、VAE、LoRA、エンベディングです。"
   },
   "steps": {
     "empty": "ステップはまだありません",
@@ -602,7 +617,9 @@
     "defaultOutput": "既定の保存設定",
     "system": "Windows",
     "closeToTray": "閉じるときに通知領域へ最小化する",
+    "closeToTrayMac": "ウィンドウを閉じてもメニューバーに残す",
     "autostart": "Windows の起動時に開始する",
+    "autostartMac": "ログイン時に開く",
     "startMinimized": "最小化した状態で開始する",
     "contextMenu": "エクスプローラーの右クリックメニューに PixelIt を表示する",
     "captureHotkey": "スクリーンショット",
@@ -617,6 +634,7 @@
     "channelBeta": "ベータ版",
     "version": "バージョン {version}",
     "updatePortable": "ポータブル版は手動で更新します。リリースページから新しいアーカイブをダウンロードしてください。",
+    "updatePortableMac": "このコピーは手動で更新します。PixelIt を「アプリケーション」フォルダに移動すると、自動で更新できるようになります。",
     "checkNow": "今すぐ確認",
     "data": "データ",
     "dataFolder": "データフォルダー",
@@ -727,7 +745,8 @@
       "create": "作成",
       "edit": "修正",
       "outpaint": "拡張",
-      "upscale": "拡大"
+      "upscale": "拡大",
+      "refine": "ディテール"
     },
     "builtin": {
       "photo": "写真",
@@ -740,7 +759,66 @@
       "sketch": "鉛筆スケッチ",
       "oil": "油彩",
       "portrait": "肖像"
-    }
+    },
+    "enlarge": "拡大",
+    "enlargeOff": "なし",
+    "enlargeHint": "各画像は生成の直後に、選んだモデルで拡大されます。",
+    "upscaleInstallTitle": "拡大モデルをインストールしますか？",
+    "upscaleInstallText": "拡大にはローカルのモデル {name}（{size}）が必要です。ダウンロードしてインストールしますか？",
+    "upscaleInstall": "インストール",
+    "upscaleInstalling": "拡大モデルをダウンロードしています。終わるとすぐに画像を拡大します。",
+    "upscaler": "拡大モデル",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "起動中の ComfyUI または Forge が必要",
+    "upscalerMissing": "このモデルは今は使えません。プログラムの起動後に一覧を更新してください。",
+    "upscaleMode": "ディテール",
+    "upscaleFast": "高速",
+    "upscaleRefine": "ディテール付き",
+    "upscaleRefineHint": "生成器が拡大した画像をもう一度描き、細かいディテールを戻します。生成とほぼ同じ時間がかかります。",
+    "upscaleFastHint": "拡大モデルだけが動きます。速く、新しいディテールは加わりません。",
+    "upscaleStrength": "ディテールの強さ",
+    "upscaleStrengthHint": "生成器が拡大後の画像からどれだけ離れてよいか。低いほど近くに留まります。",
+    "upscaleOptions": "拡大の設定",
+    "noticeNeedsGenerator": "ディテールには ComfyUI か Forge が必要です。画像は拡大のみです。",
+    "noticeNoPrompt": "この画像にはプロンプトが保存されていないため、拡大のみです。",
+    "noticeRefineFailed": "生成器が応答しなかったため、画像は拡大のみです。",
+    "tuning": "サンプラー、VAE、LoRA、エンベディング",
+    "tuningSilent": "生成器が応答しないため、一覧は空です。起動してから「更新」を押してください。",
+    "tuningUsual": "生成器の既定",
+    "tuningUsualNamed": "既定（{name}）",
+    "tuningReset": "リセット",
+    "sampler": "サンプラー",
+    "samplerHint": "シャープさと細かいディテールはサンプラーとスケジューラーで決まります。Euler a、または Karras スケジューラーと DPM++ 2M の組み合わせがよく使われます。",
+    "scheduler": "スケジューラー",
+    "vae": "VAE",
+    "vaeHint": "モデルに VAE が含まれていない場合は別の VAE が必要です。ないと画像が色あせたり、ぼやけたりします。",
+    "vaeOfModel": "モデルのもの",
+    "lora": "LoRA",
+    "loraHint": "数値は LoRA の強さです。通常は 0.6 から 1 です。",
+    "loraAdd": "追加…",
+    "loraNone": "LoRA ファイルがありません",
+    "refine": "ディテールを足す",
+    "refineHint": "生成器が画像をもう一度なぞり、細かいディテールを描き足します。サイズは変わりません。",
+    "service": {
+      "ready": "動作中",
+      "starting": "起動中…",
+      "stopped": "停止中",
+      "missing": "応答なし"
+    },
+    "historyView": {
+      "groups": "プロンプト別",
+      "grid": "グリッド",
+      "list": "リスト"
+    },
+    "before": "前",
+    "after": "後",
+    "zoomHint": "ホイールで拡大縮小、ドラッグで画像を移動、ダブルクリックで全体表示に戻ります。",
+    "negativeLine": "避けたい内容：{text}",
+    "embedding": "エンベディング",
+    "embeddingHint": "エンベディングはプロンプトの単語として働きます。選んだものはプロンプトか避けたい内容に自動で書き足されます。",
+    "embeddingPrompt": "プロンプトへ",
+    "embeddingNegative": "避けたい内容へ",
+    "embeddingNone": "エンベディングのファイルがありません"
   },
   "vision": {
     "noModelTitle": "モデルが選ばれていません",
@@ -791,7 +869,7 @@
     "nothingTitle": "何も見つかりません",
     "nothingText": "別の検索語か別のソースをお試しください。",
     "emptyTitle": "ウェブの画像",
-    "emptyText": "リンクを貼り付けるか検索語を入力すると、見つかった画像がここに表示されます。リンクはアプリのどこからでも Ctrl+V で貼り付けられます。",
+    "emptyText": "リンクを貼り付けるか検索語を入力すると、見つかった画像がここに表示されます。リンクはアプリのどこからでも {keys} で貼り付けられます。",
     "downloaded": "ダウンロード済み"
   },
   "ai": {
@@ -820,7 +898,7 @@
     "allowCloud": "外部サービスを許可する",
     "confirmCloud": "送信のたびに確認する",
     "localServers": "ローカルサーバー",
-    "localServersText": "このコンピューターで動作中の Ollama、LM Studio、ComfyUI、Forge を探します。",
+    "localServersText": "このコンピューターで動作中の Ollama、LM Studio、ComfyUI、Forge、Fooocus を探します。",
     "discover": "探す",
     "noneFound": "動作中のサーバーは見つかりませんでした",
     "modelsCount": "モデル: {count}",
@@ -837,6 +915,7 @@
     "urlHint": "例: http://127.0.0.1:11434/v1",
     "key": "キー",
     "keyHint": "{host} 用として Windows 資格情報マネージャーに保存されます。",
+    "keyHintMac": "{host} 用として macOS のキーチェーンに保存されます。",
     "keyStored": "キーは保存されています",
     "keySaved": "キーを保存しました",
     "listModels": "モデルの一覧",
@@ -888,7 +967,96 @@
     "allowCloudText": "サーバー {host} はこのコンピューターの外にあり、外部サービスは現在オフになっています。利用を許可しますか？このページの設定は保存されます。",
     "allowCloudYes": "許可",
     "forgeCheckpoint": "モデル",
-    "forgeCheckpointHint": "Forge が表示する名前です。空なら、そこで読み込み済みのモデルを使います。"
+    "forgeCheckpointHint": "Forge が表示する名前です。空なら、そこで読み込み済みのモデルを使います。",
+    "tabApps": "アプリ",
+    "apps": {
+      "title": "アプリ",
+      "text": "ComfyUI と Forge を入れ、起動と停止をし、モデルのフォルダーを共有します。",
+      "install": "インストール",
+      "useStability": "Stability Matrix を使う",
+      "fillModels": "Stability Matrix のフォルダー",
+      "start": "起動",
+      "stop": "停止",
+      "open": "開く",
+      "checkUpdates": "更新を確認",
+      "update": "更新",
+      "noHome": "フォルダーは未選択",
+      "nvidia": "NVIDIA 版",
+      "foreignUpdate": "このコピーは、入れた人が更新します。",
+      "updateReady": "バージョン {version} があります。",
+      "models": "モデルのフォルダー",
+      "modelsText": "ComfyUI はすべてのフォルダーを使います。Forge は種類ごとに一つです。",
+      "search": "モデルを探す",
+      "searchText": "Stability Matrix と同じカタログです。ファイルは頼んだときだけ、その種類の最初のフォルダーに入ります。",
+      "source": "カタログ",
+      "query": "検索",
+      "modelKind": "種類",
+      "sort": "順序",
+      "period": "期間",
+      "baseModel": "ベースモデル",
+      "hideInstalled": "入っているものを隠す",
+      "showNsfw": "成人向けモデルを表示",
+      "searchButton": "検索",
+      "download": "ダウンロード",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "未インストール",
+        "stopped": "停止",
+        "running": "動作中",
+        "foreign": "すでに動作中"
+      },
+      "origin": {
+        "missing": "未インストール",
+        "ours": "ここで入れた",
+        "folder": "選んだフォルダー",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "リスト",
+        "grid": "グリッド"
+      },
+      "sorts": {
+        "downloads": "人気",
+        "rating": "評価が高い",
+        "newest": "新しい"
+      },
+      "periods": {
+        "all": "全期間",
+        "year": "1年",
+        "month": "1か月",
+        "week": "1週間",
+        "day": "1日"
+      },
+      "notInFolder": "このフォルダにプログラムが見つかりません",
+      "log": "起動ログ",
+      "logEmpty": "ログは空です。起動すると記録されます。",
+      "logFile": "ファイルを表示",
+      "logCut": "ログの末尾だけを表示しています。全体はファイルにあります。",
+      "worksLocally": "ComfyUI なしで動く",
+      "file": "ファイル",
+      "downloaded": "ダウンロード済み",
+      "downloadedTo": "保存しました: {path}",
+      "saveTo": "保存先: {path}",
+      "showFile": "ファイルを表示"
+    },
+    "notSupportedYet": "まだ未対応"
   },
   "assistant": {
     "newChat": "新しいチャット",
@@ -942,6 +1110,7 @@
     "argsHint": "1 行に 1 つ。",
     "env": "環境変数",
     "envHint": "1 行に 1 つ: 名前=値。Windows 資格情報マネージャーに保存されます。",
+    "envHintMac": "1 行に 1 つ: 名前=値。macOS のキーチェーンに保存されます。",
     "urlHint": "Streamable HTTP トランスポートを使うサーバーのアドレス。",
     "defaultPermission": "ツール",
     "defaultPermissionHint": "個別のルールがないツールに適用されます。",
@@ -966,7 +1135,7 @@
     "aiModelFailed": "モデルが画像を処理できませんでした",
     "aiUnavailable": "モデルの実行環境を利用できません",
     "aiWorkerFailed": "モデルのプロセスがエラーで終了しました",
-    "aiWorkerMissing": "pixelit-worker.exe が見つかりません",
+    "aiWorkerMissing": "{file} が見つかりません",
     "assistantLoop": "アシスタントが連続して多くのステップを実行したため、停止しました",
     "autostartFailed": "自動起動の設定を変更できませんでした",
     "badArchive": "ダウンロードしたアーカイブが壊れています",
@@ -984,6 +1153,7 @@
     "cannotEncode": "この形式では保存できません",
     "captionUnsupported": "説明を書き込めるのは JPEG と PNG だけです",
     "captureFailed": "スクリーンショットを撮れませんでした",
+    "capturePermission": "PixelIt に画面収録の許可がありません。「システム設定」の「プライバシーとセキュリティ」→「画面収録」で許可し、PixelIt を再起動してください。",
     "chatBusy": "アシスタントがまだ応答中です",
     "chatMissing": "チャットが見つかりません",
     "checksumMismatch": "ダウンロードしたファイルが整合性チェックに合格しませんでした",
@@ -1003,7 +1173,7 @@
     "httpStatus": "サーバーがエラーを返しました",
     "internal": "内部エラー",
     "io": "ファイルを読み書きできませんでした",
-    "keyStoreFailed": "Windows 資格情報マネージャーを利用できません",
+    "keyStoreFailed": "システムのキー保管場所を利用できません",
     "localAddress": "このアドレスはこのコンピューターまたはローカルネットワークを指しており、エージェントには許可されていません: {url}",
     "mcpBadServer": "MCP サーバー「{name}」の設定が正しくありません",
     "mcpDisconnected": "MCP サーバーとの接続が切れました",
@@ -1041,13 +1211,44 @@
     "keyMissing": "サーバー {host} はアクセスキーを必要とします。下の欄にキーを入力して、もう一度お試しください。",
     "updatePortable": "ポータブル版は手動で更新します",
     "builtinStyle": "内蔵のスタイルは変更も削除もできません。",
-    "emptyName": "名前を入力してください。"
+    "emptyName": "名前を入力してください。",
+    "appAlreadyRunning": "プログラムはすでに動いていて、起動したのは PixelIt ではありません",
+    "appLaunchFailed": "プログラムを起動できませんでした",
+    "appMissing": "先にプログラムを選ぶかインストールしてください",
+    "appNotOurs": "PixelIt はこのプログラムを起動していないので、停止しません",
+    "noArchive": "このコンピューター向けの固定された {id} の書庫はありません",
+    "noModelFolder": "先にこの種類のモデル用フォルダーを追加してください",
+    "upscaleModelFailed": "拡大モデルを実行できませんでした: {model}",
+    "upscalerMissing": "拡大モデルが見つかりません: {model}",
+    "refineNeedsGenerator": "ディテールの追加には ComfyUI か Forge が必要です。どちらかを生成器に選んでください。",
+    "refineNoPrompt": "この画像にはプロンプトが保存されていないため、ディテールを足せません。",
+    "refineTooLarge": "ディテールを足すには画像が大きすぎます: 長辺 {side} px、上限は {limit} px です。",
+    "heicCodecMissingMac": "システムで HEIC を読み取れませんでした"
   },
   "native": {
     "tray": {
       "open": "PixelIt を開く",
       "capture": "スクリーンショット",
       "quit": "終了"
+    },
+    "menu": {
+      "about": "PixelIt について",
+      "services": "サービス",
+      "hide": "PixelIt を非表示",
+      "hideOthers": "ほかを非表示",
+      "showAll": "すべてを表示",
+      "quit": "PixelIt を終了",
+      "edit": "編集",
+      "undo": "取り消す",
+      "redo": "やり直す",
+      "cut": "カット",
+      "copy": "コピー",
+      "paste": "ペースト",
+      "selectAll": "すべてを選択",
+      "window": "ウインドウ",
+      "minimize": "しまう",
+      "zoom": "拡大/縮小",
+      "close": "ウインドウを閉じる"
     },
     "contextMenu": "PixelIt で開く",
     "notify": {

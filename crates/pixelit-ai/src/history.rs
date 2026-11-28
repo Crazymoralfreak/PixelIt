@@ -16,7 +16,7 @@ use pixelit_engine::store::{load_or_default, no_migration, save_json};
 use pixelit_engine::Paths;
 use serde::{Deserialize, Serialize};
 
-use crate::config::GenerationProvider;
+use crate::config::{GenerationProvider, Tuning};
 use crate::parameters::{self, Parameters};
 
 /// Version of `generated.json`.
@@ -31,6 +31,8 @@ pub enum GeneratedKind {
     Edit,
     Outpaint,
     Upscale,
+    /// The same size, with detail painted in by the generator.
+    Refine,
 }
 
 /// One file of a request.
@@ -70,6 +72,8 @@ pub struct Record {
     pub source: String,
     pub kind: GeneratedKind,
     pub pictures: Vec<Picture>,
+    /// The sampler, the schedule, the VAE and LoRA files that were applied.
+    pub tuning: Tuning,
 }
 
 impl Default for Record {
@@ -92,6 +96,7 @@ impl Default for Record {
             source: String::new(),
             kind: GeneratedKind::Create,
             pictures: Vec::new(),
+            tuning: Tuning::default(),
         }
     }
 }

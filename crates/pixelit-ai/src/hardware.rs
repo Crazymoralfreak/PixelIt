@@ -98,12 +98,42 @@ fn ram_mb() -> u64 {
     }
 }
 
-#[cfg(not(windows))]
+/// Memory and the shared GPU of Apple Silicon.
+#[cfg(target_os = "macos")]
+fn ram_mb() -> u64 {
+    use std::process::Command;
+    let Ok(output) = Command::new("sysctl").args(["-n", "hw.memsize"]).output() else {
+        return 0;
+    };
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<u64>()
+        .map_or(0, |bytes| bytes / (1024 * 1024))
+}
+
+#[cfg(target_os = "macos")]
+fn gpus() -> Vec<Gpu> {
+    // Apple Silicon: one GPU that shares the system memory. Intel Macs have no
+    // catalogue entry for a local generator that uses a discrete card here.
+    if cfg!(target_arch = "aarch64") {
+        let memory_mb = ram_mb();
+        vec![Gpu {
+            index: 0,
+            name: String::from("Apple Silicon"),
+            vendor: 0,
+            memory_mb,
+        }]
+    } else {
+        Vec::new()
+    }
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 fn gpus() -> Vec<Gpu> {
     Vec::new()
 }
 
-#[cfg(not(windows))]
+#[cfg(not(any(windows, target_os = "macos")))]
 fn ram_mb() -> u64 {
     0
 }
@@ -123,6 +153,14 @@ impl Hardware {
     }
 
     pub fn advice(&self) -> Advice {
+        if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            return Advice {
+                use_gpu: true,
+                gpu: 0,
+                generator: "sdcpp-metal",
+                slow_generation: self.ram_mb < GENERATION_VRAM_MB,
+            };
+        }
         match self.best_gpu() {
             Some(gpu) if gpu.memory_mb >= MODEL_VRAM_MB => Advice {
                 use_gpu: true,
@@ -176,6 +214,17 @@ mod tests {
 
     #[test]
     fn advice_follows_video_memory() {
+        if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+            let advice = Hardware {
+                ram_mb: 16 * 1024,
+                ..Hardware::default()
+            }
+            .advice();
+            assert_eq!(advice.generator, "sdcpp-metal");
+            assert!(advice.use_gpu);
+            return;
+        }
+
         let none = Hardware::default();
         assert_eq!(none.advice().generator, "sdcpp-cpu");
         assert!(!none.advice().use_gpu);

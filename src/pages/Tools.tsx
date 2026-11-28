@@ -11,6 +11,7 @@ import { PathField } from "../components/PathField";
 import { useT } from "../i18n";
 import { copyText } from "../lib/clipboard";
 import { fileName, folderOf, formatBytes, joinPath } from "../lib/format";
+import { isMac } from "../lib/platform";
 import { FORMAT_NAMES } from "../lib/pipeline";
 import type {
   AnimationSpec,
@@ -475,7 +476,9 @@ function DuplicatesTool() {
   const trash = async () => {
     const agreed = await confirm({
       title: t("viewer.trashTitle"),
-      text: t("viewer.trashText", { count: marked.length }),
+      text: isMac()
+        ? t("viewer.trashTextMac", { count: marked.length })
+        : t("viewer.trashText", { count: marked.length }),
       confirmLabel: t("common.delete"),
       danger: true,
     });

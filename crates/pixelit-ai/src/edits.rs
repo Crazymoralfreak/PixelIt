@@ -7,8 +7,48 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex, PoisonError};
 
-use pixelit_core::pipeline::{AiEdit, ResizeFilter};
+use pixelit_core::pipeline::{AiDetail, AiEdit, ResizeFilter};
 use pixelit_core::{ops, Image, Result};
+
+/// A step that asks the generator to draw a picture again.
+#[derive(Clone, Copy, Debug)]
+pub enum Redraw<'a> {
+    /// A change described in words.
+    Edit(&'a AiEdit),
+    /// Fine detail painted into a picture that keeps what it shows.
+    Detail(&'a AiDetail),
+}
+
+impl Redraw<'_> {
+    /// Everything of the step that decides what the generator draws: equal
+    /// text means an equal request.
+    fn text(self) -> String {
+        match self {
+            Self::Edit(spec) => format!(
+                "edit\n{}\n{}\n{}\n{}\n{}\n{}",
+                spec.prompt.trim(),
+                spec.strength,
+                spec.variant,
+                serde_json::to_string(&spec.strokes).unwrap_or_default(),
+                spec.provider,
+                spec.model,
+            ),
+            Self::Detail(spec) => format!(
+                "detail\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
+                spec.prompt.trim(),
+                spec.strength,
+                spec.variant,
+                serde_json::to_string(&spec.strokes).unwrap_or_default(),
+                spec.provider,
+                spec.model,
+                spec.negative.trim(),
+                spec.steps,
+                spec.cfg,
+                serde_json::to_string(&spec.tuning.tidy()).unwrap_or_default(),
+            ),
+        }
+    }
+}
 
 /// Results kept; older ones are dropped.
 const KEPT: usize = 4;
@@ -24,11 +64,10 @@ const SAME_PICTURE: f64 = 3.0;
 /// Largest relative difference of the shapes of two pictures.
 const SAME_SHAPE: f32 = 0.02;
 
-/// What tells one request to change a picture from another.
+/// What tells one request to draw a picture again from another.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Print {
-    /// The prompt, the strength, the attempt and the area: equal text means
-    /// an equal request.
+    /// What the step asks for: equal text means an equal request.
     request: String,
     /// Width over height.
     shape: f32,
@@ -37,19 +76,11 @@ pub struct Print {
 }
 
 impl Print {
-    pub fn of(image: &Image, spec: &AiEdit) -> Result<Self> {
+    pub fn of(image: &Image, step: Redraw<'_>) -> Result<Self> {
         let picture =
             ops::resize::resize_to(image, SIDE, SIDE, ResizeFilter::Box, false, None)?.to_rgb8();
         Ok(Self {
-            request: format!(
-                "{}\n{}\n{}\n{}\n{}\n{}",
-                spec.prompt.trim(),
-                spec.strength,
-                spec.variant,
-                serde_json::to_string(&spec.strokes).unwrap_or_default(),
-                spec.provider,
-                spec.model,
-            ),
+            request: step.text(),
             shape: image.width() as f32 / image.height().max(1) as f32,
             picture,
         })
@@ -111,35 +142,68 @@ mod tests {
         }
     }
 
+    fn print(image: &Image, spec: &AiEdit) -> Print {
+        Print::of(image, Redraw::Edit(spec)).unwrap()
+    }
+
+    fn detail_print(image: &Image, spec: &AiDetail) -> Print {
+        Print::of(image, Redraw::Detail(spec)).unwrap()
+    }
+
     #[test]
     fn the_full_file_matches_its_reduced_copy() {
         let full = Image::new(800, 400, Depth::Eight, Color::rgb(90, 120, 30)).unwrap();
         let reduced = Image::new(200, 100, Depth::Eight, Color::rgb(91, 119, 30)).unwrap();
         let spec = edit("make it night");
-        let shown = Print::of(&reduced, &spec).unwrap();
-        assert!(shown.matches(&Print::of(&full, &spec).unwrap()));
+        let shown = print(&reduced, &spec);
+        assert!(shown.matches(&print(&full, &spec)));
 
         let changed = Image::new(800, 400, Depth::Eight, Color::rgb(120, 120, 30)).unwrap();
-        assert!(!shown.matches(&Print::of(&changed, &spec).unwrap()));
+        assert!(!shown.matches(&print(&changed, &spec)));
         let square = Image::new(400, 400, Depth::Eight, Color::rgb(90, 120, 30)).unwrap();
-        assert!(!shown.matches(&Print::of(&square, &spec).unwrap()));
+        assert!(!shown.matches(&print(&square, &spec)));
     }
 
     #[test]
     fn another_request_is_another_print() {
         let image = Image::new(64, 64, Depth::Eight, Color::WHITE).unwrap();
-        let first = Print::of(&image, &edit("a hat")).unwrap();
-        assert!(!first.matches(&Print::of(&image, &edit("a scarf")).unwrap()));
+        let first = print(&image, &edit("a hat"));
+        assert!(!first.matches(&print(&image, &edit("a scarf"))));
         let mut again = edit("a hat");
         again.variant = 1;
-        assert!(!first.matches(&Print::of(&image, &again).unwrap()));
+        assert!(!first.matches(&print(&image, &again)));
         let mut area = edit("a hat");
         area.strokes.push(Stroke {
             points: vec![[0.1, 0.1], [0.2, 0.2]],
             width: 4.0,
         });
-        assert!(!first.matches(&Print::of(&image, &area).unwrap()));
-        assert!(first.matches(&Print::of(&image, &edit(" a hat ")).unwrap()));
+        assert!(!first.matches(&print(&image, &area)));
+        assert!(first.matches(&print(&image, &edit(" a hat "))));
+    }
+
+    #[test]
+    fn a_detail_pass_is_told_from_an_edit_and_by_its_settings() {
+        let image = Image::new(64, 64, Depth::Eight, Color::WHITE).unwrap();
+        // The same words and the same strength as the edit.
+        let detail = AiDetail {
+            prompt: String::from("a hat"),
+            strength: AiEdit::default().strength,
+            ..AiDetail::default()
+        };
+        let first = detail_print(&image, &detail);
+        assert!(first.matches(&detail_print(&image, &detail)));
+        assert!(!first.matches(&print(&image, &edit("a hat"))));
+
+        // What the generator is set to is part of the request as well.
+        let mut tuned = detail.clone();
+        tuned.tuning.sampler = String::from("dpmpp_2m");
+        assert!(!first.matches(&detail_print(&image, &tuned)));
+        let mut avoided = detail.clone();
+        avoided.negative = String::from("blur");
+        assert!(!first.matches(&detail_print(&image, &avoided)));
+        let mut longer = detail;
+        longer.steps = 40;
+        assert!(!first.matches(&detail_print(&image, &longer)));
     }
 
     #[test]
@@ -147,12 +211,14 @@ mod tests {
         let edits = Edits::default();
         let image = Image::new(8, 8, Depth::Eight, Color::WHITE).unwrap();
         for index in 0..=KEPT {
-            let print = Print::of(&image, &edit(&format!("prompt {index}"))).unwrap();
-            edits.remember(print, image.clone());
+            edits.remember(
+                print(&image, &edit(&format!("prompt {index}"))),
+                image.clone(),
+            );
         }
-        let oldest = Print::of(&image, &edit("prompt 0")).unwrap();
+        let oldest = print(&image, &edit("prompt 0"));
         assert!(edits.find(&oldest).is_none());
-        let latest = Print::of(&image, &edit(&format!("prompt {KEPT}"))).unwrap();
+        let latest = print(&image, &edit(&format!("prompt {KEPT}")));
         assert!(edits.find(&latest).is_some());
     }
 }

@@ -7,6 +7,7 @@ import { OutputEditor } from "../components/OutputEditor";
 import { PathField } from "../components/PathField";
 import { useT } from "../i18n";
 import { formatBytes } from "../lib/format";
+import { isMac, keyLabel } from "../lib/platform";
 import { LANGUAGES, type Settings } from "../types";
 import { Button, Checkbox, Field, NumberInput, PageFrame, Progress, Section, Segmented, Select, Tag } from "../ui";
 
@@ -14,9 +15,9 @@ const MODIFIER_CODES = /^(Control|Shift|Alt|Meta)(Left|Right)$/;
 /** Keys that may be a global shortcut without a modifier. */
 const ALONE = /^(F\d{1,2}|PrintScreen)$/;
 
-/** `Ctrl+Shift+KeyS` as people read it: `Ctrl+Shift+S`. */
+/** `Ctrl+Shift+KeyS` as people read it: `Ctrl+Shift+S`, and `⌃⇧S` on a Mac. */
 function hotkeyLabel(hotkey: string): string {
-  return hotkey.replace(/\b(Key|Digit)(?=\w$)/, "");
+  return keyLabel(hotkey.replace(/\b(Key|Digit)(?=\w$)/, ""));
 }
 
 function HotkeyField({ value, onChange }: { value: string; onChange: (hotkey: string) => void }) {
@@ -191,29 +192,32 @@ export default function SettingsPage() {
         <OutputEditor value={settings.output} onChange={(output) => set({ output })} />
       </Section>
 
-      <Section title={t("settings.system")} collapsible defaultOpen={false}>
+      <Section title={isMac() ? "macOS" : t("settings.system")} collapsible defaultOpen={false}>
         <Field label="">
           <div className="stack">
             <Checkbox
               checked={settings.closeToTray}
               onChange={(closeToTray) => set({ closeToTray })}
-              label={t("settings.closeToTray")}
+              label={isMac() ? t("settings.closeToTrayMac") : t("settings.closeToTray")}
             />
             <Checkbox
               checked={settings.autostart}
               onChange={(autostart) => set({ autostart })}
-              label={t("settings.autostart")}
+              label={isMac() ? t("settings.autostartMac") : t("settings.autostart")}
             />
             <Checkbox
               checked={settings.startMinimized}
               onChange={(startMinimized) => set({ startMinimized })}
               label={t("settings.startMinimized")}
             />
-            <Checkbox
-              checked={settings.contextMenu}
-              onChange={(contextMenu) => set({ contextMenu })}
-              label={t("settings.contextMenu")}
-            />
+            {/* The menu of Explorer exists in Windows only; on a Mac files open through their associations. */}
+            {info.platform === "windows" ? (
+              <Checkbox
+                checked={settings.contextMenu}
+                onChange={(contextMenu) => set({ contextMenu })}
+                label={t("settings.contextMenu")}
+              />
+            ) : null}
           </div>
         </Field>
         <Field label={t("settings.captureHotkey")} hint={t("settings.captureHotkeyHint")}>
@@ -252,7 +256,13 @@ export default function SettingsPage() {
         </Field>
         <Field
           label={t("settings.version", { version: info.version })}
-          hint={update.portable ? t("settings.updatePortable") : t("settings.updateAsk")}
+          hint={
+            !update.portable
+              ? t("settings.updateAsk")
+              : isMac()
+                ? t("settings.updatePortableMac")
+                : t("settings.updatePortable")
+          }
         >
           <span>
             {installFailed

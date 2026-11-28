@@ -8,6 +8,7 @@ import { JobRow } from "../components/JobsPanel";
 import { PathField } from "../components/PathField";
 import { useT } from "../i18n";
 import { formatBytes } from "../lib/format";
+import { isMac } from "../lib/platform";
 import type {
   AiSettings,
   AiStatus,
@@ -33,6 +34,7 @@ import {
   Tag,
   TextInput,
 } from "../ui";
+import { AppsTab } from "./ai/Apps";
 import { McpTab } from "./ai/Mcp";
 
 const KINDS: readonly ComponentKind[] = [
@@ -56,7 +58,49 @@ const SERVER_NAMES: Record<FoundServer["kind"], string> = {
   llamaCpp: "llama.cpp",
   comfy: "ComfyUI",
   forge: "Forge / A1111",
+  fooocus: "Fooocus",
 };
+
+function ServerAction({
+  server,
+  onGeneration,
+  onAssign,
+}: {
+  server: FoundServer;
+  onGeneration: (patch: Partial<Generation>) => void;
+  onAssign: (server: FoundServer, role: "vision" | "assistant") => void;
+}) {
+  const { t } = useT();
+  switch (server.kind) {
+    case "comfy":
+      return (
+        <Button small onClick={() => onGeneration({ provider: "comfy", comfyUrl: server.url })}>
+          {t("ai.useForGeneration")}
+        </Button>
+      );
+    case "forge":
+      return (
+        <Button small onClick={() => onGeneration({ provider: "forge", forgeUrl: server.url })}>
+          {t("ai.useForGeneration")}
+        </Button>
+      );
+    case "fooocus":
+      return <Tag tone="warning">{t("ai.notSupportedYet")}</Tag>;
+    case "ollama":
+    case "lmStudio":
+    case "llamaCpp":
+      return (
+        <>
+          <Button small onClick={() => onAssign(server, "vision")}>{t("ai.useForVision")}</Button>
+          <Button small onClick={() => onAssign(server, "assistant")}>{t("ai.useForAssistant")}</Button>
+        </>
+      );
+    default: {
+      const unreachable: never = server.kind;
+      return unreachable;
+    }
+  }
+}
 
 function hostOf(url: string): string {
   try {
@@ -151,7 +195,10 @@ function KeyField({ serverKey }: { serverKey: ServerKey }) {
     return null;
   }
   return (
-    <Field label={t("ai.key")} hint={t("ai.keyHint", { host })}>
+    <Field
+      label={t("ai.key")}
+      hint={isMac() ? t("ai.keyHintMac", { host }) : t("ai.keyHint", { host })}
+    >
       {stored ? (
         <>
           <Tag tone="ok">{t("ai.keyStored")}</Tag>
@@ -549,27 +596,11 @@ function ProvidersTab({
             <div className="component-main">
               <div className="component-name">{SERVER_NAMES[server.kind]}</div>
               <div className="component-facts">
-                {server.url} · {t("ai.modelsCount", { count: server.models.length })}
+                {server.url}
+                {server.kind === "fooocus" ? null : ` · ${t("ai.modelsCount", { count: server.models.length })}`}
               </div>
             </div>
-            {server.kind === "comfy" ? (
-              <Button small onClick={() => setGeneration({ provider: "comfy", comfyUrl: server.url })}>
-                {t("ai.useForGeneration")}
-              </Button>
-            ) : server.kind === "forge" ? (
-              <Button small onClick={() => setGeneration({ provider: "forge", forgeUrl: server.url })}>
-                {t("ai.useForGeneration")}
-              </Button>
-            ) : (
-              <>
-                <Button small onClick={() => assignServer(server, "vision")}>
-                  {t("ai.useForVision")}
-                </Button>
-                <Button small onClick={() => assignServer(server, "assistant")}>
-                  {t("ai.useForAssistant")}
-                </Button>
-              </>
-            )}
+            <ServerAction server={server} onGeneration={setGeneration} onAssign={assignServer} />
           </div>
         ))}
       </Section>
@@ -711,7 +742,7 @@ function ProvidersTab({
 export default function AiPage({ active }: { active: boolean }) {
   const { t } = useT();
   const { ai, refreshAi, showError } = useApp();
-  const [tab, setTab] = useState<"components" | "providers" | "mcp">("components");
+  const [tab, setTab] = useState<"components" | "apps" | "providers" | "mcp">("components");
 
   useEffect(() => {
     if (active) {
@@ -736,6 +767,7 @@ export default function AiPage({ active }: { active: boolean }) {
         value={tab}
         options={[
           { value: "components", label: t("ai.tabComponents") },
+          { value: "apps", label: t("ai.tabApps") },
           { value: "providers", label: t("ai.tabProviders") },
           { value: "mcp", label: "MCP" },
         ]}
@@ -745,6 +777,9 @@ export default function AiPage({ active }: { active: boolean }) {
         <>
           <div className="column" hidden={tab !== "components"}>
             <ComponentsTab ai={ai} onSettings={saveSettings} />
+          </div>
+          <div className="column" hidden={tab !== "apps"}>
+            <AppsTab ai={ai} onSettings={saveSettings} />
           </div>
           <div className="column" hidden={tab !== "providers"}>
             <ProvidersTab ai={ai} onSettings={saveSettings} />

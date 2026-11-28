@@ -8,6 +8,7 @@
     "clear": "Vaciar",
     "remove": "Quitar",
     "reveal": "Mostrar en el Explorador",
+    "revealMac": "Mostrar en el Finder",
     "delete": "Eliminar",
     "yes": "Sí",
     "no": "No",
@@ -52,7 +53,9 @@
       "vision": "Reconocimiento",
       "cli": "Línea de comandos",
       "agent": "Asistente",
-      "edit": "Editor"
+      "edit": "Editor",
+      "upscale": "Ampliación",
+      "refine": "Añadir detalle"
     },
     "state": {
       "queued": "En cola",
@@ -80,7 +83,7 @@
       "failed": "No se pudieron comprobar las actualizaciones"
     },
     "askTitle": "La versión {version} está disponible",
-    "askText": "Ahora está instalada la versión {current}. ¿Actualizar PixelIt a la versión {version}? El instalador se descarga y se verifica, las tareas en curso terminan y después la aplicación se reinicia.",
+    "askText": "Ahora está instalada la versión {current}. ¿Actualizar PixelIt a la versión {version}? La actualización se descarga y se verifica, las tareas en curso terminan y después la aplicación se reinicia.",
     "skip": "Omitir esta versión",
     "later": "Más tarde",
     "install": "Actualizar",
@@ -103,7 +106,7 @@
     "paste": "Pegar",
     "capture": "Captura de pantalla",
     "emptyTitle": "Abra una carpeta o arrastre imágenes aquí",
-    "emptyText": "Se admiten JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD y otros formatos. Ctrl+V pega una imagen del portapapeles.",
+    "emptyText": "Se admiten JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD y otros formatos. {keys} pega una imagen del portapapeles.",
     "recent": "Carpetas recientes",
     "up": "Subir",
     "looseFiles": "Archivos abiertos: {count}",
@@ -118,7 +121,7 @@
     "edit": "Editar",
     "pasteHint": "No hay ninguna imagen en el portapapeles",
     "trashTitle": "¿Mover a la papelera?",
-    "trashText": "Archivos: {count}. Podrá restaurarlos desde la Papelera de reciclaje de Windows.",
+    "trashText": "Archivos: {count}. Podrá restaurarlos desde la Papelera de reciclaje.",
     "addedToBatch": "Añadidas al lote: {count}",
     "sort": {
       "name": "Por nombre",
@@ -140,7 +143,8 @@
       "alpha": "Transparencia",
       "metadata": "Metadatos",
       "frames": "Fotogramas"
-    }
+    },
+    "trashTextMac": "Archivos: {count}. Podra recuperarlos de la Papelera."
   },
   "output": {
     "format": "Formato",
@@ -231,7 +235,8 @@
     "upscale": "Ampliar",
     "restoreFaces": "Restaurar rostros",
     "inpaint": "Quitar objetos",
-    "aiEdit": "Edición con IA"
+    "aiEdit": "Edición con IA",
+    "aiDetail": "Detalle con IA"
   },
   "op": {
     "mode": "Modo",
@@ -346,7 +351,17 @@
     "editStrength": "Intensidad del cambio",
     "editStrengthHint": "Cuanto mayor es el valor, más se aleja el resultado de la imagen original.",
     "generatorMissing": "Este paso necesita un generador de imágenes.",
-    "editModelDefault": "Predeterminado"
+    "editModelDefault": "Predeterminado",
+    "detailAbout": "El generador repasa la imagen y añade detalle fino; lo que muestra se conserva. Al guardar, el archivo se pinta a su tamaño completo.",
+    "detailAreaHint": "Pinte la zona que necesita detalle. Sin marca se repasa toda la imagen.",
+    "detailPrompt": "Qué muestra la imagen",
+    "detailPromptHint": "Describa la imagen tal como es: con este texto el generador pinta el detalle. Un campo vacío envía «{prompt}».",
+    "promptFromFile": "Tomar la solicitud del archivo",
+    "promptFromFileHint": "La solicitud con la que se generó la imagen, si el archivo la conserva.",
+    "promptFromFileNone": "El archivo no conserva ninguna solicitud.",
+    "detailStrengthHint": "Cuánto puede alejarse el generador de la imagen. Para el detalle suele bastar entre 25 y 45.",
+    "asInStudio": "Como en el estudio",
+    "asInStudioHint": "Los pasos, la fidelidad a la solicitud, el sampler, el VAE, los LoRA y los embeddings que el estudio recuerda para este modelo."
   },
   "steps": {
     "empty": "Aún no hay pasos",
@@ -602,7 +617,9 @@
     "defaultOutput": "Guardado predeterminado",
     "system": "Windows",
     "closeToTray": "Minimizar al área de notificación al cerrar",
+    "closeToTrayMac": "Seguir en la barra de menús al cerrar la ventana",
     "autostart": "Iniciar con Windows",
+    "autostartMac": "Abrir al iniciar sesión",
     "startMinimized": "Iniciar minimizado",
     "contextMenu": "Elemento PixelIt en el menú contextual del Explorador",
     "captureHotkey": "Captura de pantalla",
@@ -617,6 +634,7 @@
     "channelBeta": "Beta",
     "version": "Versión {version}",
     "updatePortable": "La versión portátil se actualiza a mano: descargue el archivo nuevo desde la página de versiones.",
+    "updatePortableMac": "Esta copia se actualiza a mano. Mueva PixelIt a la carpeta Aplicaciones para que se actualice solo.",
     "checkNow": "Comprobar ahora",
     "data": "Datos",
     "dataFolder": "Carpeta de datos",
@@ -727,7 +745,8 @@
       "create": "Creación",
       "edit": "Cambio",
       "outpaint": "Ampliación",
-      "upscale": "Ampliado"
+      "upscale": "Ampliado",
+      "refine": "Detalle"
     },
     "builtin": {
       "photo": "Fotografía",
@@ -740,7 +759,66 @@
       "sketch": "Boceto a lápiz",
       "oil": "Óleo",
       "portrait": "Retrato"
-    }
+    },
+    "enlarge": "Ampliar",
+    "enlargeOff": "No",
+    "enlargeHint": "Cada imagen se amplía con el modelo elegido justo después de generarse.",
+    "upscaleInstallTitle": "¿Instalar el modelo de ampliación?",
+    "upscaleInstallText": "Para ampliar hace falta el modelo local {name} ({size}). ¿Descargarlo e instalarlo?",
+    "upscaleInstall": "Instalar",
+    "upscaleInstalling": "El modelo de ampliación se está descargando. La imagen se ampliará justo después.",
+    "upscaler": "Modelo de ampliación",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "necesita ComfyUI o Forge en ejecución",
+    "upscalerMissing": "Este modelo no está disponible ahora. Actualice la lista cuando el programa esté en marcha.",
+    "upscaleMode": "Detalle",
+    "upscaleFast": "Rápido",
+    "upscaleRefine": "Con detalle",
+    "upscaleRefineHint": "El generador vuelve a pintar la imagen ampliada para recuperar el detalle fino. Tarda aproximadamente lo mismo que generarla.",
+    "upscaleFastHint": "Solo actúa el modelo de ampliación. Más rápido y sin detalle nuevo.",
+    "upscaleStrength": "Fuerza del detalle",
+    "upscaleStrengthHint": "Cuánto puede alejarse el generador de la imagen ampliada. Un valor bajo se queda más cerca.",
+    "upscaleOptions": "Ajustes de ampliación",
+    "noticeNeedsGenerator": "El detalle necesita ComfyUI o Forge. La imagen solo se amplió.",
+    "noticeNoPrompt": "Esta imagen no tiene un prompt guardado, así que solo se amplió.",
+    "noticeRefineFailed": "El generador no respondió, así que la imagen solo se amplió.",
+    "tuning": "Sampler, VAE, LoRA y embeddings",
+    "tuningSilent": "El generador no responde, por eso las listas están vacías. Inícielo y pulse «Actualizar».",
+    "tuningUsual": "El del generador",
+    "tuningUsualNamed": "Habitual ({name})",
+    "tuningReset": "Restablecer",
+    "sampler": "Sampler",
+    "samplerHint": "Del sampler y del planificador dependen la nitidez y el detalle fino. Son habituales Euler a o DPM++ 2M con el planificador Karras.",
+    "scheduler": "Planificador",
+    "vae": "VAE",
+    "vaeHint": "Hace falta un VAE aparte cuando el modelo no lo incluye: la imagen sale entonces apagada o borrosa.",
+    "vaeOfModel": "El del modelo",
+    "lora": "LoRA",
+    "loraHint": "El número es la fuerza de la LoRA. Normalmente entre 0,6 y 1.",
+    "loraAdd": "Añadir…",
+    "loraNone": "No hay archivos LoRA",
+    "refine": "Añadir detalle",
+    "refineHint": "El generador repasa la imagen una vez más y pinta el detalle fino. El tamaño no cambia.",
+    "service": {
+      "ready": "en marcha",
+      "starting": "iniciando…",
+      "stopped": "detenido",
+      "missing": "no responde"
+    },
+    "historyView": {
+      "groups": "Por prompt",
+      "grid": "Cuadrícula",
+      "list": "Lista"
+    },
+    "before": "Antes",
+    "after": "Después",
+    "zoomHint": "La rueda del ratón amplía, arrastrar mueve la imagen y un doble clic la vuelve a ajustar.",
+    "negativeLine": "Qué evitar: {text}",
+    "embedding": "Embeddings",
+    "embeddingHint": "Un embedding actúa como una palabra de la solicitud. Los elegidos se añaden solos a la solicitud o a lo que hay que evitar.",
+    "embeddingPrompt": "A la solicitud",
+    "embeddingNegative": "A lo que evitar",
+    "embeddingNone": "No hay archivos de embeddings"
   },
   "vision": {
     "noModelTitle": "No se ha elegido un modelo",
@@ -791,7 +869,7 @@
     "nothingTitle": "No se encontró nada",
     "nothingText": "Pruebe otra búsqueda u otra fuente.",
     "emptyTitle": "Imágenes de la web",
-    "emptyText": "Pegue un enlace o escriba una búsqueda: las imágenes encontradas aparecerán aquí. El enlace se puede pegar con Ctrl+V desde cualquier parte del programa.",
+    "emptyText": "Pegue un enlace o escriba una búsqueda: las imágenes encontradas aparecerán aquí. El enlace se puede pegar con {keys} desde cualquier parte del programa.",
     "downloaded": "Descargadas"
   },
   "ai": {
@@ -820,7 +898,7 @@
     "allowCloud": "Permitir servicios externos",
     "confirmCloud": "Preguntar antes de cada envío",
     "localServers": "Servidores locales",
-    "localServersText": "Busca Ollama, LM Studio, ComfyUI y Forge en ejecución en este equipo.",
+    "localServersText": "Busca Ollama, LM Studio, ComfyUI, Forge y Fooocus en ejecución en este equipo.",
     "discover": "Buscar",
     "noneFound": "No se encontraron servidores en ejecución",
     "modelsCount": "Modelos: {count}",
@@ -837,6 +915,7 @@
     "urlHint": "Por ejemplo: http://127.0.0.1:11434/v1",
     "key": "Clave",
     "keyHint": "Se guarda en el Administrador de credenciales de Windows para {host}.",
+    "keyHintMac": "Se guarda en el Llavero de macOS para {host}.",
     "keyStored": "Hay una clave guardada",
     "keySaved": "La clave se ha guardado",
     "listModels": "Lista de modelos",
@@ -888,7 +967,96 @@
     "allowCloudText": "El servidor {host} está fuera de este equipo y los servicios externos están desactivados. ¿Permitir el acceso a ellos? Los ajustes de esta página se guardarán.",
     "allowCloudYes": "Permitir",
     "forgeCheckpoint": "Modelo",
-    "forgeCheckpointHint": "El nombre tal como lo muestra Forge. Vacío deja el modelo ya cargado."
+    "forgeCheckpointHint": "El nombre tal como lo muestra Forge. Vacío deja el modelo ya cargado.",
+    "tabApps": "Aplicaciones",
+    "apps": {
+      "title": "Aplicaciones",
+      "text": "Instala ComfyUI o Forge, los arranca y los detiene, y guarda carpetas de modelos comunes.",
+      "install": "Instalar",
+      "useStability": "Usar Stability Matrix",
+      "fillModels": "Carpetas de Stability Matrix",
+      "start": "Iniciar",
+      "stop": "Detener",
+      "open": "Abrir",
+      "checkUpdates": "Buscar actualizaciones",
+      "update": "Actualizar",
+      "noHome": "Aún no hay carpeta",
+      "nvidia": "compilación NVIDIA",
+      "foreignUpdate": "Esta copia la actualiza quien la instaló.",
+      "updateReady": "La versión {version} está disponible.",
+      "models": "Carpetas de modelos",
+      "modelsText": "ComfyUI recibe todas las carpetas. Forge recibe una carpeta de cada tipo.",
+      "search": "Buscar modelos",
+      "searchText": "Los mismos catálogos que busca Stability Matrix. El archivo se descarga solo si lo pides, en la primera carpeta de su tipo.",
+      "source": "Catálogo",
+      "query": "Búsqueda",
+      "modelKind": "Tipo",
+      "sort": "Orden",
+      "period": "Periodo",
+      "baseModel": "Modelo base",
+      "hideInstalled": "Ocultar instalados",
+      "showNsfw": "Mostrar modelos para adultos",
+      "searchButton": "Buscar",
+      "download": "Descargar",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "No instalado",
+        "stopped": "Detenido",
+        "running": "En marcha",
+        "foreign": "Ya en marcha"
+      },
+      "origin": {
+        "missing": "No instalado",
+        "ours": "Instalado aquí",
+        "folder": "Carpeta elegida",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "Lista",
+        "grid": "Cuadrícula"
+      },
+      "sorts": {
+        "downloads": "Populares",
+        "rating": "Mejor valorados",
+        "newest": "Nuevos"
+      },
+      "periods": {
+        "all": "Todo el tiempo",
+        "year": "Ultimo ano",
+        "month": "Ultimo mes",
+        "week": "Ultima semana",
+        "day": "Ultimo dia"
+      },
+      "notInFolder": "No se encontró el programa en esta carpeta",
+      "log": "Registro de inicio",
+      "logEmpty": "El registro está vacío. Se llena después de un inicio.",
+      "logFile": "Mostrar archivo",
+      "logCut": "Solo se muestra el final del registro. El archivo lo contiene todo.",
+      "worksLocally": "Funciona sin ComfyUI",
+      "file": "Archivo",
+      "downloaded": "Descargado",
+      "downloadedTo": "Guardado en {path}",
+      "saveTo": "Se guarda en {path}",
+      "showFile": "Mostrar archivo"
+    },
+    "notSupportedYet": "Aún no compatible"
   },
   "assistant": {
     "newChat": "Nuevo chat",
@@ -942,6 +1110,7 @@
     "argsHint": "Uno por línea.",
     "env": "Variables de entorno",
     "envHint": "Una por línea: NOMBRE=valor. Se guardan en el Administrador de credenciales de Windows.",
+    "envHintMac": "Una por línea: NOMBRE=valor. Se guardan en el Llavero de macOS.",
     "urlHint": "Dirección de un servidor con el transporte Streamable HTTP.",
     "defaultPermission": "Herramientas",
     "defaultPermissionHint": "Se aplica a las herramientas sin una regla propia.",
@@ -966,7 +1135,7 @@
     "aiModelFailed": "El modelo no pudo procesar la imagen",
     "aiUnavailable": "El entorno de ejecución de los modelos no está disponible",
     "aiWorkerFailed": "El proceso de los modelos terminó con un error",
-    "aiWorkerMissing": "No se encontró el archivo pixelit-worker.exe",
+    "aiWorkerMissing": "No se encontró el archivo {file}",
     "assistantLoop": "El asistente dio demasiados pasos seguidos y fue detenido",
     "autostartFailed": "No se pudo cambiar el inicio automático",
     "badArchive": "El archivo descargado está dañado",
@@ -984,6 +1153,7 @@
     "cannotEncode": "Este formato no se puede guardar",
     "captionUnsupported": "La descripción solo se puede escribir en JPEG y PNG",
     "captureFailed": "No se pudo hacer la captura de pantalla",
+    "capturePermission": "PixelIt no tiene permiso para grabar la pantalla. Permítalo en Ajustes del Sistema: «Privacidad y seguridad» → «Grabación de pantalla», y reinicie PixelIt.",
     "chatBusy": "El asistente todavía está respondiendo",
     "chatMissing": "No se encontró el chat",
     "checksumMismatch": "El archivo descargado no superó la comprobación de integridad",
@@ -1003,7 +1173,7 @@
     "httpStatus": "El servidor respondió con un error",
     "internal": "Error interno",
     "io": "No se pudo leer o escribir el archivo",
-    "keyStoreFailed": "El Administrador de credenciales de Windows no está disponible",
+    "keyStoreFailed": "El almacén de claves del sistema no está disponible",
     "localAddress": "La dirección lleva a este equipo o a la red local y está cerrada para los agentes: {url}",
     "mcpBadServer": "El servidor MCP «{name}» está mal configurado",
     "mcpDisconnected": "Se perdió la conexión con el servidor MCP",
@@ -1041,13 +1211,44 @@
     "keyMissing": "El servidor {host} pide una clave de acceso. Introduzca la clave en el campo de abajo y vuelva a intentarlo.",
     "updatePortable": "La versión portátil se actualiza a mano",
     "builtinStyle": "Un estilo incluido no se puede cambiar ni eliminar.",
-    "emptyName": "Escriba un nombre."
+    "emptyName": "Escriba un nombre.",
+    "appAlreadyRunning": "El programa ya está en marcha y no lo inició PixelIt",
+    "appLaunchFailed": "No se pudo iniciar el programa",
+    "appMissing": "Primero elige o instala el programa",
+    "appNotOurs": "PixelIt no inició este programa y no lo detendrá",
+    "noArchive": "No hay un archivo fijado de {id} para este equipo",
+    "noModelFolder": "Primero añade una carpeta para este tipo de modelo",
+    "upscaleModelFailed": "El modelo de ampliación no pudo ejecutarse: {model}",
+    "upscalerMissing": "No se encontró el modelo de ampliación: {model}",
+    "refineNeedsGenerator": "El detalle se añade con ComfyUI o Forge. Elija uno de ellos como generador.",
+    "refineNoPrompt": "Esta imagen no tiene un prompt guardado, así que no se le puede añadir detalle.",
+    "refineTooLarge": "La imagen es demasiado grande para añadir detalle: {side} px en el lado largo; se admiten hasta {limit} px.",
+    "heicCodecMissingMac": "El sistema no pudo leer el HEIC"
   },
   "native": {
     "tray": {
       "open": "Abrir PixelIt",
       "capture": "Captura de pantalla",
       "quit": "Salir"
+    },
+    "menu": {
+      "about": "Acerca de PixelIt",
+      "services": "Servicios",
+      "hide": "Ocultar PixelIt",
+      "hideOthers": "Ocultar otros",
+      "showAll": "Mostrar todo",
+      "quit": "Salir de PixelIt",
+      "edit": "Edición",
+      "undo": "Deshacer",
+      "redo": "Rehacer",
+      "cut": "Cortar",
+      "copy": "Copiar",
+      "paste": "Pegar",
+      "selectAll": "Seleccionar todo",
+      "window": "Ventana",
+      "minimize": "Minimizar",
+      "zoom": "Zoom",
+      "close": "Cerrar ventana"
     },
     "contextMenu": "Abrir en PixelIt",
     "notify": {

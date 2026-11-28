@@ -18,6 +18,7 @@ import { useT } from "../i18n";
 import { blobToBase64, readClipboardPicture } from "../lib/clipboard";
 import { folderOf, formatBytes, formatTime } from "../lib/format";
 import { FORMAT_NAMES } from "../lib/pipeline";
+import { hasMod, isMac, isTrashKey, keyLabel } from "../lib/platform";
 import type { FileEntry, FileInfo } from "../types";
 import { Button, cx, EmptyState, PageFrame, Select, TextInput } from "../ui";
 
@@ -85,7 +86,7 @@ function Lightbox({ files, index, onIndex, onClose, onEdit, onTrash }: LightboxP
         onIndex(index - 1);
       } else if (event.key === "Enter") {
         onEdit(file);
-      } else if (event.key === "Delete") {
+      } else if (isTrashKey(event)) {
         onTrash(file);
       }
     };
@@ -106,7 +107,7 @@ function Lightbox({ files, index, onIndex, onClose, onEdit, onTrash }: LightboxP
           {t("viewer.edit")}
         </Button>
         <Button small onClick={() => api.revealPath(file.path).catch(() => undefined)}>
-          {t("common.reveal")}
+          {isMac() ? t("common.revealMac") : t("common.reveal")}
         </Button>
         <Button small onClick={() => onTrash(file)}>
           {t("common.delete")}
@@ -340,7 +341,9 @@ export default function ViewerPage({ active }: { active: boolean }) {
       if (settings.confirmDelete) {
         const agreed = await confirm({
           title: t("viewer.trashTitle"),
-          text: t("viewer.trashText", { count: paths.length }),
+          text: isMac()
+            ? t("viewer.trashTextMac", { count: paths.length })
+            : t("viewer.trashText", { count: paths.length }),
           confirmLabel: t("common.delete"),
           danger: true,
         });
@@ -369,7 +372,7 @@ export default function ViewerPage({ active }: { active: boolean }) {
         return;
       }
     }
-    if (event.ctrlKey) {
+    if (hasMod(event)) {
       setSelected((current) =>
         current.includes(file.path) ? current.filter((path) => path !== file.path) : [...current, file.path],
       );
@@ -407,12 +410,12 @@ export default function ViewerPage({ active }: { active: boolean }) {
         return;
       }
       const index = focus ? shown.findIndex((file) => file.path === focus) : -1;
-      if (event.ctrlKey && event.code === "KeyA") {
+      if (hasMod(event) && event.code === "KeyA") {
         event.preventDefault();
         setSelected(shown.map((file) => file.path));
       } else if (event.key === "Enter" && index >= 0) {
         setLightbox(index);
-      } else if (event.key === "Delete") {
+      } else if (isTrashKey(event)) {
         void trash(selected);
       } else if ((event.key === "ArrowRight" || event.key === "ArrowLeft") && shown.length > 0) {
         const next = Math.min(shown.length - 1, Math.max(0, index + (event.key === "ArrowRight" ? 1 : -1)));
@@ -448,7 +451,7 @@ export default function ViewerPage({ active }: { active: boolean }) {
         <>
           <EmptyState
             title={t("viewer.emptyTitle")}
-            text={t("viewer.emptyText")}
+            text={t("viewer.emptyText", { keys: keyLabel("Mod+V") })}
             action={
               <Button variant="primary" onClick={() => void chooseFolder()}>
                 {t("viewer.openFolder")}
@@ -501,7 +504,7 @@ export default function ViewerPage({ active }: { active: boolean }) {
                   {t("viewer.toBatch")}
                 </Button>
                 <Button small onClick={() => api.revealPath(selected[0]).catch(showError)}>
-                  {t("common.reveal")}
+                  {isMac() ? t("common.revealMac") : t("common.reveal")}
                 </Button>
                 <Button small onClick={() => void trash(selected)}>
                   {t("common.delete")}

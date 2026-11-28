@@ -18,8 +18,15 @@ import {
   type WritableFormat,
 } from "../types";
 import { newId } from "./format";
+import { NO_TUNING } from "./generation";
 
 export const PIPELINE_VERSION = 1;
+
+/** How far an "AI edit" may move from the picture, from 0 to 100. */
+export const EDIT_STRENGTH = 75;
+
+/** The same for an "AI detail" step: enough for new detail, too little to change what the picture shows. */
+export const DETAIL_STRENGTH = 35;
 
 /** Steps in the order the "add step" menu offers them. */
 export const OP_KINDS: readonly OpKind[] = [
@@ -36,12 +43,17 @@ export const OP_KINDS: readonly OpKind[] = [
   "restoreFaces",
   "inpaint",
   "aiEdit",
+  "aiDetail",
 ];
 
-export const AI_KINDS: readonly OpKind[] = ["removeBackground", "upscale", "restoreFaces", "inpaint", "aiEdit"];
+export const AI_KINDS: readonly OpKind[] = ["removeBackground", "upscale", "restoreFaces", "inpaint", "aiEdit", "aiDetail"];
 
 /** Whether a step asks the image generator of the settings, which may be an outside service. */
 export function usesGenerator(op: Op): boolean {
+  // A detail step with nothing written still asks: it sends a short description of its own.
+  if (op.type === "aiDetail") {
+    return true;
+  }
   return (op.type === "inpaint" || op.type === "aiEdit") && op.prompt.trim() !== "";
 }
 
@@ -118,7 +130,21 @@ export function defaultOp(kind: OpKind): Op {
     case "inpaint":
       return { type: "inpaint", model: "", strokes: [], prompt: "" };
     case "aiEdit":
-      return { type: "aiEdit", prompt: "", strokes: [], strength: 75, variant: 0, provider: "", model: "" };
+      return { type: "aiEdit", prompt: "", strokes: [], strength: EDIT_STRENGTH, variant: 0, provider: "", model: "" };
+    case "aiDetail":
+      return {
+        type: "aiDetail",
+        prompt: "",
+        strokes: [],
+        strength: DETAIL_STRENGTH,
+        variant: 0,
+        provider: "",
+        model: "",
+        negative: "",
+        steps: 0,
+        cfg: 0,
+        tuning: NO_TUNING,
+      };
     default: {
       const unreachable: never = kind;
       throw new Error(`Unknown step: ${String(unreachable)}`);

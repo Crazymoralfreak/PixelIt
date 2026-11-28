@@ -17,6 +17,7 @@ use crate::clock::LocalTime;
 use crate::compress::{self, Encoded};
 use crate::fonts::FileResources;
 use crate::fsops::{self, UndoRecord, Written};
+use crate::paths::Paths;
 
 /// A neural backend shared between threads.
 pub type SharedAi = Arc<dyn AiBackend + Send + Sync>;
@@ -29,6 +30,8 @@ pub struct Runner {
     pub limits: Limits,
     /// Folder of the PDFium library.
     pub pdfium: Option<PathBuf>,
+    /// Data folder: on macOS a replaced original is kept here for undo.
+    pub paths: Option<Paths>,
 }
 
 impl Default for Runner {
@@ -38,6 +41,7 @@ impl Default for Runner {
             ai: None,
             limits: Limits::default(),
             pdfium: None,
+            paths: None,
         }
     }
 }
@@ -94,6 +98,12 @@ pub struct Outcome {
     pub replaced: bool,
     /// The source file went to the Recycle Bin.
     pub source_trashed: bool,
+    /// Where a replaced output original was kept for undo, when not in Trash.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept: Option<PathBuf>,
+    /// Where the removed source was kept for undo, when not in Trash.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_kept: Option<PathBuf>,
 }
 
 impl Outcome {
@@ -103,13 +113,19 @@ impl Outcome {
             return;
         }
         let written = if self.replaced {
-            Written::Replaced(self.output.clone())
+            Written::Replaced {
+                path: self.output.clone(),
+                kept: self.kept.clone(),
+            }
         } else {
             Written::Created(self.output.clone())
         };
         record.note(&written, self.output_bytes);
         if self.source_trashed {
-            record.trashed.push(self.source.clone());
+            record.trashed.push(fsops::TrashedFile {
+                path: self.source.clone(),
+                kept: self.source_kept.clone(),
+            });
         }
     }
 }
@@ -280,11 +296,18 @@ impl Runner {
         let encoded = self.export(item, pipeline, cancel)?;
         cancel.check()?;
         let path = output_path(spec, item, encoded.format, encoded.width, encoded.height);
-        let written = fsops::write_file(&path, &encoded.bytes, spec.conflict)?;
+        let written =
+            fsops::write_file_in(&path, &encoded.bytes, spec.conflict, self.paths.as_ref())?;
         let skipped = matches!(written, Written::Skipped(_));
+        let kept = match &written {
+            Written::Replaced { kept, .. } => kept.clone(),
+            _ => None,
+        };
         let mut source_trashed = false;
+        let mut source_kept = None;
         if spec.replace_original && !skipped && !same_file(written.path(), &item.source) {
-            fsops::to_trash(&item.source)?;
+            let removed = fsops::remove_for_undo(&item.source, self.paths.as_ref())?;
+            source_kept = removed.kept;
             source_trashed = true;
         }
         Ok(Outcome {
@@ -307,8 +330,10 @@ impl Runner {
             quality: encoded.quality,
             score: encoded.score,
             target_missed: encoded.target_missed,
-            replaced: matches!(written, Written::Replaced(_)),
+            replaced: matches!(written, Written::Replaced { .. }),
             source_trashed,
+            kept,
+            source_kept,
         })
     }
 }

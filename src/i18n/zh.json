@@ -8,6 +8,7 @@
     "clear": "清空",
     "remove": "移除",
     "reveal": "在资源管理器中显示",
+    "revealMac": "在访达中显示",
     "delete": "删除",
     "yes": "是",
     "no": "否",
@@ -52,7 +53,9 @@
       "vision": "识别",
       "cli": "命令行",
       "agent": "助手",
-      "edit": "编辑器"
+      "edit": "编辑器",
+      "upscale": "放大",
+      "refine": "补细节"
     },
     "state": {
       "queued": "排队中",
@@ -80,7 +83,7 @@
       "failed": "无法检查更新"
     },
     "askTitle": "版本 {version} 可用",
-    "askText": "当前安装的版本是 {current}。是否将 PixelIt 更新到版本 {version}？安装程序将被下载并校验，正在运行的任务完成后应用会重新启动。",
+    "askText": "当前安装的版本是 {current}。是否将 PixelIt 更新到版本 {version}？更新将被下载并校验，正在运行的任务完成后应用会重新启动。",
     "skip": "跳过此版本",
     "later": "稍后",
     "install": "更新",
@@ -103,7 +106,7 @@
     "paste": "粘贴",
     "capture": "截屏",
     "emptyTitle": "打开文件夹或将图像拖到此处",
-    "emptyText": "支持 JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD 等格式。按 Ctrl+V 可粘贴剪贴板中的图像。",
+    "emptyText": "支持 JPEG、PNG、WebP、AVIF、JPEG XL、HEIC、TIFF、RAW、SVG、PDF、PSD 等格式。按 {keys} 可粘贴剪贴板中的图像。",
     "recent": "最近的文件夹",
     "up": "上一级",
     "looseFiles": "已打开的文件：{count}",
@@ -118,7 +121,7 @@
     "edit": "编辑",
     "pasteHint": "剪贴板中没有图像",
     "trashTitle": "移到回收站？",
-    "trashText": "文件：{count}。可以从 Windows 回收站还原。",
+    "trashText": "文件：{count}。可以从 回收站还原。",
     "addedToBatch": "已加入批处理：{count}",
     "sort": {
       "name": "按名称",
@@ -140,7 +143,8 @@
       "alpha": "透明度",
       "metadata": "元数据",
       "frames": "帧数"
-    }
+    },
+    "trashTextMac": "文件数：{count}。可从废纸篓恢复。"
   },
   "output": {
     "format": "格式",
@@ -231,7 +235,8 @@
     "upscale": "放大",
     "restoreFaces": "修复人脸",
     "inpaint": "移除物体",
-    "aiEdit": "AI 编辑"
+    "aiEdit": "AI 编辑",
+    "aiDetail": "AI 补细节"
   },
   "op": {
     "mode": "模式",
@@ -346,7 +351,17 @@
     "editStrength": "修改强度",
     "editStrengthHint": "数值越大，结果与原图的差别越大。",
     "generatorMissing": "此步骤需要图像生成器。",
-    "editModelDefault": "默认"
+    "editModelDefault": "默认",
+    "detailAbout": "生成器会重新走一遍图片并补上细节，画面内容不变。保存时会按文件的完整尺寸绘制。",
+    "detailAreaHint": "用画笔涂抹需要补细节的位置。未涂抹时处理整幅图像。",
+    "detailPrompt": "图片内容",
+    "detailPromptHint": "按图片本来的样子描述：生成器根据这段文字补细节。留空则发送“{prompt}”。",
+    "promptFromFile": "使用文件中的提示词",
+    "promptFromFileHint": "生成这张图片时用的提示词（如果文件里保存了）。",
+    "promptFromFileNone": "文件中没有保存提示词。",
+    "detailStrengthHint": "生成器可以偏离图片的程度。补细节通常 25–45 就够了。",
+    "asInStudio": "与工作室相同",
+    "asInStudioHint": "工作室为该模型记住的步数、提示词相关性、采样器、VAE、LoRA 和嵌入。"
   },
   "steps": {
     "empty": "还没有步骤",
@@ -602,7 +617,9 @@
     "defaultOutput": "默认保存设置",
     "system": "Windows",
     "closeToTray": "关闭时最小化到通知区域",
+    "closeToTrayMac": "关闭窗口后保留在菜单栏中",
     "autostart": "随 Windows 启动",
+    "autostartMac": "登录时打开",
     "startMinimized": "启动时最小化",
     "contextMenu": "在资源管理器右键菜单中显示 PixelIt",
     "captureHotkey": "截屏",
@@ -617,6 +634,7 @@
     "channelBeta": "测试版",
     "version": "版本 {version}",
     "updatePortable": "便携版需要手动更新：请从发布页面下载新的压缩包。",
+    "updatePortableMac": "此副本需要手动更新。将 PixelIt 移到“应用程序”文件夹后即可自行更新。",
     "checkNow": "立即检查",
     "data": "数据",
     "dataFolder": "数据文件夹",
@@ -727,7 +745,8 @@
       "create": "创建",
       "edit": "修改",
       "outpaint": "扩展",
-      "upscale": "放大"
+      "upscale": "放大",
+      "refine": "补细节"
     },
     "builtin": {
       "photo": "摄影",
@@ -740,7 +759,66 @@
       "sketch": "铅笔画",
       "oil": "油画",
       "portrait": "肖像"
-    }
+    },
+    "enlarge": "放大",
+    "enlargeOff": "不放大",
+    "enlargeHint": "每张图片在生成后会立即用所选模型放大。",
+    "upscaleInstallTitle": "安装放大模型？",
+    "upscaleInstallText": "放大需要本地模型 {name}（{size}）。下载并安装它吗？",
+    "upscaleInstall": "安装",
+    "upscaleInstalling": "正在下载放大模型。下载完成后会立即放大图片。",
+    "upscaler": "放大模型",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "需要正在运行的 ComfyUI 或 Forge",
+    "upscalerMissing": "这个模型现在不可用。请在程序运行后刷新列表。",
+    "upscaleMode": "细节",
+    "upscaleFast": "快速",
+    "upscaleRefine": "补细节",
+    "upscaleRefineHint": "生成器会再画一遍放大后的图片，从而补回细部。耗时大约和生成一张图片相当。",
+    "upscaleFastHint": "只运行放大模型。更快，但不会补出新的细节。",
+    "upscaleStrength": "细节强度",
+    "upscaleStrengthHint": "生成器可以偏离放大后图片的程度。数值越低，越接近原图。",
+    "upscaleOptions": "放大设置",
+    "noticeNeedsGenerator": "补细节需要 ComfyUI 或 Forge。图片只做了放大。",
+    "noticeNoPrompt": "这张图片没有保存提示词，所以只做了放大。",
+    "noticeRefineFailed": "生成器没有响应，所以图片只做了放大。",
+    "tuning": "采样器、VAE、LoRA 和嵌入",
+    "tuningSilent": "生成器没有响应，所以列表是空的。请启动它，然后点击“刷新”。",
+    "tuningUsual": "由生成器决定",
+    "tuningUsualNamed": "默认（{name}）",
+    "tuningReset": "重置",
+    "sampler": "采样器",
+    "samplerHint": "清晰度和细节取决于采样器和调度器。常用的是 Euler a，或 DPM++ 2M 配合 Karras 调度器。",
+    "scheduler": "调度器",
+    "vae": "VAE",
+    "vaeHint": "模型没有内置 VAE 时需要单独的 VAE，否则图片会发灰或模糊。",
+    "vaeOfModel": "使用模型自带的",
+    "lora": "LoRA",
+    "loraHint": "数字是 LoRA 的强度，通常在 0.6 到 1 之间。",
+    "loraAdd": "添加…",
+    "loraNone": "没有 LoRA 文件",
+    "refine": "补细节",
+    "refineHint": "生成器会再过一遍图片，补画细部。尺寸不变。",
+    "service": {
+      "ready": "运行中",
+      "starting": "正在启动…",
+      "stopped": "已停止",
+      "missing": "没有响应"
+    },
+    "historyView": {
+      "groups": "按提示词",
+      "grid": "网格",
+      "list": "列表"
+    },
+    "before": "之前",
+    "after": "之后",
+    "zoomHint": "滚轮缩放，拖动移动图片，双击恢复为适应窗口。",
+    "negativeLine": "不希望出现的内容：{text}",
+    "embedding": "嵌入",
+    "embeddingHint": "嵌入作为提示词中的一个词起作用。选中的会自动加到提示词或要避免的内容里。",
+    "embeddingPrompt": "加到提示词",
+    "embeddingNegative": "加到要避免的内容",
+    "embeddingNone": "没有嵌入文件"
   },
   "vision": {
     "noModelTitle": "尚未选择模型",
@@ -791,7 +869,7 @@
     "nothingTitle": "未找到任何内容",
     "nothingText": "请尝试其他查询或其他来源。",
     "emptyTitle": "来自网络的图像",
-    "emptyText": "粘贴链接或输入查询，找到的图像会显示在这里。在程序的任何位置都可以用 Ctrl+V 粘贴链接。",
+    "emptyText": "粘贴链接或输入查询，找到的图像会显示在这里。在程序的任何位置都可以用 {keys} 粘贴链接。",
     "downloaded": "已下载"
   },
   "ai": {
@@ -820,7 +898,7 @@
     "allowCloud": "允许使用外部服务",
     "confirmCloud": "每次发送前询问",
     "localServers": "本地服务器",
-    "localServersText": "查找这台电脑上正在运行的 Ollama、LM Studio、ComfyUI 和 Forge。",
+    "localServersText": "查找这台电脑上正在运行的 Ollama、LM Studio、ComfyUI、Forge 和 Fooocus。",
     "discover": "查找",
     "noneFound": "未找到正在运行的服务器",
     "modelsCount": "模型：{count}",
@@ -837,6 +915,7 @@
     "urlHint": "例如：http://127.0.0.1:11434/v1",
     "key": "密钥",
     "keyHint": "保存在 Windows 凭据管理器中，对应 {host}。",
+    "keyHintMac": "保存在 macOS 钥匙串中，对应 {host}。",
     "keyStored": "已保存密钥",
     "keySaved": "密钥已保存",
     "listModels": "模型列表",
@@ -888,7 +967,96 @@
     "allowCloudText": "服务器 {host} 不在这台电脑上，而外部服务目前处于关闭状态。是否允许访问？本页的设置将被保存。",
     "allowCloudYes": "允许",
     "forgeCheckpoint": "模型",
-    "forgeCheckpointHint": "Forge 列出的名称。留空则继续用已经加载的模型。"
+    "forgeCheckpointHint": "Forge 列出的名称。留空则继续用已经加载的模型。",
+    "tabApps": "应用程序",
+    "apps": {
+      "title": "应用程序",
+      "text": "安装、启动和停止 ComfyUI 或 Forge，并共用模型文件夹。",
+      "install": "安装",
+      "useStability": "使用 Stability Matrix",
+      "fillModels": "从 Stability Matrix 填入文件夹",
+      "start": "启动",
+      "stop": "停止",
+      "open": "打开",
+      "checkUpdates": "检查更新",
+      "update": "更新",
+      "noHome": "还没有文件夹",
+      "nvidia": "NVIDIA 版本",
+      "foreignUpdate": "这份副本由安装它的人来更新。",
+      "updateReady": "已有版本 {version}。",
+      "models": "模型文件夹",
+      "modelsText": "ComfyUI 会用到每一个文件夹。Forge 每种只用一个文件夹。",
+      "search": "查找模型",
+      "searchText": "和 Stability Matrix 相同的目录。只有在你要求时才会下载，并放进该种类的第一个文件夹。",
+      "source": "目录",
+      "query": "搜索",
+      "modelKind": "种类",
+      "sort": "排序",
+      "period": "时间",
+      "baseModel": "基础模型",
+      "hideInstalled": "隐藏已安装的",
+      "showNsfw": "显示成人模型",
+      "searchButton": "搜索",
+      "download": "下载",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "未安装",
+        "stopped": "已停止",
+        "running": "运行中",
+        "foreign": "已经在运行"
+      },
+      "origin": {
+        "missing": "未安装",
+        "ours": "由这里安装",
+        "folder": "选定的文件夹",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "列表",
+        "grid": "网格"
+      },
+      "sorts": {
+        "downloads": "热门",
+        "rating": "评分最高",
+        "newest": "最新"
+      },
+      "periods": {
+        "all": "全部时间",
+        "year": "近一年",
+        "month": "近一月",
+        "week": "近一周",
+        "day": "近一天"
+      },
+      "notInFolder": "在此文件夹中没有找到程序",
+      "log": "启动日志",
+      "logEmpty": "日志为空。启动后会有内容。",
+      "logFile": "显示文件",
+      "logCut": "只显示日志的结尾。完整内容在文件中。",
+      "worksLocally": "无需 ComfyUI 即可使用",
+      "file": "文件",
+      "downloaded": "已下载",
+      "downloadedTo": "已保存到 {path}",
+      "saveTo": "将保存到 {path}",
+      "showFile": "显示文件"
+    },
+    "notSupportedYet": "暂不支持"
   },
   "assistant": {
     "newChat": "新对话",
@@ -942,6 +1110,7 @@
     "argsHint": "每行一个。",
     "env": "环境变量",
     "envHint": "每行一个：名称=值。保存在 Windows 凭据管理器中。",
+    "envHintMac": "每行一个：名称=值。保存在 macOS 钥匙串中。",
     "urlHint": "使用 Streamable HTTP 传输的服务器地址。",
     "defaultPermission": "工具",
     "defaultPermissionHint": "适用于没有单独规则的工具。",
@@ -966,7 +1135,7 @@
     "aiModelFailed": "模型无法处理该图像",
     "aiUnavailable": "模型运行环境不可用",
     "aiWorkerFailed": "模型进程异常退出",
-    "aiWorkerMissing": "找不到文件 pixelit-worker.exe",
+    "aiWorkerMissing": "找不到文件 {file}",
     "assistantLoop": "助手连续执行的步骤过多，已被停止",
     "autostartFailed": "无法更改开机启动设置",
     "badArchive": "下载的压缩包已损坏",
@@ -984,6 +1153,7 @@
     "cannotEncode": "无法保存为该格式",
     "captionUnsupported": "说明只能写入 JPEG 和 PNG",
     "captureFailed": "截屏失败",
+    "capturePermission": "PixelIt 没有录制屏幕的权限。请在“系统设置”中允许：“隐私与安全性”→“屏幕录制”，然后重新启动 PixelIt。",
     "chatBusy": "助手仍在回复",
     "chatMissing": "找不到该对话",
     "checksumMismatch": "下载的文件未通过完整性校验",
@@ -1003,7 +1173,7 @@
     "httpStatus": "服务器返回了错误",
     "internal": "内部错误",
     "io": "无法读取或写入文件",
-    "keyStoreFailed": "Windows 凭据管理器不可用",
+    "keyStoreFailed": "系统密钥存储不可用",
     "localAddress": "该地址指向本机或本地网络，不对代理开放：{url}",
     "mcpBadServer": "MCP 服务器“{name}”配置不正确",
     "mcpDisconnected": "与 MCP 服务器的连接已断开",
@@ -1041,13 +1211,44 @@
     "keyMissing": "服务器 {host} 需要访问密钥。请在下方的字段中输入密钥后重试。",
     "updatePortable": "便携版需要手动更新",
     "builtinStyle": "内置风格不能修改或删除。",
-    "emptyName": "请输入名称。"
+    "emptyName": "请输入名称。",
+    "appAlreadyRunning": "程序已经在运行，而且不是 PixelIt 启动的",
+    "appLaunchFailed": "程序无法启动",
+    "appMissing": "请先选择或安装程序",
+    "appNotOurs": "PixelIt 没有启动这个程序，所以不会停止它",
+    "noArchive": "这台电脑没有固定的 {id} 压缩包",
+    "noModelFolder": "请先为这种模型添加一个文件夹",
+    "upscaleModelFailed": "放大模型无法运行：{model}",
+    "upscalerMissing": "找不到放大模型：{model}",
+    "refineNeedsGenerator": "补细节需要 ComfyUI 或 Forge。请选择其中一个作为生成器。",
+    "refineNoPrompt": "这张图片没有保存提示词，所以无法补细节。",
+    "refineTooLarge": "图片太大，无法补细节：长边为 {side} px，最多允许 {limit} px。",
+    "heicCodecMissingMac": "系统无法解码 HEIC"
   },
   "native": {
     "tray": {
       "open": "打开 PixelIt",
       "capture": "截屏",
       "quit": "退出"
+    },
+    "menu": {
+      "about": "关于 PixelIt",
+      "services": "服务",
+      "hide": "隐藏 PixelIt",
+      "hideOthers": "隐藏其他",
+      "showAll": "全部显示",
+      "quit": "退出 PixelIt",
+      "edit": "编辑",
+      "undo": "撤销",
+      "redo": "重做",
+      "cut": "剪切",
+      "copy": "拷贝",
+      "paste": "粘贴",
+      "selectAll": "全选",
+      "window": "窗口",
+      "minimize": "最小化",
+      "zoom": "缩放",
+      "close": "关闭窗口"
     },
     "contextMenu": "在 PixelIt 中打开",
     "notify": {

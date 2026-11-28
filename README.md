@@ -2,7 +2,7 @@
 
 [Русский](README.ru.md)
 
-An image toolkit for Windows: a viewer, a non-destructive editor, batch processing with recipes, set generators and local AI models. Everything runs on your computer. The same operations are available in the window, from the command line and to AI agents through MCP.
+An image toolkit for Windows and macOS: a viewer, a non-destructive editor, batch processing with recipes, set generators and local AI models. Everything runs on your computer. The same operations are available in the window, from the command line and to AI agents through MCP.
 
 The interface is available in German, English, Spanish, French, Japanese, Korean, Polish, Portuguese, Russian, Turkish and Simplified Chinese. The application has no account. It uses the network only for what you asked for: update checks, model downloads, and requests to the servers and services you set up yourself.
 
@@ -12,6 +12,8 @@ The latest version is on the [releases](https://github.com/Crazymoralfreak/Pixel
 
 - `PixelIt_<version>_x64-setup.exe` — the installer. It installs the application for the current user, no administrator rights needed.
 - `PixelIt_<version>_x64-portable.zip` — the portable version. Unpack the `PixelIt` folder anywhere and start `PixelIt.exe`. The `portable` file beside the program makes it keep all its data in the `data` folder next to itself.
+
+A tag also builds macOS disk images, `PixelIt_<version>_MacOS_Silicon.dmg` for Apple Silicon and `PixelIt_<version>_MacOS_Intel.dmg` for Intel. The image is signed locally, without an Apple certificate, so Gatekeeper asks before the first open. The Explorer menu, screen capture, HEIC and the local ONNX models stay on Windows. The installed Windows copy is the one that updates itself.
 
 The files are not signed with a code signing certificate, so Windows SmartScreen shows a warning on the first start.
 
@@ -31,7 +33,7 @@ The files are not signed with a code signing certificate, so Windows SmartScreen
 
 Nothing of this is installed with the application. Models and components are downloaded on the "Models and AI" page when you ask for them, each one checked against its checksum.
 
-- **Local models** (ONNX Runtime with DirectML, on the video card or the processor): background removal, upscaling, object removal, face restoration. They run in a separate process, `pixelit-worker.exe`, so a failure inside a model or a video driver does not take the application down.
+- **Local models** (ONNX Runtime with DirectML on Windows and Core ML on Apple Silicon, on the video card or the processor): background removal, upscaling, object removal, face restoration. They run in a separate process, `pixelit-worker`, so a failure inside a model or a video driver does not take the application down.
 - **Image generation** through a ComfyUI or Forge / AUTOMATIC1111 server, the built-in stable-diffusion.cpp with your model file, or an external service with an OpenAI-compatible API and your key. In the Studio you choose the generator and the model, turn on styles, make one to four pictures, change a picture (the whole one, a painted area, or past its edges) and keep them in a history.
 - **Understanding images** through a model with an OpenAI-compatible API (Ollama, LM Studio or an external service): descriptions, alt text, keywords, file names, text recognition. The answer can be written into the metadata of the file.
 - **Assistant.** A chat that calls the tools of PixelIt and of the external MCP servers you connect.
@@ -92,7 +94,7 @@ PixelIt is an MCP client as well: the same tab connects external MCP servers (a 
 
 ## Requirements
 
-- Windows 10 version 1809 or newer, or Windows 11, x64.
+- Windows 10 version 1809 or newer, or Windows 11, x64. macOS 11 or newer, Apple Silicon or Intel.
 - The WebView2 runtime. Windows 11 always has it. On a machine without WebView2 the installer downloads it; the portable version does not start without it.
 - HEIC files are read by the Windows codecs: they need the "HEIF Image Extensions" and "HEVC Video Extensions" from the Microsoft Store.
 - PDF files are read by the PDFium component, downloaded on the "Models and AI" page.
@@ -136,9 +138,9 @@ npm run tauri dev
 2. Commit the changes and tag the commit `v<version>`, for example `v1.1.0`.
 3. Push the tag to GitHub.
 
-The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches three files to the release of the tag: the installer, the portable archive and `latest.json`. The description of the release is the section of the version in `CHANGELOG.md`.
+The tag starts `.github/workflows/release.yml`: it checks that the number in the tag matches the three files, runs the tests, builds and signs the installer, builds the portable archive and attaches them to the release of the tag. The same tag builds the macOS disk images (with the model worker inside the app) and then writes `latest.json` for Windows and both Mac architectures. The description of the release is the section of the version in `CHANGELOG.md`.
 
-`latest.json` describes the update: the version, the link to the installer and its signature. Installed copies read it from `releases/latest/download/latest.json`, so they see only a release that GitHub considers the latest: not a draft and not a pre-release.
+`latest.json` describes the update: the version, the link to each platform package and its signature. Installed copies read it from `releases/latest/download/latest.json`, so they see only a release that GitHub considers the latest: not a draft and not a pre-release. A macOS disk image is signed ad-hoc; Gatekeeper asks before the first open until Apple notarization secrets are configured.
 
 A tag with a suffix, such as `v1.1.0-beta.1`, makes a pre-release. Copies on the "beta" channel read the manifest of the permanent release `beta-channel`, which every release refreshes.
 

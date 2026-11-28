@@ -6,6 +6,7 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { defaultShape } from "../../lib/pipeline";
 import type {
+  AiDetailOp,
   AiEditOp,
   AnnotateOp,
   CropOp,
@@ -42,8 +43,8 @@ export const DEFAULT_TOOL: ToolState = {
   brush: 4,
 };
 
-/** Steps painted with the brush: the area to remove, to redraw or to keep. */
-export type BrushedOp = InpaintOp | AiEditOp | RemoveBackgroundOp;
+/** Steps painted with the brush: the area to remove, to redraw, to add detail to or to keep. */
+export type BrushedOp = InpaintOp | AiEditOp | AiDetailOp | RemoveBackgroundOp;
 
 /** Steps the overlay can shape. */
 export type ShapedOp = CropOp | AnnotateOp | BrushedOp;
@@ -468,6 +469,7 @@ export function Overlay(props: OverlayProps) {
         />
       );
     case "aiEdit":
+    case "aiDetail":
       return (
         <BrushOverlay
           {...brush}

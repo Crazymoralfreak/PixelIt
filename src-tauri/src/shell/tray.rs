@@ -1,5 +1,7 @@
-//! The tray icon: open the window, take a screenshot, quit.
+//! The tray icon: open the window, take a screenshot, quit. On macOS it is
+//! the icon in the menu bar.
 
+use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Wry};
@@ -12,6 +14,9 @@ const TRAY_ID: &str = "main";
 pub const OPEN: &str = "open";
 pub const CAPTURE: &str = "capture";
 pub const QUIT: &str = "quit";
+
+/// The letter alone, in black: macOS colours it for a light or a dark menu bar.
+const TEMPLATE_ICON: &[u8] = include_bytes!("../../icons/tray-template.png");
 
 fn build_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<Wry>> {
     let item =
@@ -30,22 +35,31 @@ pub fn create(
     lang: &str,
     on_menu: impl Fn(&AppHandle, &str) + Send + Sync + 'static,
 ) -> tauri::Result<()> {
+    // An icon of the menu bar opens its menu with either button; in the tray
+    // of Windows the left button opens the window.
+    let menu_bar = cfg!(target_os = "macos");
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("PixelIt")
         .menu(&build_menu(app, lang)?)
-        .show_menu_on_left_click(false)
+        .show_menu_on_left_click(menu_bar)
         .on_menu_event(move |app, event| on_menu(app, event.id().as_ref()))
-        .on_tray_icon_event(|tray, event| {
+        .on_tray_icon_event(move |tray, event| {
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
                 ..
             } = event
             {
-                window::show_main(tray.app_handle());
+                if !menu_bar {
+                    window::show_main(tray.app_handle());
+                }
             }
         });
-    if let Some(icon) = app.default_window_icon() {
+    if menu_bar {
+        builder = builder
+            .icon(Image::from_bytes(TEMPLATE_ICON)?)
+            .icon_as_template(true);
+    } else if let Some(icon) = app.default_window_icon() {
         builder = builder.icon(icon.clone());
     }
     builder.build(app)?;

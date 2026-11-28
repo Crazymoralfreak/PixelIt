@@ -358,6 +358,22 @@ fn part_path(target: &Path) -> PathBuf {
     target.with_file_name(name)
 }
 
+/// Checks a file against a hexadecimal SHA-256.
+pub fn verify_sha256(path: &Path, expected: &str, cancel: &CancelToken) -> Result<bool> {
+    let mut file = File::open(path)?;
+    let mut buffer = vec![0u8; 1 << 20];
+    let mut sha256 = Sha256::new();
+    loop {
+        cancel.check()?;
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        sha256.update(&buffer[..read]);
+    }
+    Ok(hex(sha256.finalize().as_slice()).eq_ignore_ascii_case(expected))
+}
+
 /// Checks a file against the expected hash.
 pub fn verify(path: &Path, checksum: &Checksum, cancel: &CancelToken) -> Result<bool> {
     let mut file = File::open(path)?;
@@ -607,6 +623,77 @@ impl Net {
         progress: &mut dyn FnMut(u64),
         cancel: &CancelToken,
     ) -> Result<()> {
+        let sha = match checksum {
+            Checksum::Sha256(sha) => Some(*sha),
+            Checksum::Sha512(_) => None,
+        };
+        if let Some(sha) = sha {
+            return self.download_sha256(url, target, Some(bytes), Some(sha), progress, cancel);
+        }
+        self.receive(url, target, bytes, true, progress, cancel)?;
+        if !verify(target, checksum, cancel)? {
+            let _ = fs::remove_file(target);
+            return Err(Error::new("checksumMismatch").with("url", url));
+        }
+        Ok(())
+    }
+
+    /// Downloads a file of a known size and, when `sha256` is set, a known hash.
+    /// `bytes` of `None` accepts any size up to 20 GiB.
+    pub fn download_sha256(
+        &self,
+        url: &str,
+        target: &Path,
+        bytes: Option<u64>,
+        sha256: Option<&str>,
+        progress: &mut dyn FnMut(u64),
+        cancel: &CancelToken,
+    ) -> Result<()> {
+        let hashed = sha256.is_some_and(|sha| !sha.is_empty());
+        // A catalogue size is often rounded. With a hash, the hash decides;
+        // the size only caps how much is read, with room for that rounding.
+        let limit = match bytes {
+            Some(size) if hashed => size.saturating_add(size / 20).max(size + 4096),
+            Some(size) => size,
+            None => 20 * 1024 * 1024 * 1024,
+        };
+        self.receive(
+            url,
+            target,
+            limit,
+            !hashed && bytes.is_some(),
+            progress,
+            cancel,
+        )?;
+        if !hashed {
+            if let Some(expected) = bytes {
+                let have = fs::metadata(target).map_or(0, |meta| meta.len());
+                if have != expected {
+                    let _ = fs::remove_file(target);
+                    return Err(Error::new("checksumMismatch").with("url", url));
+                }
+            }
+        }
+        if let Some(sha) = sha256.filter(|sha| !sha.is_empty()) {
+            if !verify_sha256(target, sha, cancel)? {
+                let _ = fs::remove_file(target);
+                return Err(Error::new("checksumMismatch").with("url", url));
+            }
+        }
+        Ok(())
+    }
+
+    /// Downloads up to `bytes`. When `exact` is set, a short connection is an
+    /// error and the next call continues the same partial file.
+    fn receive(
+        &self,
+        url: &str,
+        target: &Path,
+        bytes: u64,
+        exact: bool,
+        progress: &mut dyn FnMut(u64),
+        cancel: &CancelToken,
+    ) -> Result<()> {
         if let Some(folder) = target.parent() {
             fs::create_dir_all(folder)?;
         }
@@ -654,13 +741,9 @@ impl Net {
             }
             file.flush()?;
         }
-        if have < bytes {
+        if exact && have < bytes {
             // The connection dropped; the next attempt continues from here.
             return Err(Error::new("network").detail("connection closed early"));
-        }
-        if !verify(&part, checksum, cancel)? {
-            let _ = fs::remove_file(&part);
-            return Err(Error::new("checksumMismatch").with("url", url));
         }
         if target.exists() {
             fs::remove_file(target)?;

@@ -2,12 +2,28 @@
 // and the things that can be done with it.
 
 import { useEffect } from "react";
-import { thumbUrl } from "../../api/urls";
 import { useT } from "../../i18n";
 import { fileName } from "../../lib/format";
-import type { GeneratedPicture, GeneratedRecord } from "../../types";
+import { modelTitle, shownRequest } from "../../lib/generation";
+import { isMac } from "../../lib/platform";
+import type { GeneratedPicture, GeneratedRecord, Tuning } from "../../types";
 import { Button, Modal } from "../../ui";
-import { Curtain } from "./Curtain";
+import { madeFrom } from "./format";
+import { PictureStage } from "./PictureStage";
+import { UpscaleMenu } from "./UpscaleOptions";
+
+/** The longest side of the picture in the dialog: enough to zoom into the detail. */
+const SIDE = 4096;
+
+/** The sampler, the schedule and the VAE as one line. LoRA files and embeddings are part of the prompt. */
+function tuningLine(tuning: Tuning): string {
+  return [
+    [tuning.sampler, tuning.scheduler].filter((part) => part !== "").join(" / "),
+    tuning.vae ? `VAE ${modelTitle(tuning.vae)}` : "",
+  ]
+    .filter((part) => part !== "")
+    .join(" · ");
+}
 
 export interface PictureItem {
   record: GeneratedRecord;
@@ -17,7 +33,6 @@ export interface PictureItem {
 export function PictureDialog({
   items,
   index,
-  upscaleReady,
   onIndex,
   onClose,
   onRepeat,
@@ -26,6 +41,8 @@ export function PictureDialog({
   onSimilar,
   onEdit,
   onUpscale,
+  refining = false,
+  onRefine,
   onEditor,
   onBatch,
   onReveal,
@@ -36,7 +53,6 @@ export function PictureDialog({
 }: {
   items: PictureItem[];
   index: number;
-  upscaleReady: boolean;
   onIndex: (index: number) => void;
   onClose: () => void;
   onRepeat: (record: GeneratedRecord) => void;
@@ -45,6 +61,9 @@ export function PictureDialog({
   onSimilar: (record: GeneratedRecord, file: string) => void;
   onEdit: (file: string) => void;
   onUpscale: (file: string, factor: number) => void;
+  /** A detail pass is running, so another is not started. */
+  refining?: boolean;
+  onRefine: (file: string) => void;
   onEditor: (file: string) => void;
   onBatch: (files: string[]) => void;
   onReveal: (file: string) => void;
@@ -72,23 +91,33 @@ export function PictureDialog({
     return null;
   }
   const { record, picture } = item;
-  const compared = record.source !== "" && record.kind !== "create";
-  const prompt = record.prompt || record.finalPrompt;
+  const written = record.prompt || record.finalPrompt;
+  // What the generator was told to avoid: the styles add to it, so the
+  // request alone may show nothing. LoRA files and embeddings are shown in
+  // the same words the final-prompt line uses.
+  const [prompt, negative] = shownRequest(
+    written,
+    record.finalNegative || record.negative,
+    record.tuning,
+    record.provider,
+  );
+  const tuned = tuningLine(record.tuning);
 
   return (
-    <Modal title={fileName(picture.file)} onClose={onClose} wide>
+    <Modal title={fileName(picture.file)} onClose={onClose} full closeLabel={t("common.close")}>
       <div className="studio-view">
-        {compared ? <Curtain before={record.source} after={picture.file} /> : (
-          <img src={thumbUrl({ path: picture.file, modified: 0 }, 1024)} alt="" draggable={false} />
-        )}
+        <PictureStage file={picture.file} before={madeFrom(record)} side={SIDE} zoom />
         <div className="studio-view-side">
           <p>{prompt || t("studio.noPrompt")}</p>
+          {negative ? <p className="tool-text">{t("studio.negativeLine", { text: negative })}</p> : null}
           <p className="tool-text">
             {td(`studio.kind.${record.kind}`)}
             {record.model ? ` · ${record.model}` : ""}
             {picture.width > 0 ? ` · ${picture.width}×${picture.height}` : ""}
             {` · ${t("studio.seed")} ${picture.seed}`}
           </p>
+          {tuned ? <p className="tool-text">{tuned}</p> : null}
+          <p className="tool-text">{t("studio.zoomHint")}</p>
           <div className="studio-view-actions">
             <Button small disabled={index === 0 && items.length < 2} onClick={() => onIndex((index + items.length - 1) % items.length)}>
               {t("studio.previous")}
@@ -99,7 +128,7 @@ export function PictureDialog({
             <Button small onClick={() => onFavorite(picture.file, !picture.favorite)}>
               {picture.favorite ? t("studio.unfavorite") : t("studio.favorite")}
             </Button>
-            <Button small disabled={prompt === ""} onClick={() => onRepeat(record)}>
+            <Button small disabled={written === ""} onClick={() => onRepeat(record)}>
               {t("studio.repeat")}
             </Button>
             <Button small onClick={() => onSeed(picture.seed)}>
@@ -114,11 +143,15 @@ export function PictureDialog({
             <Button small onClick={() => onEdit(picture.file)}>
               {t("studio.editThis")}
             </Button>
-            <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(picture.file, 2)}>
+            <Button small onClick={() => onUpscale(picture.file, 2)}>
               {t("studio.upscale2")}
             </Button>
-            <Button small disabled={!upscaleReady} title={upscaleReady ? undefined : t("studio.upscaleMissing")} onClick={() => onUpscale(picture.file, 4)}>
+            <Button small onClick={() => onUpscale(picture.file, 4)}>
               {t("studio.upscale4")}
+            </Button>
+            <UpscaleMenu />
+            <Button small disabled={refining || prompt === ""} title={t("studio.refineHint")} onClick={() => onRefine(picture.file)}>
+              {refining ? t("common.working") : t("studio.refine")}
             </Button>
             <Button small onClick={() => onEditor(picture.file)}>
               {t("viewer.edit")}
@@ -127,7 +160,7 @@ export function PictureDialog({
               {t("viewer.toBatch")}
             </Button>
             <Button small onClick={() => onReveal(picture.file)}>
-              {t("common.reveal")}
+              {isMac() ? t("common.revealMac") : t("common.reveal")}
             </Button>
             <Button small disabled={prompt === ""} onClick={() => onCopy(prompt)}>
               {t("studio.copyPrompt")}

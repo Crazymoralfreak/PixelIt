@@ -21,6 +21,7 @@ import { activeJobs, JobsDialog } from "./components/JobsPanel";
 import { I18nProvider, useT } from "./i18n";
 import { blobToBase64, isTextTarget, pastedLink, pastedPicture } from "./lib/clipboard";
 import { newPipeline } from "./lib/pipeline";
+import { setPlatform } from "./lib/platform";
 import AboutPage from "./pages/About";
 import AiPage from "./pages/Ai";
 import AssistantPage from "./pages/Assistant";
@@ -702,9 +703,10 @@ export default function App() {
       api.updateStatus(),
       api.openedFiles(),
     ])
-      .then(([info, settings, jobs, recipes, update, opened]) =>
-        setBoot({ info, settings, jobs, recipes, update, opened }),
-      )
+      .then(([info, settings, jobs, recipes, update, opened]) => {
+        setPlatform(info.platform);
+        setBoot({ info, settings, jobs, recipes, update, opened });
+      })
       .catch((error: unknown) => setFailure(toAppError(error).params?.message ?? toAppError(error).code));
   }, []);
 

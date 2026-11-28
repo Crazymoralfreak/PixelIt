@@ -2,6 +2,7 @@
 //! restoration. All of them run in the worker process through ONNX Runtime.
 
 use std::collections::HashSet;
+use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 
 use pixelit_core::pipeline::{Mask, ResizeFilter};
@@ -199,6 +200,23 @@ impl Onnx {
         keep: &[&Entry],
         task: impl FnOnce(&mut Worker, &[ModelInfo]) -> Result<T>,
     ) -> Result<T> {
+        let mut stored = Vec::with_capacity(keep.len());
+        for entry in keep {
+            stored.push((entry.id, install::main_path(&self.paths, entry.id)?));
+        }
+        let pairs: Vec<(&str, &Path)> = stored
+            .iter()
+            .map(|(id, path)| (*id, path.as_path()))
+            .collect();
+        self.session_files(&pairs, task)
+    }
+
+    /// Like [`Self::session`], for model files that are not in the catalogue.
+    fn session_files<T>(
+        &self,
+        keep: &[(&str, &Path)],
+        task: impl FnOnce(&mut Worker, &[ModelInfo]) -> Result<T>,
+    ) -> Result<T> {
         let device = *self.device.lock().unwrap_or_else(PoisonError::into_inner);
         let mut guard = self.worker.lock().unwrap_or_else(PoisonError::into_inner);
         if guard.as_mut().is_some_and(|worker| !worker.is_alive()) {
@@ -215,20 +233,19 @@ impl Onnx {
         };
         let result = (|| -> Result<T> {
             for id in worker.loaded() {
-                if !keep.iter().any(|entry| entry.id == id) {
+                if !keep.iter().any(|(kept, _)| *kept == id) {
                     worker.unload(&id);
                 }
             }
             let mut infos = Vec::with_capacity(keep.len());
-            for entry in keep {
-                let path = install::main_path(&self.paths, entry.id)?;
+            for (id, path) in keep {
                 let gpu = device.gpu
                     && !self
                         .cpu_only
                         .lock()
                         .unwrap_or_else(PoisonError::into_inner)
-                        .contains(entry.id);
-                infos.push(worker.load(entry.id, &path, gpu, device.gpu_index, device.threads)?);
+                        .contains(*id);
+                infos.push(worker.load(id, path, gpu, device.gpu_index, device.threads)?);
             }
             task(worker, &infos)
         })();
@@ -310,11 +327,48 @@ impl Onnx {
         if entry.spec != Spec::Upscale {
             return Err(wrong_model(entry));
         }
+        let path = install::main_path(&self.paths, entry.id)?;
+        self.upscale_path(image, entry.id, &path, factor, cancel)
+    }
+
+    /// Enlarges with an ONNX file from a folder. A file the worker cannot run
+    /// is reported with its name, not as a broken picture.
+    pub fn upscale_file(
+        &self,
+        image: &Image,
+        path: &Path,
+        factor: u32,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
+        let id = path.to_string_lossy().into_owned();
+        let name = path
+            .file_name()
+            .map_or_else(|| id.clone(), |name| name.to_string_lossy().into_owned());
+        self.upscale_path(image, &id, path, factor, cancel)
+            .map_err(|error| {
+                if error.code == "cancelled" {
+                    error
+                } else {
+                    Error::new("upscaleModelFailed")
+                        .with("model", &name)
+                        .detail(error)
+                }
+            })
+    }
+
+    fn upscale_path(
+        &self,
+        image: &Image,
+        id: &str,
+        path: &Path,
+        factor: u32,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
         let width = image.width() as usize;
         let height = image.height() as usize;
         Limits::default().check_size(image.width() * factor, image.height() * factor)?;
         let rgb = image.to_rgb8();
-        let enlarged = self.session(&[entry], |worker, infos| {
+        let enlarged = self.session_files(&[(id, path)], |worker, infos| {
             let info = &infos[0];
             let name = input_name(info, 0)?.to_owned();
             let tile = info.inputs[0]
@@ -343,7 +397,7 @@ impl Onnx {
                         }
                     }
                     let input = Tensor::new(&name, &[1, 3, tile, tile], data);
-                    let result = first_output(worker.run(entry.id, &[input])?)?;
+                    let result = first_output(worker.run(id, &[input])?)?;
                     if scale == 0 {
                         scale = result.side(3) / tile;
                         if !(1..=8).contains(&scale) || result.side(2) != tile * scale {

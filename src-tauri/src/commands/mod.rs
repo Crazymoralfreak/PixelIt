@@ -3,12 +3,14 @@
 //! main thread must stay free for.
 
 pub mod agents;
+pub mod apps;
 pub mod files;
 pub mod neural;
 pub mod studio;
 pub mod web;
 pub mod work;
 
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -207,23 +209,62 @@ pub fn pick_save(
         .map(|path| display(&path))
 }
 
-/// Shows a file selected in Explorer, or opens a folder.
+/// Shows a file selected in the file manager, or opens a folder.
 #[tauri::command(async)]
 pub fn reveal_path(path: String) -> Result<()> {
     let target = PathBuf::from(&path);
-    let mut explorer = Command::new("explorer.exe");
-    if target.is_dir() {
-        explorer.arg(&target);
-    } else if target.is_file() {
-        // Explorer reads this argument by its own rules, so it is passed as written.
-        explorer.raw_arg(format!("/select,\"{path}\""));
-    } else {
+    if !target.exists() {
         return Err(Error::new("notFound").with("path", path));
     }
-    explorer
+    let mut command = reveal_command(&path, &target);
+    command
         .spawn()
         .map(|_| ())
         .map_err(|error| Error::from(error).with("path", path))
+}
+
+/// The program that reveals a path: Explorer, Finder or the desktop opener.
+fn reveal_command(path: &str, target: &Path) -> Command {
+    #[cfg(windows)]
+    {
+        let mut command = Command::new("explorer.exe");
+        if target.is_dir() {
+            command.arg(explorer_path(path));
+        } else {
+            // Explorer reads this argument by its own rules, so it is passed as written.
+            command.raw_arg(format!("/select,\"{}\"", explorer_path(path)));
+        }
+        command
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = path;
+        let mut command = Command::new("open");
+        if target.is_file() {
+            command.arg("-R");
+        }
+        command.arg(target);
+        command
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    {
+        let _ = path;
+        let mut command = Command::new("xdg-open");
+        let folder = if target.is_dir() {
+            target
+        } else {
+            target.parent().unwrap_or(target)
+        };
+        command.arg(folder);
+        command
+    }
+}
+
+/// The path as Explorer takes it. With a forward slash in it, Explorer does
+/// not find the file and opens the user's documents instead.
+#[cfg(windows)]
+fn explorer_path(path: &str) -> String {
+    path.trim().replace('/', "\\")
 }
 
 /// Opens the folder with the log files.
@@ -258,4 +299,18 @@ pub fn cache_clear(core: CoreState<'_>) -> CacheInfo {
 #[tauri::command(async)]
 pub fn fonts_list(core: CoreState<'_>) -> Vec<String> {
     core.engine.resources().families()
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn explorer_gets_a_path_with_backslashes_only() {
+        assert_eq!(
+            explorer_path(r"D:\Programs\ComfyUI\models/upscale_models\4x-UltraSharp.pt"),
+            r"D:\Programs\ComfyUI\models\upscale_models\4x-UltraSharp.pt"
+        );
+        assert_eq!(explorer_path(r"C:\a\b.png"), r"C:\a\b.png");
+    }
 }

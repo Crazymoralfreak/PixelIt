@@ -1,4 +1,5 @@
-// The generator and its model, shared by the studio and the AI-edit step.
+// The generator and its model, shared by the studio and the steps that draw
+// with a generator.
 // An empty provider means "whatever the settings say".
 
 import { useEffect, useState } from "react";
@@ -13,12 +14,15 @@ export function GeneratorPicker({
   provider,
   model,
   allowDefault,
+  refresh = 0,
   onChange,
 }: {
   provider: GenerationProvider | "";
   model: string;
   /** The step can stay on the generator from the settings. */
   allowDefault?: boolean;
+  /** A new value asks the generator for its models again. */
+  refresh?: number;
   onChange: (provider: GenerationProvider | "", model: string) => void;
 }) {
   const { t, td } = useT();
@@ -48,7 +52,7 @@ export function GeneratorPicker({
 
   useEffect(() => {
     load(provider);
-  }, [provider]);
+  }, [provider, refresh]);
 
   const providerOptions = [
     ...(allowDefault ? [{ value: "" as const, label: t("op.editModelDefault") }] : []),

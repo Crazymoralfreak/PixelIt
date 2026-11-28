@@ -23,6 +23,7 @@ fastrand.workspace = true
 native-tls = "0.2"
 url = "2"
 zip = { version = "9", default-features = false, features = ["deflate"] }
+sevenz-rust2 = "0.27"
 
 [target.'cfg(windows)'.dependencies.windows]
 workspace = true

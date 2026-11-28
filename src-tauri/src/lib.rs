@@ -1,4 +1,4 @@
-//! PixelIt: a desktop image toolkit for Windows.
+//! PixelIt: a desktop image toolkit for Windows and macOS.
 //!
 //! One program has two faces. Started without arguments, or with files to
 //! open, it shows its window. Started with a command (`convert`, `run`,
@@ -168,6 +168,21 @@ fn run_window() -> i32 {
             commands::neural::ai_key_has,
             commands::neural::ai_key_delete,
             commands::neural::ai_discover,
+            commands::apps::apps_status,
+            commands::apps::apps_log,
+            commands::apps::apps_log_clear,
+            commands::apps::apps_set_home,
+            commands::apps::apps_use_stability,
+            commands::apps::apps_fill_models,
+            commands::apps::apps_install,
+            commands::apps::apps_start,
+            commands::apps::apps_stop,
+            commands::apps::apps_open,
+            commands::apps::apps_check_update,
+            commands::apps::apps_update,
+            commands::apps::apps_search,
+            commands::apps::apps_preview,
+            commands::apps::apps_download,
             commands::neural::ai_models,
             commands::studio::generate_start,
             commands::studio::generation_models,
@@ -178,6 +193,10 @@ fn run_window() -> i32 {
             commands::studio::generated_favorite,
             commands::studio::generated_export,
             commands::studio::generated_upscale,
+            commands::studio::generated_refine,
+            commands::studio::generation_options,
+            commands::studio::generator_status,
+            commands::studio::upscalers_list,
             commands::studio::styles_list,
             commands::studio::style_save,
             commands::studio::style_remove,
@@ -207,7 +226,11 @@ fn run_window() -> i32 {
     match built {
         Ok(built) => {
             // Closing the last window is not a reason to quit: PixelIt lives in the tray.
-            built.run(|_, event| {
+            built.run(|handle, event| {
+                #[cfg(target_os = "macos")]
+                app::mac_event(handle, &event);
+                #[cfg(not(target_os = "macos"))]
+                let _ = handle;
                 if let RunEvent::ExitRequested {
                     api, code: None, ..
                 } = event

@@ -30,6 +30,12 @@
   "kind": "rust"
  },
  {
+  "name": "aes",
+  "version": "0.9.4",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "aho-corasick",
   "version": "1.1.5",
   "license": "Unlicense OR MIT",
@@ -306,6 +312,12 @@
   "kind": "rust"
  },
  {
+  "name": "block-padding",
+  "version": "0.4.2",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "borsh",
   "version": "1.8.1",
   "license": "MIT OR Apache-2.0",
@@ -390,6 +402,12 @@
   "kind": "rust"
  },
  {
+  "name": "bzip2",
+  "version": "0.6.1",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "camino",
   "version": "1.2.6",
   "license": "MIT OR Apache-2.0",
@@ -416,6 +434,12 @@
  {
   "name": "cast",
   "version": "0.3.0",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "cbc",
+  "version": "0.2.1",
   "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
@@ -471,6 +495,12 @@
   "name": "ciborium-ll",
   "version": "0.2.2",
   "license": "Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "cipher",
+  "version": "0.5.2",
+  "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
  {
@@ -537,6 +567,12 @@
   "name": "core_detect",
   "version": "1.0.0",
   "license": "MIT/Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "cpubits",
+  "version": "0.1.1",
+  "license": "MIT OR Apache-2.0",
   "kind": "rust"
  },
  {
@@ -1188,6 +1224,12 @@
   "kind": "rust"
  },
  {
+  "name": "inout",
+  "version": "0.2.6",
+  "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
   "name": "ipnet",
   "version": "2.12.2",
   "license": "MIT OR Apache-2.0",
@@ -1416,6 +1458,12 @@
   "kind": "rust"
  },
  {
+  "name": "libbz2-rs-sys",
+  "version": "0.2.7",
+  "license": "bzip2-1.0.6",
+  "kind": "rust"
+ },
+ {
   "name": "libc",
   "version": "0.2.191",
   "license": "MIT OR Apache-2.0",
@@ -1485,6 +1533,12 @@
   "name": "loop9",
   "version": "0.1.5",
   "license": "MIT",
+  "kind": "rust"
+ },
+ {
+  "name": "lzma-rust2",
+  "version": "0.26.0",
+  "license": "Apache-2.0",
   "kind": "rust"
  },
  {
@@ -1911,6 +1965,12 @@
   "name": "powerfmt",
   "version": "0.2.1",
   "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "ppmd-rust",
+  "version": "1.5.2",
+  "license": "CC0-1.0 OR MIT-0",
   "kind": "rust"
  },
  {
@@ -2361,6 +2421,12 @@
   "name": "servo_arc",
   "version": "0.4.3",
   "license": "MIT OR Apache-2.0",
+  "kind": "rust"
+ },
+ {
+  "name": "sevenz-rust2",
+  "version": "0.27.0",
+  "license": "Apache-2.0",
   "kind": "rust"
  },
  {

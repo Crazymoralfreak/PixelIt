@@ -23,7 +23,7 @@ use pixelit_engine::Paths;
 
 use crate::catalog::Kind;
 use crate::checkpoints::chosen_model;
-use crate::config::{AiSettings, GenerationProvider};
+use crate::config::{AiSettings, Embedding, GenerationProvider, Lora, Tuning};
 use crate::install;
 use crate::net::{self, Net, Part, SocketMessage};
 use crate::progress::{self, comfy_preview, comfy_step, forge_progress, sampler_step};
@@ -63,6 +63,9 @@ pub struct GenerateRequest {
     pub model: String,
     /// Styles to apply, in order. Empty applies none.
     pub styles: Vec<String>,
+    /// The sampler, the schedule, the VAE and LoRA files. ComfyUI and Forge
+    /// take them; the other generators leave them aside.
+    pub tuning: Tuning,
 }
 
 /// What a generation used and the pictures it returned.
@@ -78,6 +81,8 @@ pub struct Outcome {
     pub height: u32,
     pub steps: u32,
     pub cfg: f32,
+    /// The tuning that was applied; empty when the generator takes none.
+    pub tuning: Tuning,
 }
 
 /// A moment of a generation: picture index, picture count, sampler step,
@@ -102,6 +107,7 @@ impl Default for GenerateRequest {
             provider: GenerationProvider::None,
             model: String::new(),
             styles: Vec::new(),
+            tuning: Tuning::default(),
         }
     }
 }
@@ -113,18 +119,20 @@ pub struct Source<'a> {
     pub mask: Option<&'a Mask>,
 }
 
+/// One request as a generator receives it, after the settings filled the gaps.
 #[derive(Clone, Copy)]
-struct Job<'a> {
-    prompt: &'a str,
-    negative: &'a str,
-    width: u32,
-    height: u32,
-    steps: u32,
-    cfg: f32,
-    seed: u64,
-    count: u32,
-    strength: f32,
-    checkpoint: &'a str,
+pub(crate) struct Job<'a> {
+    pub(crate) prompt: &'a str,
+    pub(crate) negative: &'a str,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) steps: u32,
+    pub(crate) cfg: f32,
+    pub(crate) seed: u64,
+    pub(crate) count: u32,
+    pub(crate) strength: f32,
+    pub(crate) checkpoint: &'a str,
+    pub(crate) tuning: &'a Tuning,
 }
 
 pub fn decode_image(bytes: &[u8]) -> Result<Image> {
@@ -182,7 +190,7 @@ fn mask_png(mask: &Mask) -> Result<Vec<u8>> {
     png(&image)
 }
 
-fn opaque_png(image: &Image) -> Result<Vec<u8>> {
+pub(crate) fn opaque_png(image: &Image) -> Result<Vec<u8>> {
     let mut flat = image.clone();
     flat.flatten(pixelit_core::Color::WHITE);
     png(&flat)
@@ -211,25 +219,106 @@ fn failed(detail: impl std::fmt::Display) -> Error {
 
 // ------------------------------------------------------------------ ComfyUI
 
-fn comfy_graph(job: &Job<'_>, checkpoint: &str, upload: Option<&str>, masked: bool) -> Value {
+/// The sampler and the schedule of the built-in ComfyUI graph when none is chosen.
+pub const COMFY_SAMPLER: &str = "euler";
+pub const COMFY_SCHEDULER: &str = "normal";
+
+/// A side longer than this is encoded and decoded in tiles, so the video card
+/// can hold the picture.
+pub(crate) const TILED_SIDE: u32 = 1280;
+
+/// The first node of the LoRA chain; the next ones count up from it.
+const LORA_NODE: usize = 20;
+
+/// The word that starts a new piece of a prompt in AUTOMATIC1111 and Forge.
+const BREAK: &str = "BREAK";
+
+/// The most pieces one prompt is split into.
+const MAX_PIECES: usize = 16;
+
+/// The first nodes of the further pieces of the prompt and of the negative
+/// prompt. A piece takes two nodes, so the ranges never meet.
+const POSITIVE_NODE: usize = 100;
+const NEGATIVE_NODE: usize = 200;
+
+/// How ComfyUI names an embedding in a prompt.
+const EMBEDDING_PREFIX: &str = "embedding:";
+
+/// The marks of prompt syntax that end a word: lists, weights and groups.
+const PROMPT_MARKS: [char; 11] = [',', '(', ')', '[', ']', '{', '}', ':', '|', '<', '>'];
+
+/// The built-in ComfyUI graph: text to image, or a repaint of an uploaded
+/// picture. `tiled` encodes and decodes in tiles, for pictures too large for
+/// the video card in one piece.
+pub(crate) fn comfy_graph(
+    job: &Job<'_>,
+    checkpoint: &str,
+    upload: Option<&str>,
+    masked: bool,
+    tiled: bool,
+) -> Value {
+    let tuning = job.tuning;
     let mut graph = json!({
         "1": { "class_type": "CheckpointLoaderSimple", "inputs": { "ckpt_name": checkpoint } },
-        "2": { "class_type": "CLIPTextEncode", "inputs": { "text": job.prompt, "clip": ["1", 1] } },
-        "3": { "class_type": "CLIPTextEncode", "inputs": { "text": job.negative, "clip": ["1", 1] } },
-        "5": { "class_type": "KSampler", "inputs": {
-            "seed": job.seed, "steps": job.steps, "cfg": job.cfg,
-            "sampler_name": "euler", "scheduler": "normal",
-            "denoise": if upload.is_some() { job.strength } else { 1.0 },
-            "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
-            "latent_image": [if masked { "9" } else { "4" }, 0],
-        } },
-        "6": { "class_type": "VAEDecode", "inputs": { "samples": ["5", 0], "vae": ["1", 2] } },
-        "7": { "class_type": "SaveImage", "inputs": { "filename_prefix": "PixelIt", "images": ["6", 0] } },
     });
+    // Every LoRA takes the model and the text encoder from the one before it.
+    let mut model = json!(["1", 0]);
+    let mut clip = json!(["1", 1]);
+    for (index, lora) in tuning.loras.iter().enumerate() {
+        let id = (LORA_NODE + index).to_string();
+        graph[&id] = json!({ "class_type": "LoraLoader", "inputs": {
+            "lora_name": lora.name,
+            "strength_model": lora.weight, "strength_clip": lora.weight,
+            "model": model, "clip": clip,
+        } });
+        model = json!([id, 0]);
+        clip = json!([id, 1]);
+    }
+    let vae = if tuning.vae.is_empty() {
+        json!(["1", 2])
+    } else {
+        graph["10"] = json!({ "class_type": "VAELoader", "inputs": { "vae_name": tuning.vae } });
+        json!(["10", 0])
+    };
+    let sampler = if tuning.sampler.is_empty() {
+        COMFY_SAMPLER
+    } else {
+        tuning.sampler.as_str()
+    };
+    let scheduler = if tuning.scheduler.is_empty() {
+        COMFY_SCHEDULER
+    } else {
+        tuning.scheduler.as_str()
+    };
+    let positive = comfy_encode(&mut graph, "2", POSITIVE_NODE, job.prompt, &clip);
+    let negative = comfy_encode(&mut graph, "3", NEGATIVE_NODE, job.negative, &clip);
+    graph["5"] = json!({ "class_type": "KSampler", "inputs": {
+        "seed": job.seed, "steps": job.steps, "cfg": job.cfg,
+        "sampler_name": sampler, "scheduler": scheduler,
+        "denoise": if upload.is_some() { job.strength } else { 1.0 },
+        "model": model, "positive": positive, "negative": negative,
+        "latent_image": [if masked { "9" } else { "4" }, 0],
+    } });
+    let mut decode = json!({ "samples": ["5", 0], "vae": vae });
+    if tiled {
+        set_tiles(&mut decode);
+    }
+    graph["6"] = json!({
+        "class_type": if tiled { "VAEDecodeTiled" } else { "VAEDecode" },
+        "inputs": decode,
+    });
+    graph["7"] = json!({ "class_type": "SaveImage", "inputs": { "filename_prefix": "PixelIt", "images": ["6", 0] } });
     match upload {
         Some(name) => {
             graph["8"] = json!({ "class_type": "LoadImage", "inputs": { "image": name } });
-            graph["4"] = json!({ "class_type": "VAEEncode", "inputs": { "pixels": ["8", 0], "vae": ["1", 2] } });
+            let mut encode = json!({ "pixels": ["8", 0], "vae": vae });
+            if tiled {
+                set_tiles(&mut encode);
+            }
+            graph["4"] = json!({
+                "class_type": if tiled { "VAEEncodeTiled" } else { "VAEEncode" },
+                "inputs": encode,
+            });
             if masked {
                 graph["9"] = json!({ "class_type": "SetLatentNoiseMask", "inputs": { "samples": ["4", 0], "mask": ["8", 1] } });
             }
@@ -241,6 +330,200 @@ fn comfy_graph(job: &Job<'_>, checkpoint: &str, upload: Option<&str>, masked: bo
         }
     }
     graph
+}
+
+/// Encodes one prompt and returns the output the sampler reads.
+///
+/// `BREAK` starts a new piece, as AUTOMATIC1111 and Forge read it: every piece
+/// is encoded on its own and the pieces are joined in order. ComfyUI itself
+/// would read the word as text. The first piece is node `first`; the others
+/// and their joins count up from `more`.
+fn comfy_encode(graph: &mut Value, first: &str, more: usize, text: &str, clip: &Value) -> Value {
+    let mut pieces = prompt_pieces(text).into_iter();
+    graph[first] = json!({ "class_type": "CLIPTextEncode", "inputs": {
+        "text": pieces.next().unwrap_or_default(), "clip": clip,
+    } });
+    let mut output = json!([first, 0]);
+    for (index, piece) in pieces.enumerate() {
+        let encoded = (more + index * 2).to_string();
+        let joined = (more + index * 2 + 1).to_string();
+        graph[&encoded] =
+            json!({ "class_type": "CLIPTextEncode", "inputs": { "text": piece, "clip": clip } });
+        graph[&joined] = json!({ "class_type": "ConditioningConcat", "inputs": {
+            "conditioning_to": output, "conditioning_from": [encoded, 0],
+        } });
+        output = json!([joined, 0]);
+    }
+    output
+}
+
+/// The pieces of a prompt between `BREAK` words, without the commas around
+/// them. A prompt without the word is one piece, as it was written. Past
+/// `MAX_PIECES` the rest stays in the last piece.
+fn prompt_pieces(text: &str) -> Vec<&str> {
+    let edge = |character: char| character.is_whitespace() || character == ',';
+    let mut pieces = Vec::new();
+    let mut start = 0;
+    for (at, word) in text.match_indices(BREAK) {
+        let end = at + word.len();
+        let alone = text[..at].chars().next_back().is_none_or(edge)
+            && text[end..].chars().next().is_none_or(edge);
+        if !alone || pieces.len() + 1 >= MAX_PIECES {
+            continue;
+        }
+        pieces.push(&text[start..at]);
+        start = end;
+    }
+    if pieces.is_empty() {
+        return vec![text];
+    }
+    pieces.push(&text[start..]);
+    let mut pieces: Vec<&str> = pieces
+        .into_iter()
+        .map(|piece| piece.trim_matches(edge))
+        .filter(|piece| !piece.is_empty())
+        .collect();
+    if pieces.is_empty() {
+        pieces.push("");
+    }
+    pieces
+}
+
+/// The embeddings a ComfyUI server has, as it names them: without the
+/// extension, with the folder when the file lies in one. A server that does
+/// not answer has none.
+pub(crate) fn comfy_embeddings(net: &Net, base: &str, key: Option<&str>) -> Vec<String> {
+    net.get_json(&format!("{base}/embeddings"), key, Some(SHORT_TIMEOUT))
+        .ok()
+        .as_ref()
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// A prompt as ComfyUI reads it. AUTOMATIC1111 and Forge take an embedding by
+/// the bare name of its file; ComfyUI takes such a name as plain words and
+/// wants `embedding:name`. Every word that names an embedding of the server
+/// gets the prefix; a word that already has it, and any other, is left alone.
+fn comfy_text(text: &str, embeddings: &[String]) -> String {
+    if embeddings.is_empty() {
+        return text.to_owned();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(start) = rest.find(|character| !outside(character)) {
+        out.push_str(&rest[..start]);
+        let tail = &rest[start..];
+        let word = &tail[..tail.find(outside).unwrap_or(tail.len())];
+        let written = out.as_bytes();
+        let named = written.len() >= EMBEDDING_PREFIX.len()
+            && written[written.len() - EMBEDDING_PREFIX.len()..]
+                .eq_ignore_ascii_case(EMBEDDING_PREFIX.as_bytes());
+        let known = embeddings.iter().find(|name| is_named(name, word));
+        match known {
+            Some(name) if !named => {
+                out.push_str(EMBEDDING_PREFIX);
+                out.push_str(name);
+            }
+            _ => out.push_str(word),
+        }
+        rest = &tail[word.len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
+/// Whether a character lies between the words of a prompt.
+fn outside(character: char) -> bool {
+    character.is_whitespace() || PROMPT_MARKS.contains(&character)
+}
+
+/// The file of a listed name, without the folder it lies in.
+fn file_of(name: &str) -> &str {
+    name.rsplit(['/', '\\']).next().unwrap_or(name)
+}
+
+/// Whether `word` names the embedding a generator lists as `name`: by its
+/// file or with the folder, in any case of letters.
+fn is_named(name: &str, word: &str) -> bool {
+    file_of(name).eq_ignore_ascii_case(word) || name.eq_ignore_ascii_case(word)
+}
+
+/// A prompt with the chosen embeddings named at its end; `negative` takes
+/// those of the negative prompt. An embedding works only as a word of the
+/// text: ComfyUI wants `embedding:name`, Forge and AUTOMATIC1111 the bare
+/// name of the file. A weight other than 1 is written the way both read it,
+/// `(word:weight)`. One the text already names is not named twice.
+pub(crate) fn with_embeddings(
+    text: &str,
+    embeddings: &[Embedding],
+    negative: bool,
+    comfy: bool,
+) -> String {
+    let mut out = text.to_owned();
+    for embedding in embeddings
+        .iter()
+        .filter(|embedding| embedding.negative == negative)
+    {
+        if out
+            .split(outside)
+            .any(|word| is_named(&embedding.name, word))
+        {
+            continue;
+        }
+        out.truncate(
+            out.trim_end_matches(|character: char| character.is_whitespace() || character == ',')
+                .len(),
+        );
+        if !out.is_empty() {
+            out.push_str(", ");
+        }
+        let weight = trim_weight(embedding.weight);
+        let weighted = weight != "1";
+        if weighted {
+            out.push('(');
+        }
+        if comfy {
+            out.push_str(EMBEDDING_PREFIX);
+            out.push_str(&embedding.name);
+        } else {
+            out.push_str(file_of(&embedding.name));
+        }
+        if weighted {
+            out.push(':');
+            out.push_str(&weight);
+            out.push(')');
+        }
+    }
+    out
+}
+
+/// Both prompts of a job as ComfyUI reads them: the chosen embeddings are
+/// named, and every embedding the server has gets its prefix.
+pub(crate) fn comfy_texts(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    job: &Job<'_>,
+) -> (String, String) {
+    let chosen = &job.tuning.embeddings;
+    let prompt = with_embeddings(job.prompt, chosen, false, true);
+    let negative = with_embeddings(job.negative, chosen, true, true);
+    let known = comfy_embeddings(net, base, key);
+    (comfy_text(&prompt, &known), comfy_text(&negative, &known))
+}
+
+/// The fields ComfyUI's tiled encoder and decoder require. The last two are
+/// for video; a still picture needs them present all the same.
+fn set_tiles(inputs: &mut Value) {
+    inputs["tile_size"] = json!(512);
+    inputs["overlap"] = json!(64);
+    inputs["temporal_size"] = json!(64);
+    inputs["temporal_overlap"] = json!(8);
 }
 
 /// Fills the placeholders of a user workflow.
@@ -263,7 +546,12 @@ fn fill_workflow(template: &str, job: &Job<'_>, upload: Option<&str>) -> Result<
     serde_json::from_str(&filled).map_err(|error| Error::new("badWorkflow").detail(error))
 }
 
-fn comfy_checkpoint(net: &Net, base: &str, key: Option<&str>, wanted: &str) -> Result<String> {
+pub(crate) fn comfy_checkpoint(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    wanted: &str,
+) -> Result<String> {
     if !wanted.trim().is_empty() {
         return Ok(wanted.trim().to_owned());
     }
@@ -272,13 +560,30 @@ fn comfy_checkpoint(net: &Net, base: &str, key: Option<&str>, wanted: &str) -> R
         key,
         Some(SHORT_TIMEOUT),
     )?;
-    info["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0][0]
-        .as_str()
-        .map(str::to_owned)
+    comfy_choices(&info, "CheckpointLoaderSimple", "ckpt_name")
+        .into_iter()
+        .next()
         .ok_or_else(|| Error::new("noCheckpoint"))
 }
 
-fn watch_comfy(
+/// The files ComfyUI offers for one input of a node.
+///
+/// Older nodes answer `[[names], {..}]`; nodes on the newer schema answer
+/// `["COMBO", {"options": [names]}]`. Both are read.
+pub(crate) fn comfy_choices(answer: &Value, node: &str, input: &str) -> Vec<String> {
+    let entry = &answer[node]["input"]["required"][input];
+    entry[0]
+        .as_array()
+        .or_else(|| entry[1]["options"].as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter(|name| !name.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+pub(crate) fn watch_comfy(
     net: &Net,
     base: &str,
     key: Option<&str>,
@@ -318,6 +623,134 @@ fn watch_comfy(
     }
 }
 
+pub(crate) fn upload_png(net: &Net, base: &str, key: Option<&str>, bytes: &[u8]) -> Result<String> {
+    let name = format!("pixelit-{:08x}.png", fastrand::u32(..));
+    let answer = net.post_form(
+        &format!("{base}/upload/image"),
+        key,
+        &[
+            Part::file("image", &name, "image/png", bytes),
+            Part::field("overwrite", "true"),
+        ],
+        Some(Duration::from_secs(120)),
+    )?;
+    let stored = answer["name"].as_str().unwrap_or(&name).to_owned();
+    Ok(match answer["subfolder"].as_str() {
+        Some(folder) if !folder.is_empty() => format!("{folder}/{stored}"),
+        _ => stored,
+    })
+}
+
+/// Queues one graph and returns the pictures it saved.
+pub(crate) fn run_comfy(
+    net: &Net,
+    base: &str,
+    key: Option<&str>,
+    client: &str,
+    graph: &Value,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+    index: u32,
+    count: u32,
+    steps: u32,
+) -> Result<Vec<Image>> {
+    tick(index, count, 0, steps, None);
+    cancel.check()?;
+    let queued = net.post_json(
+        &format!("{base}/prompt"),
+        key,
+        &json!({ "prompt": graph, "client_id": client }),
+        Some(SHORT_TIMEOUT),
+    )?;
+    let id = queued["prompt_id"]
+        .as_str()
+        .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
+        .to_owned();
+    let started = Instant::now();
+    let outputs = loop {
+        if cancel.is_cancelled() {
+            let _ = net.post(
+                &format!("{base}/interrupt"),
+                key,
+                &json!({}),
+                Some(SHORT_TIMEOUT),
+            );
+            return Err(Error::cancelled());
+        }
+        if started.elapsed() > GENERATION_TIMEOUT {
+            return Err(failed("timed out"));
+        }
+        thread::sleep(Duration::from_millis(700));
+        let history = net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
+        let entry = &history[id.as_str()];
+        if entry.is_null() {
+            continue;
+        }
+        if entry["status"]["status_str"].as_str() == Some("error") {
+            return Err(failed(entry["status"]["messages"].to_string()));
+        }
+        break entry["outputs"].clone();
+    };
+    let mut images = Vec::new();
+    for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
+        for file in node["images"].as_array().into_iter().flatten() {
+            let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str()) else {
+                continue;
+            };
+            let url = format!(
+                "{base}/view?filename={}&subfolder={}&type={}",
+                percent_encode(name),
+                percent_encode(file["subfolder"].as_str().unwrap_or_default()),
+                percent_encode(kind.unwrap_or("output")),
+            );
+            images.push(decode_image(&net.get(
+                &url,
+                key,
+                Some(Duration::from_secs(120)),
+            )?)?);
+        }
+    }
+    if images.is_empty() {
+        return Err(failed("the workflow saved no pictures"));
+    }
+    Ok(images)
+}
+
+/// Runs one graph and watches it for previews.
+pub(crate) fn comfy_once(
+    net: &Net,
+    settings: &AiSettings,
+    graph: &Value,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+    index: u32,
+    count: u32,
+    steps: u32,
+) -> Result<Image> {
+    let base = settings.generation.comfy_url.as_str();
+    let key = access(settings, base)?;
+    let key = key.as_deref();
+    let client = format!("pixelit-{:016x}", fastrand::u64(..));
+    let stop = AtomicBool::new(false);
+    let picture = AtomicU32::new(index);
+    let images = thread::scope(|scope| {
+        scope.spawn(|| {
+            watch_comfy(
+                net, base, key, &client, &picture, count, &stop, cancel, tick,
+            );
+        });
+        let result = run_comfy(
+            net, base, key, &client, graph, cancel, tick, index, count, steps,
+        );
+        stop.store(true, Ordering::Relaxed);
+        result
+    })?;
+    images
+        .into_iter()
+        .next()
+        .ok_or_else(|| failed("the workflow saved no pictures"))
+}
+
 fn comfy(
     net: &Net,
     settings: &AiSettings,
@@ -330,24 +763,7 @@ fn comfy(
     let key = access(settings, base)?;
     let key = key.as_deref();
     let upload = match source {
-        Some(source) => {
-            let bytes = png_with_holes(source)?;
-            let name = format!("pixelit-{:08x}.png", fastrand::u32(..));
-            let answer = net.post_form(
-                &format!("{base}/upload/image"),
-                key,
-                &[
-                    Part::file("image", &name, "image/png", &bytes),
-                    Part::field("overwrite", "true"),
-                ],
-                Some(Duration::from_secs(120)),
-            )?;
-            let stored = answer["name"].as_str().unwrap_or(&name).to_owned();
-            Some(match answer["subfolder"].as_str() {
-                Some(folder) if !folder.is_empty() => format!("{folder}/{stored}"),
-                _ => stored,
-            })
-        }
+        Some(source) => Some(upload_png(net, base, key, &png_with_holes(source)?)?),
         None => None,
     };
     let masked = source.is_some_and(|source| source.mask.is_some());
@@ -365,6 +781,15 @@ fn comfy(
     } else {
         comfy_checkpoint(net, base, key, job.checkpoint)?
     };
+    let (prompt, negative) = comfy_texts(net, base, key, job);
+    let job = &Job {
+        prompt: &prompt,
+        negative: &negative,
+        ..*job
+    };
+    // A large picture is encoded in tiles, so the video card can hold it.
+    let tiled =
+        source.is_some_and(|source| source.image.width().max(source.image.height()) > TILED_SIDE);
     let client = format!("pixelit-{:016x}", fastrand::u64(..));
     let stop = AtomicBool::new(false);
     let picture = AtomicU32::new(0);
@@ -378,71 +803,17 @@ fn comfy(
         let result = (|| -> Result<Vec<Image>> {
             for index in 0..job.count {
                 picture.store(index, Ordering::Relaxed);
-                tick(index, job.count, 0, job.steps, None);
-                cancel.check()?;
                 let job = Job {
                     seed: job.seed.wrapping_add(u64::from(index)),
                     ..*job
                 };
                 let graph = match &template {
                     Some(template) => fill_workflow(template, &job, upload.as_deref())?,
-                    None => comfy_graph(&job, &checkpoint, upload.as_deref(), masked),
+                    None => comfy_graph(&job, &checkpoint, upload.as_deref(), masked, tiled),
                 };
-                let queued = net.post_json(
-                    &format!("{base}/prompt"),
-                    key,
-                    &json!({ "prompt": graph, "client_id": client }),
-                    Some(SHORT_TIMEOUT),
-                )?;
-                let id = queued["prompt_id"]
-                    .as_str()
-                    .ok_or_else(|| failed("ComfyUI did not accept the workflow"))?
-                    .to_owned();
-                let started = Instant::now();
-                let outputs = loop {
-                    if cancel.is_cancelled() {
-                        let _ = net.post(
-                            &format!("{base}/interrupt"),
-                            key,
-                            &json!({}),
-                            Some(SHORT_TIMEOUT),
-                        );
-                        return Err(Error::cancelled());
-                    }
-                    if started.elapsed() > GENERATION_TIMEOUT {
-                        return Err(failed("timed out"));
-                    }
-                    thread::sleep(Duration::from_millis(700));
-                    let history =
-                        net.get_json(&format!("{base}/history/{id}"), key, Some(SHORT_TIMEOUT))?;
-                    let entry = &history[id.as_str()];
-                    if entry.is_null() {
-                        continue;
-                    }
-                    if entry["status"]["status_str"].as_str() == Some("error") {
-                        return Err(failed(entry["status"]["messages"].to_string()));
-                    }
-                    break entry["outputs"].clone();
-                };
-                for node in outputs.as_object().into_iter().flat_map(|map| map.values()) {
-                    for file in node["images"].as_array().into_iter().flatten() {
-                        let (Some(name), kind) = (file["filename"].as_str(), file["type"].as_str())
-                        else {
-                            continue;
-                        };
-                        let url = format!(
-                            "{base}/view?filename={}&subfolder={}&type={}",
-                            percent_encode(name),
-                            percent_encode(file["subfolder"].as_str().unwrap_or_default()),
-                            percent_encode(kind.unwrap_or("output")),
-                        );
-                        images.push(decode_image(&net.get(
-                            &url,
-                            key,
-                            Some(Duration::from_secs(120)),
-                        )?)?);
-                    }
-                }
+                images.extend(run_comfy(
+                    net, base, key, &client, &graph, cancel, tick, index, job.count, job.steps,
+                )?);
             }
             if images.is_empty() {
                 return Err(failed("the workflow saved no pictures"));
@@ -467,9 +838,11 @@ fn forge(
 ) -> Result<Vec<Image>> {
     let base = settings.generation.forge_url.as_str();
     let key = access(settings, base)?;
+    let embeddings = &job.tuning.embeddings;
+    let prompt = with_embeddings(job.prompt, embeddings, false, false);
     let mut body = json!({
-        "prompt": job.prompt,
-        "negative_prompt": job.negative,
+        "prompt": forge_prompt(&prompt, &job.tuning.loras),
+        "negative_prompt": with_embeddings(job.negative, embeddings, true, false),
         "width": job.width,
         "height": job.height,
         "steps": job.steps,
@@ -477,6 +850,12 @@ fn forge(
         "seed": job.seed,
         "batch_size": job.count,
     });
+    if !job.tuning.sampler.is_empty() {
+        body["sampler_name"] = json!(job.tuning.sampler);
+    }
+    if !job.tuning.scheduler.is_empty() {
+        body["scheduler"] = json!(job.tuning.scheduler);
+    }
     let route = match source {
         Some(source) => {
             body["init_images"] = json!([STANDARD.encode(opaque_png(source.image)?)]);
@@ -963,6 +1342,42 @@ pub fn leaves_with(settings: &AiSettings, provider: GenerationProvider) -> bool 
     }
 }
 
+/// The prompt with the LoRA tags Forge reads: `<lora:name:weight>`.
+fn forge_prompt(prompt: &str, loras: &[Lora]) -> String {
+    let mut text = prompt.to_owned();
+    for lora in loras {
+        // Forge names a LoRA by its file, without the folder and the extension.
+        let file = lora.name.rsplit(['/', '\\']).next().unwrap_or(&lora.name);
+        let name = LORA_EXTENSIONS
+            .iter()
+            .find_map(|extension| file.strip_suffix(extension))
+            .unwrap_or(file);
+        text.push_str(" <lora:");
+        text.push_str(name);
+        text.push(':');
+        text.push_str(&trim_weight(lora.weight));
+        text.push('>');
+    }
+    text
+}
+
+const LORA_EXTENSIONS: [&str; 3] = [".safetensors", ".ckpt", ".pt"];
+
+fn trim_weight(value: f32) -> String {
+    let text = format!("{value:.2}");
+    text.trim_end_matches('0').trim_end_matches('.').to_owned()
+}
+
+/// Whether this generator applies a [`Tuning`]. A ComfyUI workflow of the
+/// user's own decides these things itself.
+pub fn takes_tuning(settings: &AiSettings, provider: GenerationProvider) -> bool {
+    match provider {
+        GenerationProvider::Comfy => settings.generation.comfy_workflow.trim().is_empty(),
+        GenerationProvider::Forge => true,
+        GenerationProvider::None | GenerationProvider::SdCpp | GenerationProvider::Cloud => false,
+    }
+}
+
 fn apply_forge_model(body: &mut Value, checkpoint: &str) {
     if checkpoint.is_empty() {
         return;
@@ -1012,6 +1427,16 @@ pub fn generate(
     } else {
         defaults.cfg
     };
+    let mut tuning = if takes_tuning(settings, provider) {
+        request.tuning.tidy()
+    } else {
+        Tuning::default()
+    };
+    if provider == GenerationProvider::Forge {
+        // Forge versions disagree on how a VAE is named in a request, so it
+        // stays the one chosen in Forge itself.
+        tuning.vae.clear();
+    }
     let job = Job {
         prompt: &prompt,
         negative: &negative,
@@ -1023,6 +1448,7 @@ pub fn generate(
         count: request.count.clamp(1, MAX_COUNT),
         strength: request.strength.clamp(0.05, 1.0),
         checkpoint: &model,
+        tuning: &tuning,
     };
     cancel.check()?;
     let images = match provider {
@@ -1046,6 +1472,7 @@ pub fn generate(
         height,
         steps,
         cfg,
+        tuning,
     })
 }
 
@@ -1103,22 +1530,260 @@ mod tests {
             count: 1,
             strength: 0.5,
             checkpoint: "model.safetensors",
+            tuning: &PLAIN,
         }
     }
 
+    static PLAIN: Tuning = Tuning {
+        sampler: String::new(),
+        scheduler: String::new(),
+        vae: String::new(),
+        loras: Vec::new(),
+        embeddings: Vec::new(),
+    };
+
     #[test]
     fn text_to_image_graph_is_complete() {
-        let graph = comfy_graph(&job(), "model.safetensors", None, false);
+        let graph = comfy_graph(&job(), "model.safetensors", None, false, false);
         assert_eq!(graph["4"]["class_type"], "EmptyLatentImage");
         assert_eq!(graph["4"]["inputs"]["height"], 768);
         assert_eq!(graph["5"]["inputs"]["denoise"], 1.0);
         assert_eq!(graph["5"]["inputs"]["latent_image"][0], "4");
         assert!(graph.get("8").is_none());
+        // Without a tuning everything comes from the checkpoint, as before.
+        assert_eq!(graph["5"]["inputs"]["sampler_name"], "euler");
+        assert_eq!(graph["5"]["inputs"]["scheduler"], "normal");
+        assert_eq!(graph["5"]["inputs"]["model"], json!(["1", 0]));
+        assert_eq!(graph["2"]["inputs"]["clip"], json!(["1", 1]));
+        assert_eq!(graph["6"]["inputs"]["vae"], json!(["1", 2]));
+        assert!(graph.get("10").is_none());
+        assert!(graph.get("20").is_none());
+    }
+
+    #[test]
+    fn a_tuning_changes_the_sampler_the_vae_and_chains_the_loras() {
+        let tuning = Tuning {
+            sampler: String::from("dpmpp_2m"),
+            scheduler: String::from("karras"),
+            vae: String::from("sdxl_vae.safetensors"),
+            loras: vec![
+                Lora {
+                    name: String::from("detail.safetensors"),
+                    weight: 0.5,
+                },
+                Lora {
+                    name: String::from("style.safetensors"),
+                    weight: 1.0,
+                },
+            ],
+            embeddings: Vec::new(),
+        };
+        let job = Job {
+            tuning: &tuning,
+            ..job()
+        };
+        let graph = comfy_graph(&job, "model.safetensors", Some("in.png"), false, false);
+        assert_eq!(graph["5"]["inputs"]["sampler_name"], "dpmpp_2m");
+        assert_eq!(graph["5"]["inputs"]["scheduler"], "karras");
+        assert_eq!(graph["10"]["class_type"], "VAELoader");
+        assert_eq!(graph["10"]["inputs"]["vae_name"], "sdxl_vae.safetensors");
+        assert_eq!(graph["4"]["inputs"]["vae"], json!(["10", 0]));
+        assert_eq!(graph["6"]["inputs"]["vae"], json!(["10", 0]));
+        // The first LoRA reads the checkpoint, the second reads the first,
+        // and the sampler and both prompts read the last one.
+        assert_eq!(graph["20"]["class_type"], "LoraLoader");
+        assert_eq!(graph["20"]["inputs"]["lora_name"], "detail.safetensors");
+        assert_eq!(graph["20"]["inputs"]["strength_model"], 0.5);
+        assert_eq!(graph["20"]["inputs"]["model"], json!(["1", 0]));
+        assert_eq!(graph["20"]["inputs"]["clip"], json!(["1", 1]));
+        assert_eq!(graph["21"]["inputs"]["model"], json!(["20", 0]));
+        assert_eq!(graph["21"]["inputs"]["clip"], json!(["20", 1]));
+        assert_eq!(graph["5"]["inputs"]["model"], json!(["21", 0]));
+        assert_eq!(graph["2"]["inputs"]["clip"], json!(["21", 1]));
+        assert_eq!(graph["3"]["inputs"]["clip"], json!(["21", 1]));
+    }
+
+    #[test]
+    fn a_break_joins_separately_encoded_pieces() {
+        // Without the word both prompts are one node each, as before.
+        let plain = comfy_graph(&job(), "model.safetensors", None, false, false);
+        assert_eq!(plain["2"]["inputs"]["text"], "a \"red\" fox");
+        assert_eq!(plain["3"]["inputs"]["text"], "blur");
+        assert_eq!(plain["5"]["inputs"]["positive"], json!(["2", 0]));
+        assert_eq!(plain["5"]["inputs"]["negative"], json!(["3", 0]));
+        assert!(plain.get("100").is_none());
+        assert!(plain.get("200").is_none());
+
+        let job = Job {
+            negative: "blur, BREAK watermark, logo BREAK, text",
+            ..job()
+        };
+        let graph = comfy_graph(&job, "model.safetensors", None, false, false);
+        assert_eq!(graph["3"]["inputs"]["text"], "blur");
+        assert_eq!(graph["200"]["class_type"], "CLIPTextEncode");
+        assert_eq!(graph["200"]["inputs"]["text"], "watermark, logo");
+        assert_eq!(graph["200"]["inputs"]["clip"], json!(["1", 1]));
+        assert_eq!(graph["201"]["class_type"], "ConditioningConcat");
+        assert_eq!(graph["201"]["inputs"]["conditioning_to"], json!(["3", 0]));
+        assert_eq!(
+            graph["201"]["inputs"]["conditioning_from"],
+            json!(["200", 0])
+        );
+        assert_eq!(graph["202"]["inputs"]["text"], "text");
+        assert_eq!(graph["203"]["inputs"]["conditioning_to"], json!(["201", 0]));
+        assert_eq!(graph["5"]["inputs"]["negative"], json!(["203", 0]));
+        assert_eq!(graph["5"]["inputs"]["positive"], json!(["2", 0]));
+    }
+
+    #[test]
+    fn a_break_is_a_word_of_its_own() {
+        assert_eq!(prompt_pieces("a fox"), ["a fox"]);
+        assert_eq!(prompt_pieces(""), [""]);
+        assert_eq!(prompt_pieces("a BREAK b"), ["a", "b"]);
+        assert_eq!(prompt_pieces("a,BREAK,b"), ["a", "b"]);
+        assert_eq!(prompt_pieces("BREAK a BREAK"), ["a"]);
+        assert_eq!(prompt_pieces("BREAK"), [""]);
+        // Part of another word, or in lower case, it is only text.
+        assert_eq!(prompt_pieces("a BREAKFAST b"), ["a BREAKFAST b"]);
+        assert_eq!(prompt_pieces("a break b"), ["a break b"]);
+        assert_eq!(prompt_pieces("лиса BREAK кот"), ["лиса", "кот"]);
+        let many = vec!["x"; MAX_PIECES + 4].join(" BREAK ");
+        let pieces = prompt_pieces(&many);
+        assert_eq!(pieces.len(), MAX_PIECES);
+        assert!(pieces[MAX_PIECES - 1].contains(BREAK));
+    }
+
+    #[test]
+    fn comfy_is_told_which_words_are_embeddings() {
+        let have = [
+            String::from("zPDXL-neg"),
+            String::from(r"sdxl\negativeXL_D"),
+            String::from("EasyNegative"),
+        ];
+        assert_eq!(
+            comfy_text("score_4, zPDXL-neg, negativexl_d, blurry", &have),
+            r"score_4, embedding:zPDXL-neg, embedding:sdxl\negativeXL_D, blurry"
+        );
+        // Weights and groups stay around the name.
+        assert_eq!(
+            comfy_text("(easynegative:1.2), [zPDXL-neg]", &have),
+            "(embedding:EasyNegative:1.2), [embedding:zPDXL-neg]"
+        );
+        // A name that already has the prefix is not given a second one.
+        assert_eq!(
+            comfy_text("embedding:zPDXL-neg, Embedding:EasyNegative", &have),
+            "embedding:zPDXL-neg, Embedding:EasyNegative"
+        );
+        // Longer words and other scripts are text.
+        assert_eq!(
+            comfy_text("zPDXL-neg2, лиса, EasyNegativeV2", &have),
+            "zPDXL-neg2, лиса, EasyNegativeV2"
+        );
+        assert_eq!(comfy_text("  ", &have), "  ");
+        // A server without embeddings changes nothing.
+        assert_eq!(comfy_text("zPDXL-neg, blurry", &[]), "zPDXL-neg, blurry");
+    }
+
+    #[test]
+    fn chosen_embeddings_are_named_in_their_prompt() {
+        let chosen = [
+            Embedding {
+                name: String::from(r"sdxl\zPDXL-neg"),
+                weight: 1.0,
+                negative: true,
+            },
+            Embedding {
+                name: String::from("negativeXL_D"),
+                weight: 1.2,
+                negative: true,
+            },
+            Embedding {
+                name: String::from("detailed"),
+                weight: 0.8,
+                negative: false,
+            },
+        ];
+        // ComfyUI is told the listed name with its prefix.
+        assert_eq!(
+            with_embeddings("blurry, ", &chosen, true, true),
+            r"blurry, embedding:sdxl\zPDXL-neg, (embedding:negativeXL_D:1.2)"
+        );
+        assert_eq!(
+            with_embeddings("a fox", &chosen, false, true),
+            "a fox, (embedding:detailed:0.8)"
+        );
+        // Forge reads the bare name of the file.
+        assert_eq!(
+            with_embeddings("", &chosen, true, false),
+            "zPDXL-neg, (negativeXL_D:1.2)"
+        );
+        // One the text names already is left as the user wrote it.
+        assert_eq!(
+            with_embeddings(
+                "zpdxl-neg, (embedding:negativeXL_D:0.5)",
+                &chosen,
+                true,
+                true
+            ),
+            "zpdxl-neg, (embedding:negativeXL_D:0.5)"
+        );
+        // Nothing chosen for this prompt leaves it untouched.
+        assert_eq!(
+            with_embeddings("a fox, ", &chosen[..2], false, true),
+            "a fox, "
+        );
+    }
+
+    #[test]
+    fn a_large_repaint_is_encoded_in_tiles() {
+        let small = comfy_graph(&job(), "model.safetensors", Some("in.png"), false, false);
+        assert_eq!(small["4"]["class_type"], "VAEEncode");
+        assert_eq!(small["6"]["class_type"], "VAEDecode");
+        assert!(small["4"]["inputs"].get("tile_size").is_none());
+        let large = comfy_graph(&job(), "model.safetensors", Some("in.png"), false, true);
+        assert_eq!(large["4"]["class_type"], "VAEEncodeTiled");
+        assert_eq!(large["6"]["class_type"], "VAEDecodeTiled");
+        for node in ["4", "6"] {
+            assert_eq!(large[node]["inputs"]["tile_size"], 512);
+            assert_eq!(large[node]["inputs"]["overlap"], 64);
+            assert_eq!(large[node]["inputs"]["temporal_size"], 64);
+            assert_eq!(large[node]["inputs"]["temporal_overlap"], 8);
+        }
+    }
+
+    #[test]
+    fn forge_reads_loras_from_the_prompt() {
+        let loras = [
+            Lora {
+                name: String::from("sub/detail.safetensors"),
+                weight: 0.8,
+            },
+            Lora {
+                name: String::from("style_v1.5"),
+                weight: 1.0,
+            },
+        ];
+        assert_eq!(
+            forge_prompt("a fox", &loras),
+            "a fox <lora:detail:0.8> <lora:style_v1.5:1>"
+        );
+        assert_eq!(forge_prompt("a fox", &[]), "a fox");
+    }
+
+    #[test]
+    fn a_workflow_of_the_user_takes_no_tuning() {
+        let mut settings = AiSettings::default();
+        assert!(takes_tuning(&settings, GenerationProvider::Comfy));
+        assert!(takes_tuning(&settings, GenerationProvider::Forge));
+        assert!(!takes_tuning(&settings, GenerationProvider::SdCpp));
+        assert!(!takes_tuning(&settings, GenerationProvider::Cloud));
+        settings.generation.comfy_workflow = String::from("flow.json");
+        assert!(!takes_tuning(&settings, GenerationProvider::Comfy));
     }
 
     #[test]
     fn inpaint_graph_uses_the_mask() {
-        let graph = comfy_graph(&job(), "model.safetensors", Some("in.png"), true);
+        let graph = comfy_graph(&job(), "model.safetensors", Some("in.png"), true, false);
         assert_eq!(graph["8"]["inputs"]["image"], "in.png");
         assert_eq!(graph["4"]["class_type"], "VAEEncode");
         assert_eq!(graph["9"]["class_type"], "SetLatentNoiseMask");

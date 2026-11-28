@@ -16,7 +16,14 @@ pub struct Parameters {
     pub width: u32,
     pub height: u32,
     pub model: String,
+    /// The sampler as the generator names it. Empty is written as `Euler`,
+    /// the sampler the built-in graph starts with. A name read from a file
+    /// is for showing only: another program names its samplers differently.
+    pub sampler: String,
 }
+
+/// The sampler written when none was chosen.
+const PLAIN_SAMPLER: &str = "Euler";
 
 /// The text to store in the file.
 pub fn write(parameters: &Parameters) -> String {
@@ -25,9 +32,15 @@ pub fn write(parameters: &Parameters) -> String {
         text.push_str("\nNegative prompt: ");
         text.push_str(parameters.negative.trim());
     }
+    let sampler = parameters.sampler.trim();
     let mut tail = format!(
-        "Steps: {}, Sampler: Euler, CFG scale: {}, Seed: {}, Size: {}x{}",
+        "Steps: {}, Sampler: {}, CFG scale: {}, Seed: {}, Size: {}x{}",
         parameters.steps.max(1),
+        if sampler.is_empty() {
+            PLAIN_SAMPLER
+        } else {
+            sampler
+        },
         trim_number(parameters.cfg),
         parameters.seed,
         parameters.width,
@@ -80,6 +93,10 @@ pub fn read(text: &str) -> Option<Parameters> {
         width,
         height,
         model: value_of(tail, "Model").unwrap_or_default().to_owned(),
+        sampler: value_of(tail, "Sampler")
+            .filter(|name| *name != PLAIN_SAMPLER)
+            .unwrap_or_default()
+            .to_owned(),
     })
 }
 
@@ -141,14 +158,23 @@ mod tests {
             width: 1216,
             height: 832,
             model: String::from("dream.safetensors"),
+            sampler: String::new(),
         }
     }
 
     #[test]
     fn a_block_round_trips() {
         let text = write(&sample());
+        assert!(text.contains("Sampler: Euler, "));
         let back = read(&text).unwrap();
         assert_eq!(back, sample());
+        let chosen = Parameters {
+            sampler: String::from("dpmpp_2m"),
+            ..sample()
+        };
+        let text = write(&chosen);
+        assert!(text.contains("Sampler: dpmpp_2m, "));
+        assert_eq!(read(&text).unwrap(), chosen);
     }
 
     #[test]

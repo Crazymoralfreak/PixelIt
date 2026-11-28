@@ -1,6 +1,6 @@
 [package]
 name = "pixelit"
-description = "PixelIt - desktop image toolkit for Windows"
+description = "PixelIt - desktop image toolkit for Windows and macOS"
 version.workspace = true
 authors.workspace = true
 license.workspace = true
@@ -38,7 +38,7 @@ base64.workspace = true
 rayon.workspace = true
 tracing.workspace = true
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies.windows]
 workspace = true
 features = [
   "Win32_Foundation",

@@ -8,6 +8,7 @@
     "clear": "Clear",
     "remove": "Remove",
     "reveal": "Show in Explorer",
+    "revealMac": "Show in Finder",
     "delete": "Delete",
     "yes": "Yes",
     "no": "No",
@@ -52,7 +53,9 @@
       "vision": "Recognition",
       "cli": "Command line",
       "agent": "Assistant",
-      "edit": "Editor"
+      "edit": "Editor",
+      "upscale": "Upscaling",
+      "refine": "Adding detail"
     },
     "state": {
       "queued": "Queued",
@@ -80,7 +83,7 @@
       "failed": "Could not check for updates"
     },
     "askTitle": "Version {version} is available",
-    "askText": "Version {current} is installed now. Update PixelIt to version {version}? The installer is downloaded and verified, running jobs finish first, and then the application restarts.",
+    "askText": "Version {current} is installed now. Update PixelIt to version {version}? The update is downloaded and verified, running jobs finish first, and then the application restarts.",
     "skip": "Skip this version",
     "later": "Later",
     "install": "Update",
@@ -103,7 +106,7 @@
     "paste": "Paste",
     "capture": "Screenshot",
     "emptyTitle": "Open a folder or drop images here",
-    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD and other formats are supported. Ctrl+V pastes an image from the clipboard.",
+    "emptyText": "JPEG, PNG, WebP, AVIF, JPEG XL, HEIC, TIFF, RAW, SVG, PDF, PSD and other formats are supported. {keys} pastes an image from the clipboard.",
     "recent": "Recent folders",
     "up": "Up",
     "looseFiles": "Open files: {count}",
@@ -118,7 +121,7 @@
     "edit": "Edit",
     "pasteHint": "There is no image in the clipboard",
     "trashTitle": "Move to the Recycle Bin?",
-    "trashText": "Files: {count}. You can restore them from the Windows Recycle Bin.",
+    "trashText": "Files: {count}. You can restore them from the Recycle Bin.",
     "addedToBatch": "Added to batch: {count}",
     "sort": {
       "name": "By name",
@@ -140,7 +143,8 @@
       "alpha": "Transparency",
       "metadata": "Metadata",
       "frames": "Frames"
-    }
+    },
+    "trashTextMac": "Files: {count}. You can restore them from the Trash."
   },
   "output": {
     "format": "Format",
@@ -231,7 +235,8 @@
     "upscale": "Upscale",
     "restoreFaces": "Restore faces",
     "inpaint": "Remove objects",
-    "aiEdit": "AI edit"
+    "aiEdit": "AI edit",
+    "aiDetail": "AI detail"
   },
   "op": {
     "mode": "Mode",
@@ -346,7 +351,17 @@
     "editStrength": "Strength of the change",
     "editStrengthHint": "The higher the value, the further the result is from the original picture.",
     "generatorMissing": "This step needs an image generator.",
-    "editModelDefault": "Default"
+    "editModelDefault": "Default",
+    "detailAbout": "The generator goes over the picture and adds fine detail; what it shows stays. On saving, the file is painted at its full size.",
+    "detailAreaHint": "Paint over the place that needs detail. With nothing marked the whole picture is gone over.",
+    "detailPrompt": "What the picture shows",
+    "detailPromptHint": "Describe the picture as it is: the generator paints the detail from this text. An empty field sends “{prompt}”.",
+    "promptFromFile": "Take the prompt from the file",
+    "promptFromFileHint": "The prompt the picture was generated with, when the file keeps it.",
+    "promptFromFileNone": "The file keeps no prompt.",
+    "detailStrengthHint": "How far the generator may move from the picture. 25 to 45 is usually enough for detail.",
+    "asInStudio": "As in the studio",
+    "asInStudioHint": "The steps, the prompt adherence, the sampler, the VAE, the LoRA files and the embeddings the studio remembers for this model."
   },
   "steps": {
     "empty": "No steps yet",
@@ -602,7 +617,9 @@
     "defaultOutput": "Default saving",
     "system": "Windows",
     "closeToTray": "Minimize to the notification area on close",
+    "closeToTrayMac": "Stay in the menu bar when the window is closed",
     "autostart": "Start with Windows",
+    "autostartMac": "Open at login",
     "startMinimized": "Start minimized",
     "contextMenu": "PixelIt item in the Explorer context menu",
     "captureHotkey": "Screenshot",
@@ -617,6 +634,7 @@
     "channelBeta": "Beta",
     "version": "Version {version}",
     "updatePortable": "The portable version is updated by hand: download the new archive from the releases page.",
+    "updatePortableMac": "This copy is updated by hand. Move PixelIt to the Applications folder to let it update itself.",
     "checkNow": "Check now",
     "data": "Data",
     "dataFolder": "Data folder",
@@ -727,7 +745,8 @@
       "create": "Created",
       "edit": "Edited",
       "outpaint": "Extended",
-      "upscale": "Enlarged"
+      "upscale": "Enlarged",
+      "refine": "Detail"
     },
     "builtin": {
       "photo": "Photograph",
@@ -740,7 +759,66 @@
       "sketch": "Pencil sketch",
       "oil": "Oil painting",
       "portrait": "Portrait"
-    }
+    },
+    "enlarge": "Enlarge",
+    "enlargeOff": "No",
+    "enlargeHint": "Every picture is enlarged with the chosen upscaler right after it is generated.",
+    "upscaleInstallTitle": "Install the enlargement model?",
+    "upscaleInstallText": "Enlarging needs the local model {name} ({size}). Download and install it?",
+    "upscaleInstall": "Install",
+    "upscaleInstalling": "The enlargement model is downloading. The picture is enlarged right after that.",
+    "upscaler": "Upscaler",
+    "upscalerBuiltin": "Real-ESRGAN",
+    "upscalerNeedsServer": "needs a running ComfyUI or Forge",
+    "upscalerMissing": "This model is not available right now. Refresh the list when the program is running.",
+    "upscaleMode": "Detail",
+    "upscaleFast": "Fast",
+    "upscaleRefine": "With detail",
+    "upscaleRefineHint": "The generator paints the enlarged picture again, so fine detail comes back. This takes about as long as generating the picture.",
+    "upscaleFastHint": "Only the upscaler runs. Quicker, and no new detail is added.",
+    "upscaleStrength": "Detail strength",
+    "upscaleStrengthHint": "How far the generator may move from the enlarged picture. Lower keeps it closer.",
+    "upscaleOptions": "Upscale settings",
+    "noticeNeedsGenerator": "Detail needs ComfyUI or Forge. The picture was only enlarged.",
+    "noticeNoPrompt": "This picture has no prompt stored, so it was only enlarged.",
+    "noticeRefineFailed": "The generator did not answer, so the picture was only enlarged.",
+    "tuning": "Sampler, VAE, LoRA and embeddings",
+    "tuningSilent": "The generator does not answer, so the lists are empty. Start it and press Refresh.",
+    "tuningUsual": "Generator default",
+    "tuningUsualNamed": "Default ({name})",
+    "tuningReset": "Reset",
+    "sampler": "Sampler",
+    "samplerHint": "The sampler and the scheduler decide sharpness and fine detail. Euler a or DPM++ 2M with the Karras scheduler are common choices.",
+    "scheduler": "Scheduler",
+    "vae": "VAE",
+    "vaeHint": "A separate VAE is needed when the model has none built in: the picture then comes out washed out or blurry.",
+    "vaeOfModel": "From the model",
+    "lora": "LoRA",
+    "loraHint": "The number is the strength of the LoRA. Usually between 0.6 and 1.",
+    "loraAdd": "Add…",
+    "loraNone": "No LoRA files",
+    "refine": "Add detail",
+    "refineHint": "The generator goes over the picture once more and paints in fine detail. The size stays the same.",
+    "service": {
+      "ready": "running",
+      "starting": "starting…",
+      "stopped": "stopped",
+      "missing": "no answer"
+    },
+    "historyView": {
+      "groups": "By request",
+      "grid": "Grid",
+      "list": "List"
+    },
+    "before": "Before",
+    "after": "After",
+    "zoomHint": "The mouse wheel zooms, a drag moves the picture, a double click brings it back to fit.",
+    "negativeLine": "What to avoid: {text}",
+    "embedding": "Embeddings",
+    "embeddingHint": "An embedding works as a word of the prompt. The chosen ones are added to the prompt or to what to avoid by themselves.",
+    "embeddingPrompt": "To the prompt",
+    "embeddingNegative": "To what to avoid",
+    "embeddingNone": "No embedding files"
   },
   "vision": {
     "noModelTitle": "No model is chosen",
@@ -791,7 +869,7 @@
     "nothingTitle": "Nothing found",
     "nothingText": "Try another query or another source.",
     "emptyTitle": "Images from the web",
-    "emptyText": "Paste a link or type a query, and the images found appear here. A link can be pasted with Ctrl+V from anywhere in the application.",
+    "emptyText": "Paste a link or type a query, and the images found appear here. A link can be pasted with {keys} from anywhere in the application.",
     "downloaded": "Downloaded"
   },
   "ai": {
@@ -820,7 +898,7 @@
     "allowCloud": "Allow external services",
     "confirmCloud": "Ask before every upload",
     "localServers": "Local servers",
-    "localServersText": "Looks for Ollama, LM Studio, ComfyUI and Forge running on this computer.",
+    "localServersText": "Looks for Ollama, LM Studio, ComfyUI, Forge and Fooocus running on this computer.",
     "discover": "Find",
     "noneFound": "No running servers found",
     "modelsCount": "Models: {count}",
@@ -837,6 +915,7 @@
     "urlHint": "For example: http://127.0.0.1:11434/v1",
     "key": "Key",
     "keyHint": "Kept in Windows Credential Manager for {host}.",
+    "keyHintMac": "Kept in the macOS Keychain for {host}.",
     "keyStored": "A key is stored",
     "keySaved": "The key is saved",
     "listModels": "List models",
@@ -888,7 +967,96 @@
     "allowCloudText": "The server {host} is outside this computer, and outside services are switched off now. Allow PixelIt to reach them? The settings on this page will be saved.",
     "allowCloudYes": "Allow",
     "forgeCheckpoint": "Model",
-    "forgeCheckpointHint": "The name as Forge lists it. Empty keeps the model already loaded there."
+    "forgeCheckpointHint": "The name as Forge lists it. Empty keeps the model already loaded there.",
+    "tabApps": "Applications",
+    "apps": {
+      "title": "Applications",
+      "text": "Install ComfyUI or Forge, start and stop them, and keep one set of model folders.",
+      "install": "Install",
+      "useStability": "Use Stability Matrix",
+      "fillModels": "Fill from Stability Matrix",
+      "start": "Start",
+      "stop": "Stop",
+      "open": "Open",
+      "checkUpdates": "Check for updates",
+      "update": "Update",
+      "noHome": "No folder yet",
+      "nvidia": "NVIDIA build",
+      "foreignUpdate": "This copy is updated by whoever installed it.",
+      "updateReady": "Release {version} is available.",
+      "models": "Model folders",
+      "modelsText": "ComfyUI receives every folder. Forge receives one folder of each kind.",
+      "search": "Find models",
+      "searchText": "The same catalogues Stability Matrix searches. A file is downloaded only when you ask, into the first folder of its kind.",
+      "source": "Catalogue",
+      "query": "Search",
+      "modelKind": "Kind",
+      "sort": "Order",
+      "period": "Period",
+      "baseModel": "Base model",
+      "hideInstalled": "Hide installed",
+      "showNsfw": "Show adult models",
+      "searchButton": "Search",
+      "download": "Download",
+      "program": {
+        "comfy": "ComfyUI",
+        "forge": "Forge"
+      },
+      "state": {
+        "missing": "Not installed",
+        "stopped": "Stopped",
+        "running": "Running",
+        "foreign": "Already running"
+      },
+      "origin": {
+        "missing": "Not installed",
+        "ours": "Installed here",
+        "folder": "Chosen folder",
+        "stabilityMatrix": "Stability Matrix"
+      },
+      "kind": {
+        "checkpoints": "Checkpoints",
+        "loras": "LoRA",
+        "vaes": "VAE",
+        "embeddings": "Embeddings",
+        "controlNet": "ControlNet",
+        "upscale": "Upscalers"
+      },
+      "sources": {
+        "civitai": "CivitAI",
+        "civarchive": "CivArchive",
+        "huggingface": "Hugging Face",
+        "openmodeldb": "OpenModelDB"
+      },
+      "view": {
+        "list": "List",
+        "grid": "Grid"
+      },
+      "sorts": {
+        "downloads": "Popular",
+        "rating": "Highest rated",
+        "newest": "Newest"
+      },
+      "periods": {
+        "all": "All time",
+        "year": "Past year",
+        "month": "Past month",
+        "week": "Past week",
+        "day": "Past day"
+      },
+      "notInFolder": "The program was not found in this folder",
+      "log": "Start log",
+      "logEmpty": "The log is empty. It fills in after a start.",
+      "logFile": "Show file",
+      "logCut": "Only the end of the log is shown. The file has all of it.",
+      "worksLocally": "Works without ComfyUI",
+      "file": "File",
+      "downloaded": "Downloaded",
+      "downloadedTo": "Saved to {path}",
+      "saveTo": "Saves to {path}",
+      "showFile": "Show file"
+    },
+    "notSupportedYet": "Not supported yet"
   },
   "assistant": {
     "newChat": "New chat",
@@ -942,6 +1110,7 @@
     "argsHint": "One per line.",
     "env": "Environment variables",
     "envHint": "One per line: NAME=value. Kept in Windows Credential Manager.",
+    "envHintMac": "One per line: NAME=value. Kept in the macOS Keychain.",
     "urlHint": "Address of a server with the Streamable HTTP transport.",
     "defaultPermission": "Tools",
     "defaultPermissionHint": "Applies to tools without a rule of their own.",
@@ -966,7 +1135,7 @@
     "aiModelFailed": "The model could not process the image",
     "aiUnavailable": "The model runtime is not available",
     "aiWorkerFailed": "The model process ended with an error",
-    "aiWorkerMissing": "The file pixelit-worker.exe was not found",
+    "aiWorkerMissing": "The file {file} was not found",
     "assistantLoop": "The assistant made too many steps in a row and was stopped",
     "autostartFailed": "Could not change the autostart setting",
     "badArchive": "The downloaded archive is damaged",
@@ -984,6 +1153,7 @@
     "cannotEncode": "This format cannot be saved",
     "captionUnsupported": "A description can be written only into JPEG and PNG",
     "captureFailed": "Could not take a screenshot",
+    "capturePermission": "PixelIt has no permission to record the screen. Allow it in System Settings: Privacy & Security → Screen Recording, then restart PixelIt.",
     "chatBusy": "The assistant is still answering",
     "chatMissing": "The chat was not found",
     "checksumMismatch": "The downloaded file failed the integrity check",
@@ -1003,7 +1173,7 @@
     "httpStatus": "The server answered with an error",
     "internal": "Internal error",
     "io": "Could not read or write the file",
-    "keyStoreFailed": "Windows Credential Manager is not available",
+    "keyStoreFailed": "The system key store is not available",
     "localAddress": "The address leads to this computer or the local network and is closed to agents: {url}",
     "mcpBadServer": "The MCP server “{name}” is set up incorrectly",
     "mcpDisconnected": "The connection to the MCP server was lost",
@@ -1041,13 +1211,44 @@
     "keyMissing": "The server {host} asks for an access key. Enter the key in the field below and try again.",
     "updatePortable": "The portable version is updated by hand",
     "builtinStyle": "A built-in style cannot be changed or removed.",
-    "emptyName": "Type a name."
+    "emptyName": "Type a name.",
+    "appAlreadyRunning": "The program is already running, and PixelIt did not start it",
+    "appLaunchFailed": "The program could not be started",
+    "appMissing": "Choose or install the program first",
+    "appNotOurs": "PixelIt did not start this program, so it will not stop it",
+    "noArchive": "There is no pinned archive of {id} for this computer",
+    "noModelFolder": "Add a folder for this kind of model first",
+    "upscaleModelFailed": "The upscaler could not run: {model}",
+    "upscalerMissing": "The upscaler was not found: {model}",
+    "refineNeedsGenerator": "Adding detail works with ComfyUI or Forge. Choose one of them as the generator.",
+    "refineNoPrompt": "This picture has no prompt stored, so detail cannot be added.",
+    "refineTooLarge": "The picture is too large for adding detail: {side} px on the long side, up to {limit} px is allowed.",
+    "heicCodecMissingMac": "HEIC could not be decoded by the system"
   },
   "native": {
     "tray": {
       "open": "Open PixelIt",
       "capture": "Screenshot",
       "quit": "Quit"
+    },
+    "menu": {
+      "about": "About PixelIt",
+      "services": "Services",
+      "hide": "Hide PixelIt",
+      "hideOthers": "Hide Others",
+      "showAll": "Show All",
+      "quit": "Quit PixelIt",
+      "edit": "Edit",
+      "undo": "Undo",
+      "redo": "Redo",
+      "cut": "Cut",
+      "copy": "Copy",
+      "paste": "Paste",
+      "selectAll": "Select All",
+      "window": "Window",
+      "minimize": "Minimize",
+      "zoom": "Zoom",
+      "close": "Close Window"
     },
     "contextMenu": "Open in PixelIt",
     "notify": {
