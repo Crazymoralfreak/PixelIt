@@ -201,8 +201,7 @@ pub fn screen() -> Result<Image> {
     }
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
+        .map_or(0, |duration| duration.as_nanos());
     let path = Paths::detect().temp().join(format!("capture-{stamp}.png"));
     if let Some(folder) = path.parent() {
         fs::create_dir_all(folder)?;

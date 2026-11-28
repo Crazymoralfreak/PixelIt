@@ -172,8 +172,7 @@ mod sips {
     pub(super) fn decode(bytes: &[u8], options: &DecodeOptions) -> Result<Loaded> {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or(0);
+            .map_or(0, |duration| duration.as_nanos());
         let folder = std::env::temp_dir().join(format!("pixelit-heic-{stamp}"));
         fs::create_dir_all(&folder)?;
         let input = folder.join("in.heic");

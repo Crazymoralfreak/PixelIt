@@ -108,8 +108,7 @@ fn ram_mb() -> u64 {
     String::from_utf8_lossy(&output.stdout)
         .trim()
         .parse::<u64>()
-        .map(|bytes| bytes / (1024 * 1024))
-        .unwrap_or(0)
+        .map_or(0, |bytes| bytes / (1024 * 1024))
 }
 
 #[cfg(target_os = "macos")]
