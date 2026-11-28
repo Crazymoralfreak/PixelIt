@@ -6,15 +6,19 @@ import { api } from "../api";
 import { useApp } from "../app/context";
 import { useT } from "../i18n";
 import { GeneratorPicker } from "./GeneratorPicker";
-import { AI_KINDS, newStep, OP_KINDS } from "../lib/pipeline";
+import { TuningFields } from "./TuningFields";
+import { defaultsKey, modelOf } from "../lib/generation";
+import { AI_KINDS, DETAIL_STRENGTH, EDIT_STRENGTH, newStep, OP_KINDS } from "../lib/pipeline";
 import type {
   AdjustOp,
+  AiDetailOp,
   AiEditOp,
   Anchor,
   ComponentKind,
   CropOp,
   FilterKind,
   FilterOp,
+  GenerationProvider,
   Op,
   OpKind,
   ResizeFilter,
@@ -486,23 +490,37 @@ function StrokesField({
   );
 }
 
-function AiEditForm({ op, onChange, interactive }: { op: AiEditOp; onChange: (op: Op) => void; interactive: boolean }) {
+/** Tells that a step needs an image generator when none is set up. */
+function GeneratorNote() {
   const { t } = useT();
   const { ai, navigate } = useApp();
+  if (!ai || ai.capabilities.generation) {
+    return null;
+  }
+  return (
+    <Field label="">
+      <span className="inline-note">
+        {t("op.generatorMissing")}
+        <Button small onClick={() => navigate("ai")}>
+          {t("op.openModels")}
+        </Button>
+      </span>
+    </Field>
+  );
+}
+
+/** The generator a step names, or none when it leaves the choice to the settings. */
+function chosenProvider(provider: string): GenerationProvider | "" {
+  return provider === "" ? "" : (provider as GenerationProvider);
+}
+
+function AiEditForm({ op, onChange, interactive }: { op: AiEditOp; onChange: (op: Op) => void; interactive: boolean }) {
+  const { t } = useT();
   return (
     <>
-      {ai && !ai.capabilities.generation ? (
-        <Field label="">
-          <span className="inline-note">
-            {t("op.generatorMissing")}
-            <Button small onClick={() => navigate("ai")}>
-              {t("op.openModels")}
-            </Button>
-          </span>
-        </Field>
-      ) : null}
+      <GeneratorNote />
       <GeneratorPicker
-        provider={op.provider === "" ? "" : (op.provider as "comfy" | "forge" | "sdCpp" | "cloud")}
+        provider={chosenProvider(op.provider)}
         model={op.model}
         allowDefault
         onChange={(provider, model) => onChange({ ...op, provider, model })}
@@ -517,8 +535,110 @@ function AiEditForm({ op, onChange, interactive }: { op: AiEditOp; onChange: (op
         onChange={(strokes) => onChange({ ...op, strokes })}
       />
       <Field label={t("op.editStrength")} hint={t("op.editStrengthHint")}>
-        <Slider value={op.strength} onChange={(strength) => onChange({ ...op, strength })} min={5} max={100} reset={75} />
+        <Slider value={op.strength} onChange={(strength) => onChange({ ...op, strength })} min={5} max={100} reset={EDIT_STRENGTH} />
       </Field>
+    </>
+  );
+}
+
+/** Sent when the detail step names nothing. The same words are sent by `pixelit-ai`. */
+const DETAIL_PROMPT = "highly detailed, sharp focus, intricate details";
+
+function AiDetailForm({ op, onChange, interactive, file }: { op: AiDetailOp; onChange: (op: Op) => void; interactive: boolean; file?: string }) {
+  const { t } = useT();
+  const { ai, notify, showError } = useApp();
+  const generation = ai?.settings.generation;
+  const chosen = chosenProvider(op.provider);
+  // The generator the step runs on: its own, or the one of the settings.
+  const provider: GenerationProvider = chosen === "" ? (generation?.provider ?? "none") : chosen;
+  const model = op.model || (generation ? modelOf({ ...generation, provider }) : "");
+  const remembered = generation?.modelDefaults[defaultsKey(provider, model)];
+  const set = (patch: Partial<AiDetailOp>) => onChange({ ...op, ...patch });
+
+  /** Takes the request the picture was generated with, when the file keeps one. */
+  const fromFile = async (tell: boolean) => {
+    if (!file) {
+      return;
+    }
+    try {
+      const found = await api.pictureParameters(file);
+      if (!found || found.prompt.trim() === "") {
+        if (tell) {
+          notify(t("op.promptFromFileNone"));
+        }
+        return;
+      }
+      set({
+        prompt: found.prompt,
+        negative: found.negative || op.negative,
+        steps: found.steps || op.steps,
+        cfg: found.cfg || op.cfg,
+      });
+    } catch (error) {
+      if (tell) {
+        showError(error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    // A generated picture says itself what it shows, so a new step starts from that.
+    if (op.prompt === "" && op.negative === "" && op.steps === 0 && op.cfg === 0) {
+      void fromFile(false);
+    }
+    // Asked once for a file, not after every change of the step.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
+
+  return (
+    <>
+      <p className="tool-text">{t("op.detailAbout")}</p>
+      <GeneratorNote />
+      <GeneratorPicker provider={chosen} model={op.model} allowDefault onChange={(next, nextModel) => set({ provider: next, model: nextModel })} />
+      <Field label={t("op.detailPrompt")} hint={t("op.detailPromptHint", { prompt: DETAIL_PROMPT })}>
+        <TextArea value={op.prompt} onChange={(prompt) => set({ prompt })} placeholder={DETAIL_PROMPT} rows={3} />
+      </Field>
+      {file ? (
+        <Field label="">
+          <Button small title={t("op.promptFromFileHint")} onClick={() => void fromFile(true)}>
+            {t("op.promptFromFile")}
+          </Button>
+        </Field>
+      ) : null}
+      <Field label={t("studio.negative")}>
+        <TextInput value={op.negative} onChange={(negative) => set({ negative })} placeholder={generation?.negative} wide />
+      </Field>
+      <StrokesField
+        label={t("op.editArea")}
+        hint={interactive ? t("op.detailAreaHint") : t("op.drawInEditor")}
+        strokes={op.strokes}
+        onChange={(strokes) => set({ strokes })}
+      />
+      <Field label={t("studio.upscaleStrength")} hint={t("op.detailStrengthHint")}>
+        <Slider value={op.strength} onChange={(strength) => set({ strength })} min={5} max={100} reset={DETAIL_STRENGTH} />
+      </Field>
+      {generation && provider !== "cloud" && provider !== "none" ? (
+        <>
+          <Field label={t("studio.steps")}>
+            <Slider value={op.steps || generation.steps} onChange={(steps) => set({ steps })} min={1} max={150} reset={generation.steps} />
+          </Field>
+          <Field label={t("studio.cfg")} hint={t("studio.cfgHint")}>
+            <Slider value={op.cfg || generation.cfg} onChange={(cfg) => set({ cfg })} min={1} max={30} step={0.5} reset={generation.cfg} />
+          </Field>
+          {remembered ? (
+            <Field label="">
+              <Button
+                small
+                title={t("op.asInStudioHint")}
+                onClick={() => set({ steps: remembered.steps, cfg: remembered.cfg, tuning: remembered.tuning })}
+              >
+                {t("op.asInStudio")}
+              </Button>
+            </Field>
+          ) : null}
+        </>
+      ) : null}
+      <TuningFields provider={provider} tuning={op.tuning} onChange={(tuning) => set({ tuning })} />
     </>
   );
 }
@@ -528,9 +648,11 @@ interface OpFormProps {
   onChange: (op: Op) => void;
   /** The host has a canvas to draw shapes and masks on. */
   interactive: boolean;
+  /** The file the steps are tried on, when the host works on one. */
+  file?: string;
 }
 
-function OpForm({ op, onChange, interactive }: OpFormProps) {
+function OpForm({ op, onChange, interactive, file }: OpFormProps) {
   const { t } = useT();
   switch (op.type) {
     case "resize":
@@ -650,6 +772,8 @@ function OpForm({ op, onChange, interactive }: OpFormProps) {
       );
     case "aiEdit":
       return <AiEditForm op={op} onChange={onChange} interactive={interactive} />;
+    case "aiDetail":
+      return <AiDetailForm op={op} onChange={onChange} interactive={interactive} file={file} />;
     default: {
       const unreachable: never = op;
       return unreachable;
@@ -668,6 +792,8 @@ interface StepsEditorProps {
   /** What the host puts under the form of the open step, such as the button that runs it. */
   footer?: (step: Step) => ReactNode;
   interactive?: boolean;
+  /** The file the steps are tried on: a step may read what the file says about itself. */
+  file?: string;
 }
 
 export function StepsEditor({
@@ -678,6 +804,7 @@ export function StepsEditor({
   extra,
   footer,
   interactive = false,
+  file,
 }: StepsEditorProps) {
   const { t, td } = useT();
   const [own, setOwn] = useState<string | null>(null);
@@ -753,7 +880,7 @@ export function StepsEditor({
             {isOpen ? (
               <div className="step-body">
                 {extra?.(step)}
-                <OpForm op={step.op} onChange={(op) => replace(step.id, { op })} interactive={interactive} />
+                <OpForm op={step.op} onChange={(op) => replace(step.id, { op })} interactive={interactive} file={file} />
                 {footer?.(step)}
               </div>
             ) : null}

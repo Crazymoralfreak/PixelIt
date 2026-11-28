@@ -52,7 +52,9 @@
       "vision": "Tanıma",
       "cli": "Komut satırı",
       "agent": "Asistan",
-      "edit": "Düzenleyici"
+      "edit": "Düzenleyici",
+      "upscale": "Büyütme",
+      "refine": "Ayrıntı ekleme"
     },
     "state": {
       "queued": "Sırada",
@@ -231,7 +233,8 @@
     "upscale": "Büyütme",
     "restoreFaces": "Yüzleri onarma",
     "inpaint": "Nesne kaldırma",
-    "aiEdit": "Yapay zekâ ile düzenleme"
+    "aiEdit": "Yapay zekâ ile düzenleme",
+    "aiDetail": "Yapay zekâ ile ayrıntı"
   },
   "op": {
     "mode": "Kip",
@@ -346,7 +349,17 @@
     "editStrength": "Değişim gücü",
     "editStrengthHint": "Değer büyüdükçe sonuç özgün görüntüden o kadar uzaklaşır.",
     "generatorMissing": "Bu adım bir görüntü üretici gerektirir.",
-    "editModelDefault": "Varsayılan"
+    "editModelDefault": "Varsayılan",
+    "detailAbout": "Üretici görüntünün üzerinden geçip ince ayrıntı ekler; görüntünün gösterdiği şey değişmez. Kaydederken dosya tam boyutunda boyanır.",
+    "detailAreaHint": "Ayrıntı gereken yeri fırçayla boyayın. İşaret yoksa görüntünün tamamının üzerinden geçilir.",
+    "detailPrompt": "Görüntüde ne var",
+    "detailPromptHint": "Görüntüyü olduğu gibi anlatın: üretici ayrıntıyı bu metne göre boyar. Boş alan “{prompt}” gönderir.",
+    "promptFromFile": "İsteği dosyadan al",
+    "promptFromFileHint": "Dosyada saklanıyorsa, görüntünün üretildiği istek.",
+    "promptFromFileNone": "Dosyada kayıtlı bir istek yok.",
+    "detailStrengthHint": "Üreticinin görüntüden ne kadar uzaklaşabileceği. Ayrıntı için çoğunlukla 25–45 yeter.",
+    "asInStudio": "Stüdyodaki gibi",
+    "asInStudioHint": "Stüdyonun bu model için hatırladığı adımlar, isteğe bağlılık, örnekleyici, VAE, LoRA ve embedding’ler."
   },
   "steps": {
     "empty": "Henüz adım yok",
@@ -727,7 +740,8 @@
       "create": "Oluşturma",
       "edit": "Düzeltme",
       "outpaint": "Genişletme",
-      "upscale": "Büyütme"
+      "upscale": "Büyütme",
+      "refine": "Ayrıntı"
     },
     "builtin": {
       "photo": "Fotoğraf",
@@ -762,7 +776,44 @@
     "upscaleOptions": "Büyütme ayarları",
     "noticeNeedsGenerator": "Ayrıntı için ComfyUI veya Forge gerekir. Resim yalnızca büyütüldü.",
     "noticeNoPrompt": "Bu resimde kayıtlı bir istem yok, bu yüzden yalnızca büyütüldü.",
-    "noticeRefineFailed": "Üretici yanıt vermedi, bu yüzden resim yalnızca büyütüldü."
+    "noticeRefineFailed": "Üretici yanıt vermedi, bu yüzden resim yalnızca büyütüldü.",
+    "tuning": "Örnekleyici, VAE, LoRA ve embedding’ler",
+    "tuningSilent": "Üretici yanıt vermiyor, bu yüzden listeler boş. Onu başlatın ve “Yenile”ye basın.",
+    "tuningUsual": "Üreticinin seçimi",
+    "tuningUsualNamed": "Olağan ({name})",
+    "tuningReset": "Sıfırla",
+    "sampler": "Örnekleyici",
+    "samplerHint": "Keskinlik ve ince ayrıntı örnekleyiciye ve zamanlayıcıya bağlıdır. Çoğunlukla Euler a veya Karras zamanlayıcısıyla DPM++ 2M seçilir.",
+    "scheduler": "Zamanlayıcı",
+    "vae": "VAE",
+    "vaeHint": "Modelin içinde VAE yoksa ayrı bir VAE gerekir: yoksa resim soluk veya bulanık çıkar.",
+    "vaeOfModel": "Modeldeki",
+    "lora": "LoRA",
+    "loraHint": "Sayı, LoRA’nın gücüdür. Genellikle 0,6 ile 1 arasındadır.",
+    "loraAdd": "Ekle…",
+    "loraNone": "LoRA dosyası yok",
+    "refine": "Ayrıntı ekle",
+    "refineHint": "Üretici resmin üzerinden bir kez daha geçer ve ince ayrıntıyı boyar. Boyut değişmez.",
+    "service": {
+      "ready": "çalışıyor",
+      "starting": "başlatılıyor…",
+      "stopped": "durduruldu",
+      "missing": "yanıt vermiyor"
+    },
+    "historyView": {
+      "groups": "İsteme göre",
+      "grid": "Izgara",
+      "list": "Liste"
+    },
+    "before": "Önce",
+    "after": "Sonra",
+    "zoomHint": "Fare tekerleği yakınlaştırır, sürüklemek resmi kaydırır, çift tıklama onu yeniden sığdırır.",
+    "negativeLine": "Nelerden kaçınılsın: {text}",
+    "embedding": "Embedding’ler",
+    "embeddingHint": "Bir embedding, isteğin bir sözcüğü gibi çalışır. Seçilenler isteğe ya da kaçınılacaklara kendiliğinden eklenir.",
+    "embeddingPrompt": "İsteğe",
+    "embeddingNegative": "Kaçınılacaklara",
+    "embeddingNone": "Embedding dosyası yok"
   },
   "vision": {
     "noModelTitle": "Model seçilmedi",
@@ -993,7 +1044,11 @@
       "logFile": "Dosyayı göster",
       "logCut": "Günlüğün yalnızca sonu gösteriliyor. Tamamı dosyada.",
       "worksLocally": "ComfyUI olmadan çalışır",
-      "file": "Dosya"
+      "file": "Dosya",
+      "downloaded": "İndirildi",
+      "downloadedTo": "Kaydedildi: {path}",
+      "saveTo": "Şuraya kaydedilir: {path}",
+      "showFile": "Dosyayı göster"
     },
     "notSupportedYet": "Henüz desteklenmiyor"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "Bu bilgisayar için sabitlenmiş bir {id} arşivi yok",
     "noModelFolder": "Önce bu tür modeller için bir klasör ekleyin",
     "upscaleModelFailed": "Büyütme modeli çalışmadı: {model}",
-    "upscalerMissing": "Büyütme modeli bulunamadı: {model}"
+    "upscalerMissing": "Büyütme modeli bulunamadı: {model}",
+    "refineNeedsGenerator": "Ayrıntı, ComfyUI veya Forge ile eklenir. Üretici olarak bunlardan birini seçin.",
+    "refineNoPrompt": "Bu resimde kayıtlı bir istem yok, bu yüzden ayrıntı eklenemiyor.",
+    "refineTooLarge": "Resim ayrıntı eklemek için çok büyük: uzun kenarı {side} px, en fazla {limit} px olabilir."
   },
   "native": {
     "tray": {

@@ -1,5 +1,6 @@
 // Enlarging with the local model. When the model is not installed, the user is
 // asked once and it is downloaded; a button never stays grey without a reason.
+// The detail pass at the same size lives here too.
 
 import { api } from "../../api";
 import { useApp } from "../../app/context";
@@ -9,7 +10,7 @@ import type { GeneratedRecord } from "../../types";
 import { tellUpscale } from "./UpscaleOptions";
 
 export function useUpscale() {
-  const { ai, confirm, notify, jobResult, refreshAi } = useApp();
+  const { ai, confirm, notify, jobResult, refreshAi, withCloud } = useApp();
   const { t } = useT();
 
   /** True when the chosen model can run, or the built-in one was installed just now. */
@@ -57,5 +58,15 @@ export function useUpscale() {
     return record;
   };
 
-  return { ensure, upscale };
+  /**
+   * The same picture with detail painted in by the generator, as a new record.
+   * `onJob` is told the job, so a form can show how far it is.
+   */
+  const refine = async (file: string, onJob?: (id: number) => void): Promise<GeneratedRecord> => {
+    const id = await withCloud((confirmed) => api.generatedRefine(file, confirmed));
+    onJob?.(id);
+    return jobResult<GeneratedRecord>(id);
+  };
+
+  return { ensure, upscale, refine };
 }

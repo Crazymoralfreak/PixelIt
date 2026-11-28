@@ -52,7 +52,9 @@
       "vision": "Reconocimiento",
       "cli": "Línea de comandos",
       "agent": "Asistente",
-      "edit": "Editor"
+      "edit": "Editor",
+      "upscale": "Ampliación",
+      "refine": "Añadir detalle"
     },
     "state": {
       "queued": "En cola",
@@ -231,7 +233,8 @@
     "upscale": "Ampliar",
     "restoreFaces": "Restaurar rostros",
     "inpaint": "Quitar objetos",
-    "aiEdit": "Edición con IA"
+    "aiEdit": "Edición con IA",
+    "aiDetail": "Detalle con IA"
   },
   "op": {
     "mode": "Modo",
@@ -346,7 +349,17 @@
     "editStrength": "Intensidad del cambio",
     "editStrengthHint": "Cuanto mayor es el valor, más se aleja el resultado de la imagen original.",
     "generatorMissing": "Este paso necesita un generador de imágenes.",
-    "editModelDefault": "Predeterminado"
+    "editModelDefault": "Predeterminado",
+    "detailAbout": "El generador repasa la imagen y añade detalle fino; lo que muestra se conserva. Al guardar, el archivo se pinta a su tamaño completo.",
+    "detailAreaHint": "Pinte la zona que necesita detalle. Sin marca se repasa toda la imagen.",
+    "detailPrompt": "Qué muestra la imagen",
+    "detailPromptHint": "Describa la imagen tal como es: con este texto el generador pinta el detalle. Un campo vacío envía «{prompt}».",
+    "promptFromFile": "Tomar la solicitud del archivo",
+    "promptFromFileHint": "La solicitud con la que se generó la imagen, si el archivo la conserva.",
+    "promptFromFileNone": "El archivo no conserva ninguna solicitud.",
+    "detailStrengthHint": "Cuánto puede alejarse el generador de la imagen. Para el detalle suele bastar entre 25 y 45.",
+    "asInStudio": "Como en el estudio",
+    "asInStudioHint": "Los pasos, la fidelidad a la solicitud, el sampler, el VAE, los LoRA y los embeddings que el estudio recuerda para este modelo."
   },
   "steps": {
     "empty": "Aún no hay pasos",
@@ -727,7 +740,8 @@
       "create": "Creación",
       "edit": "Cambio",
       "outpaint": "Ampliación",
-      "upscale": "Ampliado"
+      "upscale": "Ampliado",
+      "refine": "Detalle"
     },
     "builtin": {
       "photo": "Fotografía",
@@ -762,7 +776,44 @@
     "upscaleOptions": "Ajustes de ampliación",
     "noticeNeedsGenerator": "El detalle necesita ComfyUI o Forge. La imagen solo se amplió.",
     "noticeNoPrompt": "Esta imagen no tiene un prompt guardado, así que solo se amplió.",
-    "noticeRefineFailed": "El generador no respondió, así que la imagen solo se amplió."
+    "noticeRefineFailed": "El generador no respondió, así que la imagen solo se amplió.",
+    "tuning": "Sampler, VAE, LoRA y embeddings",
+    "tuningSilent": "El generador no responde, por eso las listas están vacías. Inícielo y pulse «Actualizar».",
+    "tuningUsual": "El del generador",
+    "tuningUsualNamed": "Habitual ({name})",
+    "tuningReset": "Restablecer",
+    "sampler": "Sampler",
+    "samplerHint": "Del sampler y del planificador dependen la nitidez y el detalle fino. Son habituales Euler a o DPM++ 2M con el planificador Karras.",
+    "scheduler": "Planificador",
+    "vae": "VAE",
+    "vaeHint": "Hace falta un VAE aparte cuando el modelo no lo incluye: la imagen sale entonces apagada o borrosa.",
+    "vaeOfModel": "El del modelo",
+    "lora": "LoRA",
+    "loraHint": "El número es la fuerza de la LoRA. Normalmente entre 0,6 y 1.",
+    "loraAdd": "Añadir…",
+    "loraNone": "No hay archivos LoRA",
+    "refine": "Añadir detalle",
+    "refineHint": "El generador repasa la imagen una vez más y pinta el detalle fino. El tamaño no cambia.",
+    "service": {
+      "ready": "en marcha",
+      "starting": "iniciando…",
+      "stopped": "detenido",
+      "missing": "no responde"
+    },
+    "historyView": {
+      "groups": "Por prompt",
+      "grid": "Cuadrícula",
+      "list": "Lista"
+    },
+    "before": "Antes",
+    "after": "Después",
+    "zoomHint": "La rueda del ratón amplía, arrastrar mueve la imagen y un doble clic la vuelve a ajustar.",
+    "negativeLine": "Qué evitar: {text}",
+    "embedding": "Embeddings",
+    "embeddingHint": "Un embedding actúa como una palabra de la solicitud. Los elegidos se añaden solos a la solicitud o a lo que hay que evitar.",
+    "embeddingPrompt": "A la solicitud",
+    "embeddingNegative": "A lo que evitar",
+    "embeddingNone": "No hay archivos de embeddings"
   },
   "vision": {
     "noModelTitle": "No se ha elegido un modelo",
@@ -993,7 +1044,11 @@
       "logFile": "Mostrar archivo",
       "logCut": "Solo se muestra el final del registro. El archivo lo contiene todo.",
       "worksLocally": "Funciona sin ComfyUI",
-      "file": "Archivo"
+      "file": "Archivo",
+      "downloaded": "Descargado",
+      "downloadedTo": "Guardado en {path}",
+      "saveTo": "Se guarda en {path}",
+      "showFile": "Mostrar archivo"
     },
     "notSupportedYet": "Aún no compatible"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "No hay un archivo fijado de {id} para este equipo",
     "noModelFolder": "Primero añade una carpeta para este tipo de modelo",
     "upscaleModelFailed": "El modelo de ampliación no pudo ejecutarse: {model}",
-    "upscalerMissing": "No se encontró el modelo de ampliación: {model}"
+    "upscalerMissing": "No se encontró el modelo de ampliación: {model}",
+    "refineNeedsGenerator": "El detalle se añade con ComfyUI o Forge. Elija uno de ellos como generador.",
+    "refineNoPrompt": "Esta imagen no tiene un prompt guardado, así que no se le puede añadir detalle.",
+    "refineTooLarge": "La imagen es demasiado grande para añadir detalle: {side} px en el lado largo; se admiten hasta {limit} px."
   },
   "native": {
     "tray": {

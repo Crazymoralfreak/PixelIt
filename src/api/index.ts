@@ -24,6 +24,8 @@ import type {
   Expand,
   GenerateRequest,
   GeneratedRecord,
+  GenerationOptions,
+  GeneratorService,
   Upscaler,
   ModelHit,
   ModelKind,
@@ -215,6 +217,9 @@ export const api = {
     upscale: number,
   ) => invoke<number>("generate_start", { start: { request, source, strokes, expand, confirmed, upscale } }),
   generationModels: (provider: string) => invoke<ModelList>("generation_models", { provider }),
+  /** Samplers, schedules, VAE and LoRA files. Rejects when the generator does not answer. */
+  generationOptions: (provider: string) => invoke<GenerationOptions>("generation_options", { provider }),
+  generatorStatus: (provider: string) => invoke<GeneratorService>("generator_status", { provider }),
   promptImprove: (text: string, confirmed: boolean) => invoke<string>("prompt_improve", { text, confirmed }),
   pictureParameters: (path: string) => invoke<PictureParameters | null>("picture_parameters", { path }),
   generatedList: () => invoke<GeneratedRecord[]>("generated_list"),
@@ -223,6 +228,8 @@ export const api = {
   generatedExport: (files: string[], folder: string) => invoke<string[]>("generated_export", { files, folder }),
   /** The history entry is the result of the returned job. */
   generatedUpscale: (file: string, factor: number) => invoke<number>("generated_upscale", { file, factor }),
+  /** Detail painted in at the same size. The history entry is the result of the returned job. */
+  generatedRefine: (file: string, confirmed: boolean) => invoke<number>("generated_refine", { file, confirmed }),
   upscalersList: () => invoke<Upscaler[]>("upscalers_list"),
   stylesList: () => invoke<Style[]>("styles_list"),
   styleSave: (style: Style) => invoke<Style>("style_save", { style }),

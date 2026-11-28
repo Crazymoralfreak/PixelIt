@@ -52,7 +52,9 @@
       "vision": "Rozpoznawanie",
       "cli": "Wiersz poleceń",
       "agent": "Asystent",
-      "edit": "Edytor"
+      "edit": "Edytor",
+      "upscale": "Powiększanie",
+      "refine": "Dodawanie szczegółów"
     },
     "state": {
       "queued": "W kolejce",
@@ -231,7 +233,8 @@
     "upscale": "Powiększanie",
     "restoreFaces": "Odtwarzanie twarzy",
     "inpaint": "Usuwanie obiektów",
-    "aiEdit": "Edycja AI"
+    "aiEdit": "Edycja AI",
+    "aiDetail": "Szczegóły AI"
   },
   "op": {
     "mode": "Tryb",
@@ -346,7 +349,17 @@
     "editStrength": "Siła zmiany",
     "editStrengthHint": "Im większa wartość, tym bardziej wynik różni się od oryginalnego obrazu.",
     "generatorMissing": "Ten krok wymaga generatora obrazów.",
-    "editModelDefault": "Domyślnie"
+    "editModelDefault": "Domyślnie",
+    "detailAbout": "Generator przechodzi po obrazie i dodaje drobne szczegóły; to, co obraz przedstawia, zostaje. Przy zapisie plik jest malowany w pełnym rozmiarze.",
+    "detailAreaHint": "Zamaluj miejsce, któremu brakuje szczegółów. Bez zaznaczenia domalowywany jest cały obraz.",
+    "detailPrompt": "Co jest na obrazie",
+    "detailPromptHint": "Opisz obraz taki, jaki jest: według tego tekstu generator domalowuje szczegóły. Puste pole wysyła „{prompt}”.",
+    "promptFromFile": "Weź zapytanie z pliku",
+    "promptFromFileHint": "Zapytanie, z którym obraz został wygenerowany, jeśli plik je przechowuje.",
+    "promptFromFileNone": "Plik nie zawiera zapytania.",
+    "detailStrengthHint": "Jak daleko generator może odejść od obrazu. Do szczegółów zwykle wystarcza 25–45.",
+    "asInStudio": "Jak w studiu",
+    "asInStudioHint": "Kroki, wierność zapytaniu, sampler, VAE, LoRA i embeddingi zapamiętane w studiu dla tego modelu."
   },
   "steps": {
     "empty": "Nie ma jeszcze kroków",
@@ -727,7 +740,8 @@
       "create": "Tworzenie",
       "edit": "Poprawka",
       "outpaint": "Rozszerzenie",
-      "upscale": "Powiększenie"
+      "upscale": "Powiększenie",
+      "refine": "Szczegóły"
     },
     "builtin": {
       "photo": "Fotografia",
@@ -762,7 +776,44 @@
     "upscaleOptions": "Ustawienia powiększania",
     "noticeNeedsGenerator": "Szczegóły wymagają ComfyUI lub Forge. Obraz został tylko powiększony.",
     "noticeNoPrompt": "Przy tym obrazie nie zapisano zapytania, więc został tylko powiększony.",
-    "noticeRefineFailed": "Generator nie odpowiedział, więc obraz został tylko powiększony."
+    "noticeRefineFailed": "Generator nie odpowiedział, więc obraz został tylko powiększony.",
+    "tuning": "Sampler, VAE, LoRA i embeddingi",
+    "tuningSilent": "Generator nie odpowiada, więc listy są puste. Uruchom go i kliknij „Odśwież”.",
+    "tuningUsual": "Jak w generatorze",
+    "tuningUsualNamed": "Zwykły ({name})",
+    "tuningReset": "Przywróć",
+    "sampler": "Sampler",
+    "samplerHint": "Od samplera i harmonogramu zależą ostrość i drobne szczegóły. Często wybiera się Euler a albo DPM++ 2M z harmonogramem Karras.",
+    "scheduler": "Harmonogram",
+    "vae": "VAE",
+    "vaeHint": "Osobny VAE jest potrzebny, gdy model go nie zawiera: obraz wychodzi wtedy wyblakły lub rozmyty.",
+    "vaeOfModel": "Z modelu",
+    "lora": "LoRA",
+    "loraHint": "Liczba to siła LoRA. Zwykle od 0,6 do 1.",
+    "loraAdd": "Dodaj…",
+    "loraNone": "Brak plików LoRA",
+    "refine": "Dodaj szczegóły",
+    "refineHint": "Generator przechodzi po obrazie jeszcze raz i domalowuje drobne szczegóły. Rozmiar się nie zmienia.",
+    "service": {
+      "ready": "działa",
+      "starting": "uruchamia się…",
+      "stopped": "zatrzymany",
+      "missing": "nie odpowiada"
+    },
+    "historyView": {
+      "groups": "Według zapytań",
+      "grid": "Siatka",
+      "list": "Lista"
+    },
+    "before": "Przed",
+    "after": "Po",
+    "zoomHint": "Kółko myszy przybliża, przeciąganie przesuwa obraz, dwukrotne kliknięcie dopasowuje go z powrotem.",
+    "negativeLine": "Czego unikać: {text}",
+    "embedding": "Embeddingi",
+    "embeddingHint": "Embedding działa jak słowo zapytania. Wybrane same dopisują się do zapytania albo do tego, czego unikać.",
+    "embeddingPrompt": "Do zapytania",
+    "embeddingNegative": "Do unikanych",
+    "embeddingNone": "Brak plików embeddingów"
   },
   "vision": {
     "noModelTitle": "Nie wybrano modelu",
@@ -993,7 +1044,11 @@
       "logFile": "Pokaż plik",
       "logCut": "Widać tylko koniec dziennika. Całość jest w pliku.",
       "worksLocally": "Działa bez ComfyUI",
-      "file": "Plik"
+      "file": "Plik",
+      "downloaded": "Pobrano",
+      "downloadedTo": "Zapisano w {path}",
+      "saveTo": "Zapisuje do {path}",
+      "showFile": "Pokaż plik"
     },
     "notSupportedYet": "Jeszcze nieobsługiwane"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "Dla tego komputera nie ma przypiętego archiwum {id}",
     "noModelFolder": "Najpierw dodaj folder na modele tego rodzaju",
     "upscaleModelFailed": "Model powiększania nie uruchomił się: {model}",
-    "upscalerMissing": "Nie znaleziono modelu powiększania: {model}"
+    "upscalerMissing": "Nie znaleziono modelu powiększania: {model}",
+    "refineNeedsGenerator": "Szczegóły dodaje ComfyUI lub Forge. Wybierz jeden z nich jako generator.",
+    "refineNoPrompt": "Przy tym obrazie nie zapisano zapytania, więc nie można dodać szczegółów.",
+    "refineTooLarge": "Obraz jest za duży, aby dodać szczegóły: {side} px na dłuższym boku, dozwolone jest do {limit} px."
   },
   "native": {
     "tray": {

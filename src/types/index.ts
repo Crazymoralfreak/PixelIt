@@ -215,6 +215,31 @@ export interface AiEditOp {
   model: string;
 }
 
+/** The generator goes over the picture, adds fine detail and keeps what it shows. */
+export interface AiDetailOp {
+  type: "aiDetail";
+  /** What the picture shows. Empty sends a short description that asks for detail. */
+  prompt: string;
+  /** Area to paint detail in; without strokes it is the whole picture. */
+  strokes: Stroke[];
+  /** From 0 to 100. */
+  strength: number;
+  /** Number of the attempt: another number asks for another result. */
+  variant: number;
+  /** Empty uses the generator from the settings. */
+  provider: string;
+  /** Empty uses the model of that generator. */
+  model: string;
+  /** Empty uses the settings. */
+  negative: string;
+  /** 0 uses the settings. */
+  steps: number;
+  /** 0 uses the settings. */
+  cfg: number;
+  /** Ignored by a generator that takes none. */
+  tuning: Tuning;
+}
+
 export type Op =
   | ResizeOp
   | CropOp
@@ -228,7 +253,8 @@ export type Op =
   | UpscaleOp
   | RestoreFacesOp
   | InpaintOp
-  | AiEditOp;
+  | AiEditOp
+  | AiDetailOp;
 
 export type OpKind = Op["type"];
 
@@ -671,11 +697,65 @@ export interface Endpoint {
 
 export type GenerationProvider = "none" | "comfy" | "forge" | "sdCpp" | "cloud";
 
+/** One LoRA file laid over a checkpoint. */
+export interface Lora {
+  name: string;
+  weight: number;
+}
+
+/** A textual inversion file. It works as a word of a prompt, so it is named there. */
+export interface Embedding {
+  name: string;
+  /** 1 is a plain word. */
+  weight: number;
+  /** Named in the negative prompt rather than in the prompt. */
+  negative: boolean;
+}
+
+/**
+ * What shapes a picture besides the checkpoint. ComfyUI and Forge take these;
+ * every name is the one that generator lists. Empty keeps its usual choice.
+ */
+export interface Tuning {
+  sampler: string;
+  scheduler: string;
+  vae: string;
+  loras: Lora[];
+  embeddings: Embedding[];
+}
+
 export interface ModelDefaults {
   width: number;
   height: number;
   steps: number;
   cfg: number;
+  tuning: Tuning;
+}
+
+/** What a generator offers besides checkpoints. */
+export interface GenerationOptions {
+  /** False when the generator takes none of this. */
+  supported: boolean;
+  samplers: string[];
+  schedulers: string[];
+  vaes: string[];
+  loras: string[];
+  embeddings: string[];
+  /** The sampler and the schedule used when none is chosen; empty when the generator decides. */
+  sampler: string;
+  scheduler: string;
+}
+
+export type HistoryView = "groups" | "grid" | "list";
+
+export type ServiceState = "ready" | "starting" | "stopped" | "missing" | "remote";
+
+/** How the generator of the studio stands. `remote` shows nothing. */
+export interface GeneratorService {
+  state: ServiceState;
+  /** Started by PixelIt, so it can be stopped from the studio. */
+  ours: boolean;
+  app: AppKind | "";
 }
 
 export interface Generation {
@@ -705,6 +785,8 @@ export interface Generation {
   upscaleRefine: boolean;
   /** How far that pass may move from the enlarged picture, from 0 to 1. */
   upscaleStrength: number;
+  /** How the history of the studio is laid out. */
+  historyView: HistoryView;
 }
 
 export type AppKind = "comfy" | "forge";
@@ -798,6 +880,8 @@ export interface ModelHit {
   previews: string[];
   /** Every file that can be downloaded. The fields above are the one offered first. */
   files?: ModelFile[];
+  /** Full path when one of the files is already in a shared folder. */
+  installed?: string;
 }
 
 export interface SearchPage {
@@ -918,6 +1002,8 @@ export interface GenerateRequest {
   /** Empty uses the model of the settings. */
   model: string;
   styles: string[];
+  /** Ignored by a generator that takes none. */
+  tuning: Tuning;
 }
 
 export interface GenerationModel {
@@ -941,7 +1027,7 @@ export interface PictureParameters {
   model: string;
 }
 
-export type GeneratedKind = "create" | "edit" | "outpaint" | "upscale";
+export type GeneratedKind = "create" | "edit" | "outpaint" | "upscale" | "refine";
 
 export interface GeneratedPicture {
   file: string;
@@ -970,6 +1056,7 @@ export interface GeneratedRecord {
   source: string;
   kind: GeneratedKind;
   pictures: GeneratedPicture[];
+  tuning: Tuning;
   /** Why the detail pass did not run. Absent when it ran or was not asked for. */
   notice?: UpscaleNotice;
 }

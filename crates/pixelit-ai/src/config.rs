@@ -5,9 +5,13 @@
 //! accepted from the search for local servers.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+// The tuning of a generator is part of the "AI edit" step, so it lives with
+// the pipeline; the settings and the studio use the same types.
+pub use pixelit_core::pipeline::{Embedding, Lora, Tuning, MAX_EMBEDDINGS, MAX_LORAS};
 use pixelit_core::Result;
 use pixelit_engine::store::{load_or_default, no_migration, save_json};
 use pixelit_engine::Paths;
@@ -85,7 +89,7 @@ impl GenerationProvider {
     }
 }
 
-/// Size, steps and CFG remembered for one model.
+/// Size, steps, CFG and tuning remembered for one model.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ModelDefaults {
@@ -93,6 +97,7 @@ pub struct ModelDefaults {
     pub height: u32,
     pub steps: u32,
     pub cfg: f32,
+    pub tuning: Tuning,
 }
 
 impl Default for ModelDefaults {
@@ -102,8 +107,22 @@ impl Default for ModelDefaults {
             height: 1024,
             steps: 24,
             cfg: 6.0,
+            tuning: Tuning::default(),
         }
     }
+}
+
+/// How the history of the studio is laid out.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HistoryView {
+    /// Pictures under the request that made them.
+    #[default]
+    Groups,
+    /// Every picture as a tile.
+    Grid,
+    /// One row for a picture, with its request beside it.
+    List,
 }
 
 fn remember_parameters() -> bool {
@@ -150,6 +169,7 @@ pub struct Generation {
     pub upscale_refine: bool,
     /// How far that pass may move from the enlarged picture, from 0 to 1.
     pub upscale_strength: f32,
+    pub history_view: HistoryView,
 }
 
 /// Which local program a card is about.
@@ -364,11 +384,25 @@ impl LocalApps {
             &mut self.models.upscale,
         ] {
             for folder in folders.iter_mut() {
-                *folder = folder.trim().to_owned();
+                *folder = native_path(Path::new(folder.trim()));
             }
             folders.retain(|folder| !folder.is_empty());
+            let mut seen = Vec::new();
+            folders.retain(|folder| {
+                let fresh = !seen.contains(folder);
+                if fresh {
+                    seen.push(folder.clone());
+                }
+                fresh
+            });
         }
     }
+}
+
+/// A path written with the separators of this system: `D:\a/b` reads `D:\a\b`
+/// on Windows. Explorer does not find a file by a path with mixed separators.
+pub fn native_path(path: &Path) -> String {
+    path.components().collect::<PathBuf>().display().to_string()
 }
 
 /// Key of [`Generation::model_defaults`] for one generator and model.
@@ -399,6 +433,7 @@ impl Default for Generation {
             upscaler: String::new(),
             upscale_refine: true,
             upscale_strength: 0.35,
+            history_view: HistoryView::Groups,
         }
     }
 }
@@ -471,6 +506,7 @@ impl AiSettings {
             } else {
                 6.0
             };
+            defaults.tuning = defaults.tuning.tidy();
         }
         generation.cfg = if generation.cfg.is_finite() {
             generation.cfg.clamp(0.0, 30.0)
@@ -523,6 +559,81 @@ mod tests {
         assert_eq!(settings.generation.steps, 1);
         assert_eq!(settings.generation.cfg, 6.0);
         assert_eq!(settings.vision.url, "http://127.0.0.1:11434/v1");
+    }
+
+    #[test]
+    fn tuning_is_tidied_with_the_settings() {
+        let mut settings = AiSettings::default();
+        let key = defaults_key(GenerationProvider::Comfy, "sdxl.safetensors");
+        settings.generation.model_defaults.insert(
+            key.clone(),
+            ModelDefaults {
+                tuning: Tuning {
+                    sampler: String::from(" euler_ancestral "),
+                    scheduler: String::new(),
+                    vae: String::from("sdxl_vae.safetensors"),
+                    loras: vec![
+                        Lora {
+                            name: String::from(" detail.safetensors "),
+                            weight: 9.0,
+                        },
+                        Lora {
+                            name: String::from("  "),
+                            weight: 1.0,
+                        },
+                        Lora {
+                            name: String::from("style.safetensors"),
+                            weight: f32::NAN,
+                        },
+                    ],
+                    embeddings: vec![
+                        Embedding {
+                            name: String::from(" zPDXL-neg "),
+                            weight: 0.0,
+                            negative: true,
+                        },
+                        Embedding::default(),
+                    ],
+                },
+                ..ModelDefaults::default()
+            },
+        );
+        settings.normalize();
+        let tuning = &settings.generation.model_defaults[&key].tuning;
+        assert_eq!(tuning.sampler, "euler_ancestral");
+        assert_eq!(tuning.loras.len(), 2);
+        assert_eq!(tuning.loras[0].name, "detail.safetensors");
+        assert_eq!(tuning.loras[0].weight, 4.0);
+        assert_eq!(tuning.loras[1].weight, 1.0);
+        assert_eq!(tuning.embeddings.len(), 1);
+        assert_eq!(tuning.embeddings[0].name, "zPDXL-neg");
+        assert_eq!(tuning.embeddings[0].weight, 0.1);
+        assert!(tuning.embeddings[0].negative);
+        // A file written before these fields existed still loads.
+        let old: ModelDefaults =
+            serde_json::from_str(r#"{"width":832,"height":1216,"steps":28,"cfg":5.0}"#).unwrap();
+        assert_eq!(old.tuning, Tuning::default());
+        assert_eq!(old.width, 832);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn model_folders_are_written_with_one_kind_of_separator() {
+        let mut settings = AiSettings::default();
+        settings.apps.models.upscale = vec![
+            String::from(r" D:\Programs\ComfyUI\models/upscale_models "),
+            String::from(r"D:\Programs\ComfyUI\models\upscale_models"),
+            String::from("  "),
+        ];
+        settings.normalize();
+        assert_eq!(
+            settings.apps.models.upscale,
+            [r"D:\Programs\ComfyUI\models\upscale_models"]
+        );
+        assert_eq!(
+            native_path(Path::new(r"D:\a/b\4x-UltraSharp.pt")),
+            r"D:\a\b\4x-UltraSharp.pt"
+        );
     }
 
     #[test]

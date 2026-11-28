@@ -1,4 +1,5 @@
-// Every picture the studio has kept, newest first, grouped by the request.
+// Every picture the studio has kept, newest first: grouped by the request,
+// as a plain grid, or as a list with the request beside each picture.
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
@@ -6,14 +7,28 @@ import { thumbUrl } from "../../api/urls";
 import { useAppEvent } from "../../api/events";
 import { useApp } from "../../app/context";
 import { useT } from "../../i18n";
-import type { GeneratedRecord, Style } from "../../types";
-import { Button, Checkbox, EmptyState, Field, TextInput } from "../../ui";
+import { copyText } from "../../lib/clipboard";
+import type { GeneratedPicture, GeneratedRecord, HistoryView, Style } from "../../types";
+import { Button, Checkbox, EmptyState, Field, Segmented, TextInput } from "../../ui";
 import { PictureDialog, type PictureItem } from "./PictureDialog";
 import { useUpscale } from "./upscale";
+
+const VIEWS: readonly HistoryView[] = ["groups", "grid", "list"];
+
+/** The side of a thumbnail asked for a tile and for a row of the list. */
+const TILE = 640;
+const ROW = 160;
 
 function itemsOf(records: GeneratedRecord[]): PictureItem[] {
   return records.flatMap((record) => record.pictures.map((picture) => ({ record, picture })));
 }
+
+function promptOf(record: GeneratedRecord): string {
+  return record.prompt || record.finalPrompt;
+}
+
+type Keys = { ctrlKey: boolean; shiftKey: boolean; metaKey: boolean };
+const ADD: Keys = { ctrlKey: true, shiftKey: false, metaKey: false };
 
 export function History({
   styles,
@@ -31,14 +46,18 @@ export function History({
   onEdit: (file: string) => void;
 }) {
   const { t, td } = useT();
-  const { addToQueue, notify, showError, openInEditor, confirm } = useApp();
-  const { upscale } = useUpscale();
+  const { ai, refreshAi, addToQueue, notify, showError, openInEditor, confirm } = useApp();
+  const { upscale, refine } = useUpscale();
   const [records, setRecords] = useState<GeneratedRecord[]>([]);
   const [query, setQuery] = useState("");
   const [favorites, setFavorites] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [open, setOpen] = useState<number | null>(null);
+  const [refining, setRefining] = useState(false);
   const anchor = useRef<string | null>(null);
+  const saved: HistoryView = ai?.settings.generation.historyView ?? "groups";
+  const [view, setView] = useState<HistoryView>(saved);
+  useEffect(() => setView(saved), [saved]);
 
   const reload = () => {
     api
@@ -63,7 +82,18 @@ export function History({
     .filter((record) => needle === "" || record.prompt.toLowerCase().includes(needle) || record.finalPrompt.toLowerCase().includes(needle));
   const flat = itemsOf(shown);
 
-  const toggle = (file: string, event: { ctrlKey: boolean; shiftKey: boolean; metaKey: boolean }) => {
+  const changeView = (next: HistoryView) => {
+    setView(next);
+    if (!ai) {
+      return;
+    }
+    void api
+      .aiSettingsSet({ ...ai.settings, generation: { ...ai.settings.generation, historyView: next } })
+      .then(() => refreshAi())
+      .catch(showError);
+  };
+
+  const toggle = (file: string, event: Keys) => {
     if (event.shiftKey && anchor.current) {
       const from = flat.findIndex((item) => item.picture.file === anchor.current);
       const to = flat.findIndex((item) => item.picture.file === file);
@@ -116,6 +146,18 @@ export function History({
     }
   };
 
+  /**
+   * A picture made from the open one is the newest, so the dialog moves to
+   * it. Not while only favourites are shown: the new one is not among them.
+   */
+  const showNewest = () => {
+    setOpen((current) => (current === null || favorites ? current : 0));
+  };
+
+  const copy = (text: string) => {
+    void copyText(text).then((copied) => copied && notify(t("common.copied")));
+  };
+
   const styleLabel = (id: string) => {
     const style = styles.find((item) => item.id === id);
     if (!style) {
@@ -124,11 +166,120 @@ export function History({
     return style.builtin ? td(`studio.builtin.${style.id}`) : style.name;
   };
 
+  const about = (record: GeneratedRecord) =>
+    [
+      new Date(record.created).toLocaleString(),
+      record.model,
+      record.styles.length > 0 ? record.styles.map(styleLabel).join(", ") : "",
+    ]
+      .filter((part) => part !== "")
+      .join(" · ");
+
+  const copyButton = (record: GeneratedRecord) => (
+    <Button small disabled={promptOf(record) === ""} onClick={() => copy(promptOf(record))}>
+      {t("studio.copyPrompt")}
+    </Button>
+  );
+
+  const favoriteButton = (picture: GeneratedPicture) => (
+    <Button small onClick={() => void favorite(picture.file, !picture.favorite)}>
+      {picture.favorite ? t("studio.unfavorite") : t("studio.favorite")}
+    </Button>
+  );
+
+  const check = (picture: GeneratedPicture) => (
+    <Checkbox checked={picked.includes(picture.file)} onChange={() => toggle(picture.file, ADD)} label="" />
+  );
+
+  /** A picture with its buttons; `record` adds the button that copies the request. */
+  const tile = (picture: GeneratedPicture, record?: GeneratedRecord) => {
+    const index = flat.findIndex((item) => item.picture.file === picture.file);
+    return (
+      <div key={picture.file} className="gallery-item" title={record ? promptOf(record) : undefined}>
+        <img
+          src={thumbUrl({ path: picture.file, modified: 0 }, TILE)}
+          alt=""
+          draggable={false}
+          onClick={(event) => toggle(picture.file, event)}
+          onDoubleClick={() => setOpen(index)}
+        />
+        <div className="gallery-actions">
+          {check(picture)}
+          {favoriteButton(picture)}
+          <Button small onClick={() => setOpen(index)}>
+            {t("studio.open")}
+          </Button>
+          {record ? copyButton(record) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const body = () => {
+    switch (view) {
+      case "groups":
+        return shown.map((record) => (
+          <section key={record.id} className="studio-group">
+            <header>
+              <strong>{record.prompt || t("studio.noPrompt")}</strong>
+              <span className="studio-group-side">
+                <span className="tool-text">{about(record)}</span>
+                {copyButton(record)}
+              </span>
+            </header>
+            <div className="studio-grid">{record.pictures.map((picture) => tile(picture))}</div>
+          </section>
+        ));
+      case "grid":
+        return <div className="studio-tiles">{flat.map((item) => tile(item.picture, item.record))}</div>;
+      case "list":
+        return (
+          <div className="studio-rows">
+            {flat.map((item, index) => (
+              <div key={item.picture.file} className="studio-row">
+                {check(item.picture)}
+                <img
+                  src={thumbUrl({ path: item.picture.file, modified: 0 }, ROW)}
+                  alt=""
+                  draggable={false}
+                  onClick={(event) => toggle(item.picture.file, event)}
+                  onDoubleClick={() => setOpen(index)}
+                />
+                <div className="studio-row-text">
+                  <strong title={promptOf(item.record)}>{promptOf(item.record) || t("studio.noPrompt")}</strong>
+                  <span>
+                    {td(`studio.kind.${item.record.kind}`)}
+                    {item.picture.width > 0 ? ` · ${item.picture.width}×${item.picture.height}` : ""}
+                    {` · ${about(item.record)}`}
+                  </span>
+                </div>
+                <div className="studio-row-actions">
+                  {copyButton(item.record)}
+                  <Button small disabled={promptOf(item.record) === ""} onClick={() => onRepeat(item.record)}>
+                    {t("studio.repeat")}
+                  </Button>
+                  {favoriteButton(item.picture)}
+                  <Button small onClick={() => setOpen(index)}>
+                    {t("studio.open")}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      default: {
+        const unreachable: never = view;
+        return unreachable;
+      }
+    }
+  };
+
   return (
     <div className="column">
       <Field label={t("studio.historySearch")}>
         <TextInput value={query} onChange={setQuery} wide />
         <Checkbox checked={favorites} onChange={setFavorites} label={t("studio.favoritesOnly")} />
+        <Segmented value={view} options={VIEWS.map((value) => ({ value, label: td(`studio.historyView.${value}`) }))} onChange={changeView} />
       </Field>
       {picked.length > 0 ? (
         <div className="tool-run">
@@ -149,47 +300,7 @@ export function History({
           </Button>
         </div>
       ) : null}
-      {shown.length === 0 ? (
-        <EmptyState title={t("studio.historyEmptyTitle")} text={t("studio.historyEmptyText")} />
-      ) : (
-        shown.map((record) => (
-          <section key={record.id} className="studio-group">
-            <header>
-              <strong>{record.prompt || t("studio.noPrompt")}</strong>
-              <span className="tool-text">
-                {new Date(record.created).toLocaleString()}
-                {record.model ? ` · ${record.model}` : ""}
-                {record.styles.length > 0 ? ` · ${record.styles.map(styleLabel).join(", ")}` : ""}
-              </span>
-            </header>
-            <div className="studio-grid">
-              {record.pictures.map((picture) => {
-                const index = flat.findIndex((item) => item.picture.file === picture.file);
-                return (
-                  <div key={picture.file} className="gallery-item">
-                    <img
-                      src={thumbUrl({ path: picture.file, modified: 0 }, 512)}
-                      alt=""
-                      draggable={false}
-                      onClick={(event) => toggle(picture.file, event)}
-                      onDoubleClick={() => setOpen(index)}
-                    />
-                    <div className="gallery-actions">
-                      <Checkbox checked={picked.includes(picture.file)} onChange={() => toggle(picture.file, { ctrlKey: true, shiftKey: false, metaKey: false })} label="" />
-                      <Button small onClick={() => void favorite(picture.file, !picture.favorite)}>
-                        {picture.favorite ? t("studio.unfavorite") : t("studio.favorite")}
-                      </Button>
-                      <Button small onClick={() => setOpen(index)}>
-                        {t("studio.open")}
-                      </Button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        ))
-      )}
+      {shown.length === 0 ? <EmptyState title={t("studio.historyEmptyTitle")} text={t("studio.historyEmptyText")} /> : body()}
       {open !== null ? (
         <PictureDialog
           items={flat}
@@ -202,7 +313,17 @@ export function History({
           onSimilar={onSimilar}
           onEdit={onEdit}
           onUpscale={(file, factor) => {
-            void upscale(file, factor).catch(showError);
+            void upscale(file, factor)
+              .then((made) => made && showNewest())
+              .catch(showError);
+          }}
+          refining={refining}
+          onRefine={(file) => {
+            setRefining(true);
+            void refine(file)
+              .then(showNewest)
+              .catch(showError)
+              .finally(() => setRefining(false));
           }}
           onEditor={openInEditor}
           onBatch={(files) => {
@@ -210,7 +331,7 @@ export function History({
             notify(t("viewer.addedToBatch", { count: files.length }));
           }}
           onReveal={(file) => void api.revealPath(file).catch(showError)}
-          onCopy={(text) => void navigator.clipboard.writeText(text).then(() => notify(t("common.copied")))}
+          onCopy={copy}
           onSave={(files) => void save(files)}
           onDelete={(files) => void remove(files)}
           onFavorite={(file, on) => void favorite(file, on)}

@@ -15,6 +15,9 @@ use serde_json::Value;
 /// Version of `styles.json`.
 const VERSION: u32 = 1;
 
+/// The id of a style whose name has no letters or digits.
+const UNNAMED_ID: &str = "style";
+
 /// A style shipped with PixelIt. Its name is translated in the interface.
 #[derive(Clone, Copy)]
 struct Builtin {
@@ -141,8 +144,9 @@ pub fn list(paths: &Paths) -> Vec<Style> {
     styles
 }
 
-/// Stores a style of the user. A built-in id is refused. An empty id is made
-/// from the name, and an id already in use is replaced.
+/// Stores a style of the user. A built-in id is refused. A style without an id
+/// is new: it replaces the saved style of the same name or gets an id of its
+/// own. An id already in use is replaced.
 pub fn save(paths: &Paths, mut style: Style) -> Result<Style> {
     style.name = trim_owned(&style.name);
     style.prompt = trim_owned(&style.prompt);
@@ -150,17 +154,17 @@ pub fn save(paths: &Paths, mut style: Style) -> Result<Style> {
     if style.name.is_empty() {
         return Err(Error::new("emptyName"));
     }
-    let id = if style.id.trim().is_empty() {
-        slug(&style.name)
-    } else {
-        slug(&style.id)
-    };
-    if id.is_empty() || is_builtin(&id) {
+    let id = slug(&style.id);
+    if is_builtin(&id) {
         return Err(Error::new("builtinStyle"));
     }
-    style.id = id;
-    style.builtin = false;
     let mut styles = load_custom(paths);
+    style.id = if id.is_empty() {
+        new_id(&style.name, &styles)
+    } else {
+        id
+    };
+    style.builtin = false;
     if let Some(known) = styles.iter_mut().find(|known| known.id == style.id) {
         *known = style.clone();
     } else {
@@ -168,6 +172,35 @@ pub fn save(paths: &Paths, mut style: Style) -> Result<Style> {
     }
     save_custom(paths, &styles)?;
     Ok(style)
+}
+
+/// The id of a style saved without one: that of the saved style with this
+/// name, or else one made from the name that nothing uses yet. A name may be
+/// in any script, may leave no letters at all and may match a built-in style.
+fn new_id(name: &str, styles: &[Style]) -> String {
+    let wanted = name.to_lowercase();
+    if let Some(known) = styles
+        .iter()
+        .find(|known| known.name.to_lowercase() == wanted)
+    {
+        return known.id.clone();
+    }
+    let taken = |id: &str| is_builtin(id) || styles.iter().any(|known| known.id == id);
+    let mut base = slug(name);
+    if base.is_empty() {
+        base.push_str(UNNAMED_ID);
+    }
+    if !taken(&base) {
+        return base;
+    }
+    let mut number = 2_u32;
+    loop {
+        let id = format!("{base}-{number}");
+        if !taken(&id) {
+            return id;
+        }
+        number += 1;
+    }
 }
 
 /// Removes a style of the user. A built-in style is left in place.
@@ -286,11 +319,12 @@ fn trim_owned(text: &str) -> String {
     text.trim().to_owned()
 }
 
+/// Letters and digits of any script in lower case, the rest as single dashes.
 fn slug(text: &str) -> String {
     let mut out = String::new();
     for character in text.chars() {
-        if character.is_ascii_alphanumeric() {
-            out.push(character.to_ascii_lowercase());
+        if character.is_alphanumeric() {
+            out.extend(character.to_lowercase());
         } else if !out.ends_with('-') && !out.is_empty() {
             out.push('-');
         }
@@ -379,5 +413,64 @@ mod tests {
         let custom: Vec<Style> = load_custom(&paths);
         assert_eq!(custom.len(), 1);
         assert_eq!(custom[0].prompt, "pen");
+    }
+
+    #[test]
+    fn a_style_of_any_name_is_saved() {
+        let folder = tempfile::tempdir().unwrap();
+        let paths = Paths::at(folder.path());
+        let named = |name: &str| Style {
+            name: name.to_owned(),
+            prompt: String::from("ink"),
+            ..Style::default()
+        };
+        let id = |name: &str| save(&paths, named(name)).unwrap().id;
+
+        // A name without Latin letters, one that matches a built-in style and
+        // one without letters at all.
+        assert_eq!(id("Мой"), "мой");
+        assert_eq!(id("写真"), "写真");
+        assert_eq!(id("Anime"), "anime-2");
+        assert_eq!(id("!!!"), "style");
+        // Different names never share a style.
+        assert_eq!(id("Ink"), "ink");
+        assert_eq!(id("Ink!"), "ink-2");
+        assert_eq!(id("???"), "style-2");
+        // The same name is the same style, whatever the case of its letters.
+        assert_eq!(id("мой"), "мой");
+        assert_eq!(load_custom(&paths).len(), 7);
+
+        // What was saved is read back under the same ids and stays the user's.
+        let again = list(&paths);
+        assert!(again
+            .iter()
+            .any(|style| style.id == "мой" && !style.builtin));
+        assert!(again
+            .iter()
+            .any(|style| style.id == "anime" && style.builtin));
+        assert!(again
+            .iter()
+            .any(|style| style.id == "anime-2" && !style.builtin));
+
+        // An edit keeps the id, and a built-in id is still refused.
+        let edited = save(
+            &paths,
+            Style {
+                id: String::from("мой"),
+                ..named("Мой новый")
+            },
+        )
+        .unwrap();
+        assert_eq!(edited.id, "мой");
+        assert_eq!(load_custom(&paths).len(), 7);
+        let refused = save(
+            &paths,
+            Style {
+                id: String::from("photo"),
+                ..named("Photo")
+            },
+        );
+        assert!(refused.is_err());
+        assert!(remove(&paths, "мой").unwrap());
     }
 }

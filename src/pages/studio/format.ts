@@ -1,7 +1,7 @@
-// Shared numbers and text of the studio: aspect ratios, the canvas grow,
-// style text and the key a model's settings are stored under.
+// Shared numbers and text of the studio: aspect ratios, the canvas grow
+// and style text.
 
-import type { Expand, Generation, GenerationProvider, Style } from "../../types";
+import type { Expand, GeneratedRecord, Generation, GenerationProvider, Style } from "../../types";
 
 export const ASPECTS: ReadonlyArray<readonly [number, number]> = [
   [1, 1],
@@ -13,26 +13,22 @@ export const ASPECTS: ReadonlyArray<readonly [number, number]> = [
 
 export const NO_EXPAND: Expand = { left: 0, right: 0, top: 0, bottom: 0 };
 
-const SEPARATOR = "\u0001";
-
-export function defaultsKey(provider: GenerationProvider, model: string): string {
-  return `${provider}${SEPARATOR}${model.trim()}`;
-}
-
-export function modelOf(generation: Generation): string {
-  switch (generation.provider) {
-    case "none":
-      return "";
-    case "comfy":
-      return generation.comfyCheckpoint;
-    case "forge":
-      return generation.forgeCheckpoint;
-    case "sdCpp":
-      return generation.sdcppModel;
-    case "cloud":
-      return generation.cloud.model;
+/** The picture a record was made from, when the two can be shown under a curtain. */
+export function madeFrom(record: GeneratedRecord): string | undefined {
+  if (record.source === "") {
+    return undefined;
+  }
+  switch (record.kind) {
+    case "edit":
+    case "upscale":
+    case "refine":
+      return record.source;
+    case "create":
+    // A grown canvas has another shape, so the two would not lie over each other.
+    case "outpaint":
+      return undefined;
     default: {
-      const unreachable: never = generation.provider;
+      const unreachable: never = record.kind;
       return unreachable;
     }
   }

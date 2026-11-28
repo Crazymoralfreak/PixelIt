@@ -11,6 +11,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::config::AiSettings;
+use crate::generate::comfy_choices;
 use crate::net::Net;
 
 const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
@@ -108,11 +109,10 @@ fn model_names(kind: ServerKind, answer: &Value) -> Option<Vec<String>> {
             .iter()
             .filter_map(|model| model["id"].as_str().map(str::to_owned))
             .collect(),
-        ServerKind::Comfy => answer["CheckpointLoaderSimple"]["input"]["required"]["ckpt_name"][0]
-            .as_array()?
-            .iter()
-            .filter_map(|name| name.as_str().map(str::to_owned))
-            .collect(),
+        ServerKind::Comfy => {
+            answer.get("CheckpointLoaderSimple")?.get("input")?;
+            comfy_choices(answer, "CheckpointLoaderSimple", "ckpt_name")
+        }
         ServerKind::Forge => answer
             .as_array()?
             .iter()
@@ -252,6 +252,14 @@ mod tests {
         assert_eq!(
             picture_kind(PictureAsk::Comfy, &comfy).unwrap().1,
             ["sdxl.safetensors"]
+        );
+        // Nodes on the newer ComfyUI schema list their files under "options".
+        let newer = json!({ "CheckpointLoaderSimple": { "input": { "required": {
+            "ckpt_name": ["COMBO", { "multiselect": false, "options": ["flux.safetensors"] }],
+        } } } });
+        assert_eq!(
+            picture_kind(PictureAsk::Comfy, &newer).unwrap().1,
+            ["flux.safetensors"]
         );
         let forge = json!([{ "title": "dream [abc]" }]);
         assert_eq!(

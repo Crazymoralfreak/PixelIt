@@ -52,7 +52,9 @@
       "vision": "인식",
       "cli": "명령줄",
       "agent": "어시스턴트",
-      "edit": "편집기"
+      "edit": "편집기",
+      "upscale": "확대",
+      "refine": "디테일 더하기"
     },
     "state": {
       "queued": "대기 중",
@@ -231,7 +233,8 @@
     "upscale": "확대",
     "restoreFaces": "얼굴 복원",
     "inpaint": "개체 제거",
-    "aiEdit": "AI 편집"
+    "aiEdit": "AI 편집",
+    "aiDetail": "AI 디테일"
   },
   "op": {
     "mode": "모드",
@@ -346,7 +349,17 @@
     "editStrength": "변경 강도",
     "editStrengthHint": "값이 클수록 결과가 원본 이미지와 더 많이 달라집니다.",
     "generatorMissing": "이 단계에는 이미지 생성기가 필요합니다.",
-    "editModelDefault": "기본값"
+    "editModelDefault": "기본값",
+    "detailAbout": "생성기가 그림을 다시 훑으며 세밀한 디테일을 더합니다. 그림의 내용은 그대로입니다. 저장할 때는 파일을 원래 크기로 다시 그립니다.",
+    "detailAreaHint": "디테일이 필요한 부분을 브러시로 칠하세요. 표시가 없으면 이미지 전체에 적용됩니다.",
+    "detailPrompt": "그림의 내용",
+    "detailPromptHint": "그림을 있는 그대로 설명하세요. 생성기가 이 글을 바탕으로 디테일을 그립니다. 비워 두면 “{prompt}”가 전달됩니다.",
+    "promptFromFile": "파일의 프롬프트 사용",
+    "promptFromFileHint": "파일에 남아 있다면, 그림을 생성할 때 쓴 프롬프트입니다.",
+    "promptFromFileNone": "파일에 저장된 프롬프트가 없습니다.",
+    "detailStrengthHint": "생성기가 그림에서 얼마나 벗어나도 되는지입니다. 디테일에는 보통 25~45면 충분합니다.",
+    "asInStudio": "스튜디오와 같게",
+    "asInStudioHint": "스튜디오가 이 모델에 대해 기억하는 단계 수, 프롬프트 충실도, 샘플러, VAE, LoRA, 임베딩입니다."
   },
   "steps": {
     "empty": "아직 단계가 없습니다",
@@ -727,7 +740,8 @@
       "create": "만들기",
       "edit": "고치기",
       "outpaint": "넓히기",
-      "upscale": "확대"
+      "upscale": "확대",
+      "refine": "디테일"
     },
     "builtin": {
       "photo": "사진",
@@ -762,7 +776,44 @@
     "upscaleOptions": "확대 설정",
     "noticeNeedsGenerator": "디테일에는 ComfyUI 또는 Forge가 필요합니다. 그림은 확대만 되었습니다.",
     "noticeNoPrompt": "이 그림에는 저장된 프롬프트가 없어 확대만 되었습니다.",
-    "noticeRefineFailed": "생성기가 응답하지 않아 그림은 확대만 되었습니다."
+    "noticeRefineFailed": "생성기가 응답하지 않아 그림은 확대만 되었습니다.",
+    "tuning": "샘플러, VAE, LoRA, 임베딩",
+    "tuningSilent": "생성기가 응답하지 않아 목록이 비어 있습니다. 생성기를 시작한 뒤 “새로고침”을 누르세요.",
+    "tuningUsual": "생성기 기본값",
+    "tuningUsualNamed": "기본값({name})",
+    "tuningReset": "초기화",
+    "sampler": "샘플러",
+    "samplerHint": "선명도와 가는 디테일은 샘플러와 스케줄러에 달려 있습니다. Euler a 또는 Karras 스케줄러와 함께 쓰는 DPM++ 2M이 흔히 쓰입니다.",
+    "scheduler": "스케줄러",
+    "vae": "VAE",
+    "vaeHint": "모델에 VAE가 들어 있지 않으면 별도의 VAE가 필요합니다. 없으면 그림이 바래거나 흐리게 나옵니다.",
+    "vaeOfModel": "모델의 것",
+    "lora": "LoRA",
+    "loraHint": "숫자는 LoRA의 강도입니다. 보통 0.6에서 1 사이입니다.",
+    "loraAdd": "추가…",
+    "loraNone": "LoRA 파일 없음",
+    "refine": "디테일 더하기",
+    "refineHint": "생성기가 그림을 한 번 더 훑으며 가는 디테일을 그려 넣습니다. 크기는 그대로입니다.",
+    "service": {
+      "ready": "실행 중",
+      "starting": "시작하는 중…",
+      "stopped": "중지됨",
+      "missing": "응답 없음"
+    },
+    "historyView": {
+      "groups": "프롬프트별",
+      "grid": "격자",
+      "list": "목록"
+    },
+    "before": "이전",
+    "after": "이후",
+    "zoomHint": "마우스 휠로 확대하고, 끌어서 그림을 옮기고, 두 번 클릭하면 창에 맞게 돌아갑니다.",
+    "negativeLine": "피할 내용: {text}",
+    "embedding": "임베딩",
+    "embeddingHint": "임베딩은 프롬프트의 한 단어처럼 작동합니다. 고른 것은 프롬프트나 피할 내용에 저절로 덧붙습니다.",
+    "embeddingPrompt": "프롬프트에",
+    "embeddingNegative": "피할 내용에",
+    "embeddingNone": "임베딩 파일 없음"
   },
   "vision": {
     "noModelTitle": "모델을 선택하지 않았습니다",
@@ -993,7 +1044,11 @@
       "logFile": "파일 표시",
       "logCut": "로그의 끝부분만 표시됩니다. 전체는 파일에 있습니다.",
       "worksLocally": "ComfyUI 없이 동작",
-      "file": "파일"
+      "file": "파일",
+      "downloaded": "받음",
+      "downloadedTo": "저장했습니다: {path}",
+      "saveTo": "저장 위치: {path}",
+      "showFile": "파일 보기"
     },
     "notSupportedYet": "아직 지원하지 않음"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "이 컴퓨터용으로 고정된 {id} 압축 파일이 없습니다",
     "noModelFolder": "먼저 이 종류의 모델 폴더를 추가하세요",
     "upscaleModelFailed": "확대 모델을 실행하지 못했습니다: {model}",
-    "upscalerMissing": "확대 모델을 찾지 못했습니다: {model}"
+    "upscalerMissing": "확대 모델을 찾지 못했습니다: {model}",
+    "refineNeedsGenerator": "디테일은 ComfyUI 또는 Forge로 더합니다. 둘 중 하나를 생성기로 선택하세요.",
+    "refineNoPrompt": "이 그림에는 저장된 프롬프트가 없어 디테일을 더할 수 없습니다.",
+    "refineTooLarge": "디테일을 더하기에는 그림이 너무 큽니다: 긴 변 {side} px, 최대 {limit} px까지 가능합니다."
   },
   "native": {
     "tray": {

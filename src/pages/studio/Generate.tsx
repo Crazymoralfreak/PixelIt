@@ -8,16 +8,19 @@ import { useApp } from "../../app/context";
 import { GeneratorPicker } from "../../components/GeneratorPicker";
 import { JobRow } from "../../components/JobsPanel";
 import { PathField } from "../../components/PathField";
+import { TuningFields } from "../../components/TuningFields";
 import { useT } from "../../i18n";
 import { copyText } from "../../lib/clipboard";
+import { NO_TUNING, defaultsKey, modelOf, tuningEmpty, tuningOf } from "../../lib/generation";
 import type { Expand, GeneratePreview, GenerateRequest, GeneratedRecord, Generation, GenerationProvider, Stroke } from "../../types";
 import { Button, EmptyState, Field, Section, Segmented, Slider, Tag, TextArea } from "../../ui";
 import { Advanced } from "./Advanced";
 import { EditSource } from "./EditSource";
-import { ASPECTS, NO_EXPAND, applyStyles, defaultsKey, expandEmpty, fitRatio, modelOf, withModel } from "./format";
+import { ASPECTS, NO_EXPAND, applyStyles, expandEmpty, fitRatio, withModel } from "./format";
 import type { StudioHandoff } from "./handoff";
 import { PictureDialog, type PictureItem } from "./PictureDialog";
 import { Results } from "./Results";
+import { ServiceStatus } from "./Service";
 import { StyleBar, useStyles } from "./Styles";
 import { UpscaleFields, tellUpscale } from "./UpscaleOptions";
 import { useUpscale } from "./upscale";
@@ -50,8 +53,11 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
   const { t, td } = useT();
   const { ai, jobs, jobResult, navigate, openInEditor, addToQueue, notify, showError, withCloud, refreshAi } = useApp();
   const { styles, reload } = useStyles();
-  const { ensure: ensureUpscale, upscale } = useUpscale();
+  const { ensure: ensureUpscale, upscale, refine } = useUpscale();
   const [enlarge, setEnlarge] = useState<Enlarge>(0);
+  // Counts the starts of the generator, so the lists of models are asked for again.
+  const [started, setStarted] = useState(0);
+  const [refining, setRefining] = useState(false);
   const generation = ai?.settings.generation;
   const [mode, setMode] = useState<"create" | "edit">("create");
   const [request, setRequest] = useState<GenerateRequest | null>(null);
@@ -85,6 +91,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
       provider: generation.provider,
       model: modelOf(generation),
       styles: generation.styles,
+      tuning: tuningOf(generation, generation.provider, modelOf(generation)) ?? NO_TUNING,
     });
   }, [generation, request]);
 
@@ -94,7 +101,15 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
     }
     setSeen(handoff.token);
     switch (handoff.kind) {
-      case "repeat":
+      case "repeat": {
+        const target = handoff.record.provider === "none" ? request.provider : handoff.record.provider;
+        // A picture made without any keeps what the form has now, as long as
+        // the generator is the same: the names belong to the generator.
+        const tuning = !tuningEmpty(handoff.record.tuning)
+          ? handoff.record.tuning
+          : target === request.provider
+            ? request.tuning
+            : NO_TUNING;
         setMode("create");
         setRequest({
           ...request,
@@ -106,10 +121,12 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
           cfg: handoff.record.cfg || request.cfg,
           seed: null,
           styles: handoff.record.styles,
-          provider: handoff.record.provider === "none" ? request.provider : handoff.record.provider,
+          provider: target,
           model: handoff.record.model,
+          tuning,
         });
         break;
+      }
       case "seed":
         setRequest({ ...request, seed: handoff.seed });
         break;
@@ -217,7 +234,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
   const chosenStyles = request.styles
     .map((id) => styles.find((style) => style.id === id))
     .filter((style): style is NonNullable<typeof style> => style !== undefined);
-  const [finalPrompt] = applyStyles(request.prompt, request.negative || generation.negative, chosenStyles);
+  const [finalPrompt, finalNegative] = applyStyles(request.prompt, request.negative || generation.negative, chosenStyles);
   const job = jobId === null ? undefined : jobs.find((item) => item.id === jobId);
   const items: PictureItem[] = record ? record.pictures.map((picture) => ({ record, picture })) : [];
 
@@ -234,6 +251,9 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
     const currentKey = defaultsKey(provider, request.model || modelOf(generation));
     const nextKey = defaultsKey(nextProvider, kept);
     const recalled = generation.modelDefaults[nextKey];
+    // A model used before brings its own; a new one of the same generator
+    // keeps what is set, since the names mean the same there.
+    const nextTuning = tuningOf(generation, nextProvider, kept) ?? (nextProvider === provider ? request.tuning : NO_TUNING);
     const nextGeneration = withModel(
       {
         ...generation,
@@ -243,7 +263,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
         cfg: recalled?.cfg ?? cfg,
         modelDefaults: {
           ...generation.modelDefaults,
-          [currentKey]: { width, height, steps, cfg },
+          [currentKey]: { width, height, steps, cfg, tuning: request.tuning },
         },
       },
       nextProvider,
@@ -257,6 +277,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
       height: nextGeneration.height,
       steps: nextGeneration.steps,
       cfg: nextGeneration.cfg,
+      tuning: nextTuning,
     });
     try {
       await api.aiSettingsSet({ ...ai.settings, generation: nextGeneration });
@@ -300,7 +321,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
           styles: next.styles,
           modelDefaults: {
             ...generation.modelDefaults,
-            [key]: { width: next.width, height: next.height, steps: next.steps, cfg: next.cfg },
+            [key]: { width: next.width, height: next.height, steps: next.steps, cfg: next.cfg, tuning: next.tuning },
           },
         },
       });
@@ -337,6 +358,18 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
     }
   };
 
+  const paintDetail = (file: string) => {
+    setRefining(true);
+    void refine(file, setJobId)
+      .then(setRecord)
+      .catch(showError)
+      .finally(() => {
+        setRefining(false);
+        setJobId(null);
+        setPreviews([]);
+      });
+  };
+
   const saveTo = async (files: string[]) => {
     const folder = await api.pickFolder();
     if (!folder) {
@@ -354,17 +387,21 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
     <div className="columns">
       <div className="column">
         <Section>
-          <Segmented
-            value={mode}
-            options={[
-              { value: "create", label: t("studio.modeCreate") },
-              { value: "edit", label: t("studio.modeEdit") },
-            ]}
-            onChange={setMode}
-          />
+          <div className="studio-form-head">
+            <Segmented
+              value={mode}
+              options={[
+                { value: "create", label: t("studio.modeCreate") },
+                { value: "edit", label: t("studio.modeEdit") },
+              ]}
+              onChange={setMode}
+            />
+            <ServiceStatus provider={provider} onReady={() => setStarted((count) => count + 1)} />
+          </div>
           <GeneratorPicker
             provider={provider}
             model={request.model}
+            refresh={started}
             onChange={(nextProvider, nextModel) => {
               if (nextProvider === "") {
                 return;
@@ -404,6 +441,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
             styles={styles}
             showFinal={showFinal}
             finalText={finalPrompt}
+            finalNegative={finalNegative}
             onToggle={(id) => {
               const stylesOn = request.styles.includes(id) ? request.styles.filter((item) => item !== id) : [...request.styles, id];
               set({ styles: stylesOn });
@@ -443,7 +481,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
               onChange={(value) => setEnlarge(ENLARGE.find((factor) => String(factor) === value) ?? 0)}
             />
           </Field>
-          {enlarge !== 0 ? <UpscaleFields generation={generation} onChange={saveUpscale} /> : null}
+          {enlarge !== 0 ? <UpscaleFields generation={generation} refresh={started} onChange={saveUpscale} /> : null}
           {mode === "edit" ? (
             <>
               <Field label={t("studio.source")} hint={t("studio.sourceHint")}>
@@ -457,6 +495,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
               </Field>
             </>
           ) : null}
+          <TuningFields provider={provider} tuning={request.tuning} refresh={started} onChange={(tuning) => set({ tuning })} />
           <Advanced
             request={request}
             width={width}
@@ -478,7 +517,7 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
             <Tag tone={cloud ? "warning" : "ok"}>
               {td(`ai.provider.${provider}`)} · {cloud ? t("ai.remote") : t("ai.local")}
             </Tag>
-            <Button variant="primary" disabled={busy || request.prompt.trim() === "" || (mode === "edit" && source === "")} onClick={() => void run()}>
+            <Button variant="primary" disabled={busy || refining || request.prompt.trim() === "" || (mode === "edit" && source === "")} onClick={() => void run()}>
               {busy ? t("common.working") : mode === "edit" ? t("studio.editRun") : t("studio.generate")}
             </Button>
           </div>
@@ -511,6 +550,8 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
                 .then((enlarged) => enlarged && setRecord(enlarged))
                 .catch(showError);
             }}
+            refining={refining}
+            onRefine={paintDetail}
             onEditor={openInEditor}
             onBatch={(files) => {
               addToQueue(files);
@@ -542,6 +583,11 @@ export function Generate({ handoff }: { handoff: StudioHandoff | null }) {
             void upscale(file, factor)
               .then((enlarged) => enlarged && setRecord(enlarged))
               .catch(showError);
+          }}
+          refining={refining}
+          onRefine={(file) => {
+            setOpen(null);
+            paintDetail(file);
           }}
           onEditor={openInEditor}
           onBatch={(files) => {

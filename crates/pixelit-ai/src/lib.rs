@@ -35,18 +35,19 @@ use std::sync::{PoisonError, RwLock};
 
 use serde::Serialize;
 
-use pixelit_core::pipeline::{AiBackend, AiEdit, Mask, Op, ResizeFilter, Step};
+use pixelit_core::pipeline::{AiBackend, AiDetail, AiEdit, Mask, Op, ResizeFilter, Step};
 use pixelit_core::{ops, CancelToken, Error, Image, Result};
 use pixelit_engine::Paths;
 
-use crate::edits::{Edits, Print};
+use crate::edits::{Edits, Print, Redraw};
 
 pub use crate::apps::Host;
 pub use crate::browse::{ModelHit, SearchSource};
 pub use crate::catalog::{Entry, Kind};
-pub use crate::checkpoints::{GenerationModel, ModelList};
+pub use crate::checkpoints::{GenerationModel, ModelList, Options};
 pub use crate::config::{AiSettings, DeviceChoice, Endpoint, Generation, GenerationProvider};
 pub use crate::config::{AppKind, AppOrigin, LocalApps, ModelKind, ModelLibrary};
+pub use crate::config::{HistoryView, Lora, Tuning};
 pub use crate::discover::Found;
 pub use crate::faces::Face;
 pub use crate::generate::{GenerateRequest, Outcome, Source};
@@ -364,18 +365,20 @@ impl Ai {
     /// Whether any enabled step would ask a generator that is outside this computer.
     pub fn steps_leave_computer(&self, steps: &[Step]) -> bool {
         let settings = self.settings();
+        // A step names its own generator or leaves it to the settings.
+        let leaves = |provider: &str| {
+            let provider = match GenerationProvider::parse(provider) {
+                GenerationProvider::None => settings.generation.provider,
+                other => other,
+            };
+            generate::leaves_with(&settings, provider)
+        };
         steps
             .iter()
             .filter(|step| step.enabled)
             .any(|step| match &step.op {
-                Op::AiEdit(spec) if !spec.prompt.trim().is_empty() => {
-                    let chosen = GenerationProvider::parse(&spec.provider);
-                    let provider = match chosen {
-                        GenerationProvider::None => settings.generation.provider,
-                        other => other,
-                    };
-                    generate::leaves_with(&settings, provider)
-                }
+                Op::AiEdit(spec) if !spec.prompt.trim().is_empty() => leaves(&spec.provider),
+                Op::AiDetail(spec) => leaves(&spec.provider),
                 Op::Inpaint(spec) if !spec.prompt.trim().is_empty() => {
                     generate::leaves_computer(&settings)
                 }
@@ -439,6 +442,26 @@ impl Ai {
         )
     }
 
+    /// Paints detail into a picture at its own size with the generator of the
+    /// settings.
+    pub fn refine(
+        &self,
+        image: &Image,
+        notes: &upscale::Notes,
+        cancel: &CancelToken,
+        tick: &generate::Tick<'_>,
+    ) -> Result<Image> {
+        upscale::refine(
+            &self.net,
+            &self.paths,
+            &self.settings(),
+            image,
+            notes,
+            cancel,
+            tick,
+        )
+    }
+
     /// Finds the faces of a picture.
     pub fn detect_faces(&self, image: &Image, cancel: &CancelToken) -> Result<Vec<Face>> {
         if !install::is_installed(&self.paths, catalog::DETECTOR) {
@@ -452,13 +475,13 @@ impl Ai {
         generate::leaves_computer(&self.settings())
     }
 
-    /// Whether this picture and this change are already in the editor cache,
+    /// Whether this picture and this step are already in the editor cache,
     /// so applying the step again does not call the generator.
-    pub fn edit_is_cached(&self, image: &Image, spec: &AiEdit) -> bool {
-        Print::of(image, spec)
+    fn is_cached(&self, image: &Image, step: Redraw<'_>) -> bool {
+        Print::of(image, step)
             .ok()
             .and_then(|print| self.edits.find(&print))
-            .is_some()
+            .is_some_and(|generated| serves(step, &generated, image))
     }
 
     /// Whether every enabled step that would ask a generator already has its
@@ -476,7 +499,8 @@ impl Ai {
             .iter()
             .zip(inputs)
             .all(|(step, image)| match &step.op {
-                Op::AiEdit(spec) => self.edit_is_cached(image, spec),
+                Op::AiEdit(spec) => self.is_cached(image, Redraw::Edit(spec)),
+                Op::AiDetail(spec) => self.is_cached(image, Redraw::Detail(spec)),
                 Op::Inpaint(_)
                 | Op::Resize(_)
                 | Op::Crop(_)
@@ -526,7 +550,103 @@ impl Ai {
         let generated = self.redraw(image, Some(mask), &request, cancel)?;
         place(image, &generated, Some(mask))
     }
+
+    /// Runs an "AI edit" or an "AI detail" step: inside the mask, or over
+    /// the whole picture without one.
+    fn redrawn(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        step: Redraw<'_>,
+        preview: bool,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
+        // The real run repeats what the editor has shown: a generator gives
+        // another picture every time it is asked.
+        let print = Print::of(image, step)?;
+        if let Some(generated) = self
+            .edits
+            .find(&print)
+            .filter(|generated| serves(step, generated, image))
+        {
+            return place(image, &generated, mask);
+        }
+        let side = image.width().max(image.height());
+        if matches!(step, Redraw::Detail(_)) && side > upscale::REFINE_SIDE {
+            return Err(Error::new("refineTooLarge")
+                .with("side", side)
+                .with("limit", upscale::REFINE_SIDE));
+        }
+        let generated = self.redraw(image, mask, &request_of(step), cancel)?;
+        let result = place(image, &generated, mask)?;
+        if preview {
+            self.edits.remember(print, generated);
+        }
+        Ok(result)
+    }
 }
+
+/// What a detail pass sends when the step names nothing. A generator reads a
+/// prompt as a description of the picture, so these words ask for detail
+/// rather than giving an order. The editor shows the same words.
+const DETAIL_PROMPT: &str = "highly detailed, sharp focus, intricate details";
+
+/// What a step asks the generator for. What an edit leaves empty is taken
+/// from the settings. An empty detail prompt takes `DETAIL_PROMPT`.
+fn request_of(step: Redraw<'_>) -> GenerateRequest {
+    let strength = |strength: f32| (strength / 100.0).clamp(0.05, 1.0);
+    match step {
+        Redraw::Edit(spec) => GenerateRequest {
+            prompt: spec.prompt.trim().to_owned(),
+            strength: strength(spec.strength),
+            seed: Some(u64::from(spec.variant)),
+            provider: GenerationProvider::parse(&spec.provider),
+            model: spec.model.clone(),
+            ..GenerateRequest::default()
+        },
+        Redraw::Detail(spec) => GenerateRequest {
+            prompt: {
+                let prompt = spec.prompt.trim();
+                if prompt.is_empty() {
+                    DETAIL_PROMPT
+                } else {
+                    prompt
+                }
+                .to_owned()
+            },
+            negative: spec.negative.trim().to_owned(),
+            steps: spec.steps,
+            cfg: spec.cfg,
+            tuning: spec.tuning.clone(),
+            strength: strength(spec.strength),
+            seed: Some(u64::from(spec.variant)),
+            provider: GenerationProvider::parse(&spec.provider),
+            model: spec.model.clone(),
+            ..GenerateRequest::default()
+        },
+    }
+}
+
+/// Whether a picture the generator drew for the editor may stand for the
+/// same step on `image`. A changed picture is stretched over the full file,
+/// so the file shows what the editor has shown. A detail pass is worth only
+/// the size it was painted at: one painted for a clearly smaller copy is
+/// painted again.
+fn serves(step: Redraw<'_>, generated: &Image, image: &Image) -> bool {
+    match step {
+        Redraw::Edit(_) => true,
+        Redraw::Detail(_) => {
+            let drawn = u64::from(generated.width().max(generated.height()));
+            let wanted = u64::from(image.width().max(image.height()));
+            drawn * DETAIL_SIZE.1 >= wanted * DETAIL_SIZE.0
+        }
+    }
+}
+
+/// The share of the long side of a file, as a fraction, that a detail pass
+/// must have been painted at to be used for it. A generator rounds a size
+/// down to what it can paint, so the sizes are rarely equal.
+const DETAIL_SIZE: (u64, u64) = (9, 10);
 
 /// Puts a generated picture over the original: inside the mask, or over all
 /// of it without one. The size, the transparency and the depth stay those of
@@ -624,26 +744,18 @@ impl AiBackend for Ai {
         preview: bool,
         cancel: &CancelToken,
     ) -> Result<Image> {
-        // The real run repeats what the editor has shown: a generator gives
-        // another picture every time it is asked.
-        let print = Print::of(image, spec)?;
-        if let Some(generated) = self.edits.find(&print) {
-            return place(image, &generated, mask);
-        }
-        let request = GenerateRequest {
-            prompt: spec.prompt.trim().to_owned(),
-            strength: (spec.strength / 100.0).clamp(0.05, 1.0),
-            seed: Some(u64::from(spec.variant)),
-            provider: GenerationProvider::parse(&spec.provider),
-            model: spec.model.clone(),
-            ..GenerateRequest::default()
-        };
-        let generated = self.redraw(image, mask, &request, cancel)?;
-        let result = place(image, &generated, mask)?;
-        if preview {
-            self.edits.remember(print, generated);
-        }
-        Ok(result)
+        self.redrawn(image, mask, Redraw::Edit(spec), preview, cancel)
+    }
+
+    fn detail(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        spec: &AiDetail,
+        preview: bool,
+        cancel: &CancelToken,
+    ) -> Result<Image> {
+        self.redrawn(image, mask, Redraw::Detail(spec), preview, cancel)
     }
 }
 
@@ -693,6 +805,59 @@ mod tests {
         };
         let edit = ai.edit(&image, None, &spec, true, &cancel).unwrap_err();
         assert_eq!(edit.code, "providerNotSet");
+        let pass = AiDetail {
+            prompt: String::from("a night street"),
+            ..AiDetail::default()
+        };
+        let detail = ai.detail(&image, None, &pass, true, &cancel).unwrap_err();
+        assert_eq!(detail.code, "providerNotSet");
+    }
+
+    #[test]
+    fn a_detail_pass_carries_its_settings_and_refuses_a_huge_picture() {
+        let mut pass = AiDetail {
+            prompt: String::from(" a night street "),
+            negative: String::from(" blur "),
+            steps: 30,
+            cfg: 5.5,
+            variant: 3,
+            provider: String::from("forge"),
+            ..AiDetail::default()
+        };
+        pass.tuning.sampler = String::from("dpmpp_2m");
+        let request = request_of(Redraw::Detail(&pass));
+        assert_eq!(request.prompt, "a night street");
+        assert_eq!(request.negative, "blur");
+        assert_eq!((request.steps, request.cfg), (30, 5.5));
+        assert_eq!(request.tuning.sampler, "dpmpp_2m");
+        assert_eq!(request.seed, Some(3));
+        assert_eq!(request.provider, GenerationProvider::Forge);
+        assert!((request.strength - 0.35).abs() < 1e-6);
+
+        // Nothing written still asks for detail, in the words the editor shows.
+        let bare = AiDetail::default();
+        assert_eq!(request_of(Redraw::Detail(&bare)).prompt, DETAIL_PROMPT);
+        let spaces = AiDetail {
+            prompt: String::from("   "),
+            ..AiDetail::default()
+        };
+        assert_eq!(request_of(Redraw::Detail(&spaces)).prompt, DETAIL_PROMPT);
+
+        // An edit leaves all of that to the settings.
+        let edit = AiEdit {
+            prompt: String::from("make it night"),
+            ..AiEdit::default()
+        };
+        let request = request_of(Redraw::Edit(&edit));
+        assert_eq!((request.steps, request.cfg), (0, 0.0));
+        assert_eq!(request.negative, "");
+        assert_eq!(request.tuning, Tuning::default());
+
+        let (_folder, ai) = ai();
+        let cancel = CancelToken::new();
+        let huge = Image::new(upscale::REFINE_SIDE + 1, 8, Depth::Eight, Color::WHITE).unwrap();
+        let error = ai.detail(&huge, None, &pass, false, &cancel).unwrap_err();
+        assert_eq!(error.code, "refineTooLarge");
     }
 
     #[test]
@@ -722,13 +887,37 @@ mod tests {
             prompt: String::from("make it night"),
             ..AiEdit::default()
         };
-        let print = Print::of(&image, &spec).unwrap();
+        let print = Print::of(&image, Redraw::Edit(&spec)).unwrap();
         ai.edits.remember(print, image.clone());
         let step = Step::new("edit", Op::AiEdit(spec));
         assert!(ai.generator_steps_cached(&[&image], std::slice::from_ref(&step)));
 
         let other = Image::new(32, 24, Depth::Eight, Color::rgb(200, 10, 10)).unwrap();
         assert!(!ai.generator_steps_cached(&[&other], &[step]));
+
+        // A change shown on a reduced copy is used for the full file; a
+        // detail pass is used only at about the size it was painted at.
+        let full = Image::new(320, 240, Depth::Eight, Color::rgb(40, 80, 120)).unwrap();
+        let near = Image::new(33, 25, Depth::Eight, Color::rgb(40, 80, 120)).unwrap();
+        let change = AiEdit {
+            prompt: String::from("make it night"),
+            ..AiEdit::default()
+        };
+        assert!(ai.is_cached(&full, Redraw::Edit(&change)));
+        let detail = AiDetail {
+            prompt: String::from("a night street"),
+            ..AiDetail::default()
+        };
+        let pass = Redraw::Detail(&detail);
+        assert!(!ai.is_cached(&image, pass));
+        ai.edits
+            .remember(Print::of(&image, pass).unwrap(), image.clone());
+        assert!(ai.is_cached(&image, pass));
+        assert!(ai.is_cached(&near, pass));
+        assert!(!ai.is_cached(&full, pass));
+        let step = Step::new("detail", Op::AiDetail(detail.clone()));
+        assert!(ai.generator_steps_cached(&[&near], std::slice::from_ref(&step)));
+        assert!(!ai.generator_steps_cached(&[&full], &[step]));
 
         let prompted = Step::new(
             "fill",

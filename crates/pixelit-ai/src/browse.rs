@@ -87,6 +87,9 @@ pub struct ModelHit {
     pub previews: Vec<String>,
     #[serde(default)]
     pub files: Vec<ModelFile>,
+    /// Full path when a file of this model is already in a shared folder.
+    #[serde(default)]
+    pub installed: String,
 }
 
 fn format_of(name: &str) -> String {
@@ -319,6 +322,7 @@ pub fn civitai_hits(value: &Value, kind: ModelKind, show_nsfw: bool) -> Vec<Mode
             base_model: text_of(version, &["baseModel"]),
             previews: pictures(version, show_nsfw),
             files: Vec::new(),
+            installed: String::new(),
         }));
     }
     hits
@@ -355,6 +359,7 @@ pub fn civarchive_hits(value: &Value, kind: ModelKind, show_nsfw: bool) -> Vec<M
             base_model: text_of(version, &["baseModel", "base_model"]),
             previews: pictures(version, show_nsfw),
             files: Vec::new(),
+            installed: String::new(),
         }));
     }
     hits
@@ -388,6 +393,7 @@ pub fn huggingface_hits(value: &Value, kind: ModelKind) -> Vec<ModelHit> {
             base_model: String::new(),
             previews: Vec::new(),
             files: Vec::new(),
+            installed: String::new(),
         }));
     }
     hits
@@ -428,6 +434,7 @@ pub fn huggingface_file(value: &Value) -> Option<ModelHit> {
         base_model: String::new(),
         previews: Vec::new(),
         files: Vec::new(),
+        installed: String::new(),
     }))
 }
 
@@ -477,9 +484,34 @@ pub fn openmodeldb_hits(value: &Value, text: &str, show_nsfw: bool) -> Vec<Model
             base_model: text_of(model, &["architecture"]),
             previews: pictures(model, show_nsfw),
             files,
+            installed: String::new(),
         });
     }
     hits
+}
+
+/// Hosts that show a page about a file instead of the file itself.
+const PAGE_HOSTS: &[&str] = &[
+    "mega.nz",
+    "mega.io",
+    "drive.google.com",
+    "disk.yandex.",
+    "dropbox.com",
+];
+
+/// A link that is the file itself, not a page that only offers the file.
+fn direct_file(url: &str) -> bool {
+    let lower = url.to_ascii_lowercase();
+    lower.starts_with("https://") && !PAGE_HOSTS.iter().any(|host| lower.contains(host))
+}
+
+/// Hugging Face `/blob/` pages are not the file. `/resolve/` is.
+fn huggingface_resolve(url: &str) -> String {
+    if url.contains("huggingface.co/") && url.contains("/blob/") {
+        url.replacen("/blob/", "/resolve/", 1)
+    } else {
+        url.to_owned()
+    }
 }
 
 /// One OpenModelDB file that has a direct address.
@@ -490,8 +522,9 @@ fn openmodeldb_file(id: &str, resource: &Value) -> Option<ModelFile> {
         .and_then(|urls| {
             urls.iter()
                 .filter_map(Value::as_str)
-                .find(|url| url.starts_with("https://"))
+                .find(|url| direct_file(url))
         })?;
+    let url = huggingface_resolve(url);
     let extension = text_of(resource, &["type"]);
     let file_name = if extension.is_empty() {
         format!("{id}.bin")
@@ -501,7 +534,7 @@ fn openmodeldb_file(id: &str, resource: &Value) -> Option<ModelFile> {
     Some(ModelFile {
         format: extension.to_ascii_lowercase(),
         file_name,
-        url: url.to_owned(),
+        url,
         bytes: number_of(resource, &["size"]),
         sha256: text_of(resource, &["sha256"]),
     })
@@ -844,5 +877,22 @@ mod tests {
         assert_eq!(hits[0].files.len(), 2);
         assert_eq!(hits[0].files[0].format, "onnx");
         assert!(hits[0].files.iter().any(|file| file.format == "pth"));
+    }
+
+    #[test]
+    fn a_folder_link_is_not_a_file_and_a_blob_page_points_at_the_file() {
+        assert!(!direct_file("https://mega.nz/folder/abc"));
+        assert!(direct_file("https://example.invalid/a.onnx"));
+        assert_eq!(
+            huggingface_resolve("https://huggingface.co/org/model/blob/main/a.onnx"),
+            "https://huggingface.co/org/model/resolve/main/a.onnx"
+        );
+        let value = json!({
+            "only": {
+                "name": "OnlyMega",
+                "resources": [{"type": "pth", "urls": ["https://mega.nz/folder/abc"]}]
+            }
+        });
+        assert!(openmodeldb_hits(&value, "mega", false).is_empty());
     }
 }

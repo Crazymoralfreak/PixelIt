@@ -15,7 +15,7 @@ use tauri::Emitter;
 
 use pixelit_ai::generate::{self, save_generated, GenerateRequest, Outcome, Source};
 use pixelit_ai::parameters::{self, Parameters};
-use pixelit_ai::{history, styles, Expand, GenerationProvider, Style};
+use pixelit_ai::{history, styles, AppKind, Expand, GenerationProvider, Style};
 use pixelit_core::ops::annotate::stroke_mask;
 use pixelit_core::pipeline::{Mask, Stroke};
 use pixelit_core::{Error, Image, Result};
@@ -79,6 +79,7 @@ fn note_of(outcome: &Outcome, image: &Image, seed: u64, embed: bool) -> Option<S
         width: image.width(),
         height: image.height(),
         model: outcome.model.clone(),
+        sampler: outcome.tuning.sampler.clone(),
     }))
 }
 
@@ -126,6 +127,7 @@ fn remember(
             source: start.source.clone().unwrap_or_default(),
             kind,
             pictures,
+            tuning: outcome.tuning.clone(),
             ..history::Record::default()
         },
     )?;
@@ -214,11 +216,7 @@ pub fn generate_start(core: CoreState<'_>, start: GenerateStart) -> Result<u64> 
             });
             let app = core.app().clone();
             let tick = |index: u32, count: u32, step: u32, steps: u32, preview: Option<&[u8]>| {
-                let image = preview.filter(|bytes| bytes.len() <= 1_500_000).map(|bytes| STANDARD.encode(bytes));
-                let _ = app.emit(
-                    "generate:preview",
-                    json!({ "index": index, "count": count, "step": step, "steps": steps, "image": image }),
-                );
+                emit_preview(&app, index, count, step, steps, preview);
             };
             let outcome = core
                 .ai
@@ -290,6 +288,38 @@ pub fn generation_models(core: CoreState<'_>, provider: String) -> Result<pixeli
         &core.ai.settings(),
         GenerationProvider::parse(&provider),
     )
+}
+
+/// The samplers, schedules, VAE and LoRA files of a generator. A generator
+/// that is not running gives an error, and the form keeps what it has.
+#[tauri::command(async)]
+pub fn generation_options(core: CoreState<'_>, provider: String) -> Result<pixelit_ai::Options> {
+    pixelit_ai::checkpoints::options(
+        core.ai.net(),
+        &core.ai.settings(),
+        GenerationProvider::parse(&provider),
+    )
+}
+
+/// Whether the generator of the studio answers, and whether it can be
+/// started or stopped from here.
+#[tauri::command(async)]
+pub fn generator_status(core: CoreState<'_>, provider: String) -> pixelit_ai::apps::Service {
+    let settings = core.ai.settings();
+    let provider = match GenerationProvider::parse(&provider) {
+        GenerationProvider::None => settings.generation.provider,
+        chosen => chosen,
+    };
+    let (kind, url) = match provider {
+        GenerationProvider::Comfy => (AppKind::Comfy, &settings.generation.comfy_url),
+        GenerationProvider::Forge => (AppKind::Forge, &settings.generation.forge_url),
+        GenerationProvider::None | GenerationProvider::SdCpp | GenerationProvider::Cloud => {
+            return pixelit_ai::apps::Service::remote();
+        }
+    };
+    core.ai
+        .apps_host
+        .service(core.ai.net(), &settings.apps, kind, url)
 }
 
 #[tauri::command(async)]
@@ -375,56 +405,118 @@ pub fn generated_upscale(core: CoreState<'_>, file: String, factor: u32) -> Resu
             let notes = pixelit_ai::upscale::notes_of_file(core.paths(), Path::new(&file));
             let app = core.app().clone();
             let tick = |index: u32, count: u32, step: u32, steps: u32, preview: Option<&[u8]>| {
-                let image = preview
-                    .filter(|bytes| bytes.len() <= 1_500_000)
-                    .map(|bytes| STANDARD.encode(bytes));
-                let _ = app.emit(
-                    "generate:preview",
-                    json!({ "index": index, "count": count, "step": step, "steps": steps, "image": image }),
-                );
+                emit_preview(&app, index, count, step, steps, preview);
             };
             let done = core
                 .ai
                 .enlarge(&image, factor, &notes, 0, 1, &job.cancel, &tick)?;
-            let width = done.image.width();
-            let height = done.image.height();
-            let written = pixelit_ai::upscale::parameters_of(&notes, &done.image);
-            let files = save_generated(core.paths(), &[done.image], Some(&[written]))?;
-            let mut entry = history::record(
-                core.paths(),
-                history::Record {
-                    prompt: notes.prompt.clone(),
-                    negative: notes.negative.clone(),
-                    final_prompt: notes.prompt.clone(),
-                    provider: notes.provider,
-                    model: notes.model,
-                    steps: notes.steps,
-                    cfg: notes.cfg,
-                    source: file.clone(),
-                    kind: history::GeneratedKind::Upscale,
-                    width,
-                    height,
-                    pictures: files
-                        .iter()
-                        .map(|path| history::Picture {
-                            file: file_name(path),
-                            seed: notes.seed,
-                            width,
-                            height,
-                            ..history::Picture::default()
-                        })
-                        .collect(),
-                    ..history::Record::default()
-                },
+            let entry = keep_remade(
+                &core,
+                notes,
+                &file,
+                done.image,
+                history::GeneratedKind::Upscale,
             )?;
-            let folder = core.paths().generated();
-            for picture in &mut entry.pictures {
-                picture.file = display(&folder.join(&picture.file));
-            }
-            changed(&core);
             with_notice(&entry, done.notice)
         }
     }))
+}
+
+/// Paints detail into one generated picture at its own size and keeps the
+/// result next to it.
+#[tauri::command(async)]
+pub fn generated_refine(core: CoreState<'_>, file: String, confirmed: bool) -> Result<u64> {
+    core.ensure_not_updating()?;
+    let settings = core.ai.settings();
+    confirm_cloud(&core, generate::leaves_computer(&settings), confirmed)?;
+    let title = file_name(Path::new(&file));
+    let core = Arc::clone(core.inner());
+    Ok(core.engine.jobs.spawn("refine", &title, Lane::Gpu, {
+        let core = Arc::clone(&core);
+        move |job: &JobContext| {
+            let notes = pixelit_ai::upscale::notes_of_file(core.paths(), Path::new(&file));
+            let image = core
+                .engine
+                .runner()
+                .load(Path::new(&file), 0, &job.cancel)?
+                .media
+                .into_first()
+                .ok_or_else(|| Error::new("emptyImage").with("path", &file))?;
+            let app = core.app().clone();
+            let tick = |index: u32, count: u32, step: u32, steps: u32, preview: Option<&[u8]>| {
+                emit_preview(&app, index, count, step, steps, preview);
+            };
+            let painted = core.ai.refine(&image, &notes, &job.cancel, &tick)?;
+            let entry = keep_remade(&core, notes, &file, painted, history::GeneratedKind::Refine)?;
+            with_notice(&entry, "")
+        }
+    }))
+}
+
+fn emit_preview(
+    app: &tauri::AppHandle,
+    index: u32,
+    count: u32,
+    step: u32,
+    steps: u32,
+    preview: Option<&[u8]>,
+) {
+    let image = preview
+        .filter(|bytes| bytes.len() <= 1_500_000)
+        .map(|bytes| STANDARD.encode(bytes));
+    let _ = app.emit(
+        "generate:preview",
+        json!({ "index": index, "count": count, "step": step, "steps": steps, "image": image }),
+    );
+}
+
+/// Saves a picture made from the generated `source` and writes it into the
+/// history with the request of that picture.
+fn keep_remade(
+    core: &Core,
+    notes: pixelit_ai::upscale::Notes,
+    source: &str,
+    image: Image,
+    kind: history::GeneratedKind,
+) -> Result<history::Record> {
+    let width = image.width();
+    let height = image.height();
+    let written = pixelit_ai::upscale::parameters_of(&notes, &image);
+    let files = save_generated(core.paths(), &[image], Some(&[written]))?;
+    let mut entry = history::record(
+        core.paths(),
+        history::Record {
+            prompt: notes.prompt.clone(),
+            negative: notes.negative,
+            final_prompt: notes.prompt,
+            provider: notes.provider,
+            model: notes.model,
+            steps: notes.steps,
+            cfg: notes.cfg,
+            source: source.to_owned(),
+            kind,
+            width,
+            height,
+            pictures: files
+                .iter()
+                .map(|path| history::Picture {
+                    file: file_name(path),
+                    seed: notes.seed,
+                    width,
+                    height,
+                    ..history::Picture::default()
+                })
+                .collect(),
+            tuning: notes.tuning,
+            ..history::Record::default()
+        },
+    )?;
+    let folder = core.paths().generated();
+    for picture in &mut entry.pictures {
+        picture.file = display(&folder.join(&picture.file));
+    }
+    changed(core);
+    Ok(entry)
 }
 
 /// The upscalers the studio can offer right now.

@@ -81,7 +81,12 @@ function shapedByHand(op: Op): boolean {
 
 /** Whether a step has an area painted with the brush, which is done in a mode of its own. */
 function isBrushed(op: Op): op is BrushedOp {
-  return op.type === "inpaint" || op.type === "aiEdit" || op.type === "removeBackground";
+  return op.type === "inpaint" || op.type === "aiEdit" || op.type === "aiDetail" || op.type === "removeBackground";
+}
+
+/** Whether a step is drawn by a model that is run by hand: a change of the step waits for the button. */
+function isRedrawn(op: Op): boolean {
+  return op.type === "inpaint" || op.type === "aiEdit" || op.type === "aiDetail";
 }
 
 /** Whether a brushed step has nothing to show yet, so it opens ready to be painted. */
@@ -90,6 +95,7 @@ function awaitsBrush(op: BrushedOp): boolean {
     case "inpaint":
       return op.strokes.length === 0;
     case "aiEdit":
+    case "aiDetail":
       return op.prompt.trim() === "";
     case "removeBackground":
       return false;
@@ -107,6 +113,8 @@ function canRun(op: BrushedOp): boolean {
       return op.strokes.length > 0;
     case "aiEdit":
       return op.prompt.trim() !== "";
+    case "aiDetail":
+      return true;
     case "removeBackground":
       return true;
     default: {
@@ -132,6 +140,7 @@ function paintLabel(op: BrushedOp, t: Translator["t"]): string {
   switch (op.type) {
     case "inpaint":
     case "aiEdit":
+    case "aiDetail":
       return t("editor.editArea");
     case "removeBackground":
       return t("editor.markKeep");
@@ -265,6 +274,7 @@ function RunControls({
         </div>
       );
     case "aiEdit":
+    case "aiDetail":
       return (
         <div className="step-run">
           <Button small onClick={() => onPaint(true)}>
@@ -509,8 +519,7 @@ export default function EditorPage({ active }: { active: boolean }) {
       } else {
         const before = steps.find((step) => step.id === selected);
         const after = next.find((step) => step.id === selected);
-        const reshaped =
-          before && after && (after.op.type === "inpaint" || after.op.type === "aiEdit") && before.op !== after.op;
+        const reshaped = before && after && isRedrawn(after.op) && before.op !== after.op;
         if (reshaped) {
           setPainting(after.id);
         }
@@ -950,6 +959,7 @@ export default function EditorPage({ active }: { active: boolean }) {
                   selected={selected}
                   onSelect={selectStep}
                   interactive
+                  file={session.path}
                   extra={(step) => (
                     <ToolControls
                       step={step}
@@ -967,7 +977,7 @@ export default function EditorPage({ active }: { active: boolean }) {
                         busy={rendering}
                         onPaint={(on) => setPainting(on ? step.id : null)}
                         onAgain={() => {
-                          if (op.type === "aiEdit") {
+                          if (op.type === "aiEdit" || op.type === "aiDetail") {
                             lastCommit.current = 0;
                             commit(
                               steps.map((known) =>

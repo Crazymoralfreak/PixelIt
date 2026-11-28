@@ -21,7 +21,9 @@ use pixelit_engine::clock::LocalTime;
 use pixelit_engine::Paths;
 
 use crate::browse::{self, ModelHit, SearchPage, SearchQuery, SearchSource};
-use crate::config::{AppKind, AppOrigin, LocalApp, LocalApps, ModelKind, ModelLibrary};
+use crate::config::{
+    native_path, AppKind, AppOrigin, LocalApp, LocalApps, ModelKind, ModelLibrary,
+};
 use crate::net::{self, Net};
 
 /// Largest archive this section will unpack: 16 GiB.
@@ -256,7 +258,7 @@ fn package_kind(name: &str) -> Option<AppKind> {
 
 fn push_dir(list: &mut Vec<String>, path: PathBuf) {
     if path.is_dir() {
-        let text = path.display().to_string();
+        let text = native_path(&path);
         if !list.iter().any(|known| known == &text) {
             list.push(text);
         }
@@ -407,6 +409,56 @@ pub struct UpdateInfo {
     pub sha256: String,
 }
 
+/// What the studio shows about the generator it is about to ask.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ServiceState {
+    /// The address answers.
+    Ready,
+    /// Started here, and the address does not answer yet.
+    Starting,
+    /// Installed, not running: it can be started from the studio.
+    Stopped,
+    /// Nothing answers, and no program is known that could be started.
+    Missing,
+    /// Not a program of this computer: another machine, a cloud service,
+    /// stable-diffusion.cpp. Nothing is shown.
+    Remote,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Service {
+    pub state: ServiceState,
+    /// Started by this program, so it can be stopped here.
+    pub ours: bool,
+    /// `comfy` or `forge`; empty when there is nothing to start.
+    pub app: &'static str,
+}
+
+impl Service {
+    pub fn remote() -> Self {
+        Self {
+            state: ServiceState::Remote,
+            ours: false,
+            app: "",
+        }
+    }
+}
+
+/// The state of a generator on this computer.
+pub fn service_state(answers: bool, ours: bool, installed: bool) -> ServiceState {
+    if answers {
+        ServiceState::Ready
+    } else if ours {
+        ServiceState::Starting
+    } else if installed {
+        ServiceState::Stopped
+    } else {
+        ServiceState::Missing
+    }
+}
+
 struct Running {
     kind: AppKind,
     child: Child,
@@ -485,6 +537,27 @@ impl Host {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         running.retain_mut(|item| matches!(item.child.try_wait(), Ok(None)));
         running.iter().any(|item| item.kind == kind)
+    }
+
+    /// How the generator at `url` stands for the studio, when `kind` is the
+    /// program that serves it.
+    pub fn service(&self, net: &Net, apps: &LocalApps, kind: AppKind, url: &str) -> Service {
+        if !net::is_local(url) {
+            return Service::remote();
+        }
+        let ours = self.owns(kind);
+        let answers = net.get(url, None, Some(Duration::from_millis(800))).is_ok();
+        let app = apps.of(kind);
+        let installed = !answers
+            && !ours
+            && !app.home.is_empty()
+            && app.origin != AppOrigin::Missing
+            && program_found(kind, Path::new(&app.home));
+        Service {
+            state: service_state(answers, ours, installed),
+            ours,
+            app: kind.name(),
+        }
     }
 
     /// Stops a process this section started. A process it did not start is left alone.
@@ -1003,7 +1076,7 @@ pub fn adopt_models(kind: AppKind, home: &Path, models: &mut ModelLibrary) {
         if !folder.is_dir() {
             continue;
         }
-        let text = folder.display().to_string();
+        let text = native_path(&folder);
         let list = models.of_mut(*model_kind);
         if !list.iter().any(|item| item == &text) {
             list.push(text);
@@ -1359,15 +1432,38 @@ pub fn search_models(
             cursor: cursor.to_owned(),
         },
     )?;
+    for hit in &mut page.hits {
+        hit.installed = installed_path(&apps.models, kind, hit);
+    }
     if hide_installed {
-        let present = installed_names(&apps.models, kind);
-        page.hits.retain(|hit| {
-            !present
-                .iter()
-                .any(|name| name == &hit.file_name.to_ascii_lowercase())
-        });
+        page.hits.retain(|hit| hit.installed.is_empty());
     }
     Ok(page)
+}
+
+/// The file of this result that is already in a shared folder, if there is one.
+fn installed_path(models: &ModelLibrary, kind: ModelKind, hit: &ModelHit) -> String {
+    let mut names = vec![hit.file_name.as_str()];
+    for file in &hit.files {
+        if !names
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(&file.file_name))
+        {
+            names.push(file.file_name.as_str());
+        }
+    }
+    for folder in models.of(kind) {
+        for name in &names {
+            if name.is_empty() {
+                continue;
+            }
+            let path = Path::new(folder).join(name);
+            if path.is_file() {
+                return native_path(&path);
+            }
+        }
+    }
+    String::new()
 }
 
 /// Downloads one search result into the first folder of its kind.
@@ -1446,6 +1542,43 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_installed_file_is_found_by_any_of_its_names() {
+        let folder = tempfile::tempdir().unwrap();
+        fs::write(folder.path().join("sharp.onnx"), b"model").unwrap();
+        let models = ModelLibrary {
+            upscale: vec![folder.path().display().to_string()],
+            ..ModelLibrary::default()
+        };
+        let hit = ModelHit {
+            source: SearchSource::OpenModelDb,
+            name: String::from("Sharp"),
+            kind: ModelKind::Upscale,
+            file_name: String::from("sharp.pth"),
+            url: String::new(),
+            bytes: 0,
+            sha256: String::new(),
+            base_model: String::new(),
+            previews: Vec::new(),
+            files: vec![crate::browse::ModelFile {
+                file_name: String::from("sharp.onnx"),
+                url: String::new(),
+                bytes: 0,
+                sha256: String::new(),
+                format: String::from("onnx"),
+            }],
+            installed: String::new(),
+        };
+        let path = installed_path(&models, ModelKind::Upscale, &hit);
+        assert!(path.ends_with("sharp.onnx"));
+        let missing = ModelHit {
+            file_name: String::from("other.pth"),
+            files: Vec::new(),
+            ..hit
+        };
+        assert!(installed_path(&models, ModelKind::Upscale, &missing).is_empty());
+    }
+
+    #[test]
     fn a_later_release_is_newer_and_a_word_is_not() {
         assert!(release_is_newer("v0.45.0", "v0.46.0"));
         assert!(!release_is_newer("v0.46.0", "v0.46.0"));
@@ -1510,6 +1643,24 @@ mod tests {
         assert!(offer.forge.is_empty());
         assert_eq!(offer.models.checkpoints.len(), 1);
         assert_eq!(offer.models.loras.len(), 1);
+    }
+
+    #[test]
+    fn the_studio_is_told_how_its_generator_stands() {
+        assert_eq!(service_state(true, false, true), ServiceState::Ready);
+        assert_eq!(service_state(true, true, false), ServiceState::Ready);
+        assert_eq!(service_state(false, true, false), ServiceState::Starting);
+        assert_eq!(service_state(false, false, true), ServiceState::Stopped);
+        assert_eq!(service_state(false, false, false), ServiceState::Missing);
+        let host = Host::default();
+        let apps = LocalApps::default();
+        let far = host.service(
+            &Net::new(),
+            &apps,
+            AppKind::Comfy,
+            "http://192.168.1.20:8188",
+        );
+        assert_eq!(far, Service::remote());
     }
 
     #[test]

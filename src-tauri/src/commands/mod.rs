@@ -229,10 +229,10 @@ fn reveal_command(path: &str, target: &Path) -> Command {
     {
         let mut command = Command::new("explorer.exe");
         if target.is_dir() {
-            command.arg(target);
+            command.arg(explorer_path(path));
         } else {
             // Explorer reads this argument by its own rules, so it is passed as written.
-            command.raw_arg(format!("/select,\"{path}\""));
+            command.raw_arg(format!("/select,\"{}\"", explorer_path(path)));
         }
         command
     }
@@ -258,6 +258,13 @@ fn reveal_command(path: &str, target: &Path) -> Command {
         command.arg(folder);
         command
     }
+}
+
+/// The path as Explorer takes it. With a forward slash in it, Explorer does
+/// not find the file and opens the user's documents instead.
+#[cfg(windows)]
+fn explorer_path(path: &str) -> String {
+    path.trim().replace('/', "\\")
 }
 
 /// Opens the folder with the log files.
@@ -292,4 +299,18 @@ pub fn cache_clear(core: CoreState<'_>) -> CacheInfo {
 #[tauri::command(async)]
 pub fn fonts_list(core: CoreState<'_>) -> Vec<String> {
     core.engine.resources().families()
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn explorer_gets_a_path_with_backslashes_only() {
+        assert_eq!(
+            explorer_path(r"D:\Programs\ComfyUI\models/upscale_models\4x-UltraSharp.pt"),
+            r"D:\Programs\ComfyUI\models\upscale_models\4x-UltraSharp.pt"
+        );
+        assert_eq!(explorer_path(r"C:\a\b.png"), r"C:\a\b.png");
+    }
 }

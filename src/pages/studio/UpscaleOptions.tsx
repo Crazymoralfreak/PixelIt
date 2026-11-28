@@ -33,9 +33,12 @@ function bare(id: string): string {
 
 export function UpscaleFields({
   generation,
+  refresh = 0,
   onChange,
 }: {
   generation: Generation;
+  /** A new value asks for the list again: a generator that has started brings its own models. */
+  refresh?: number;
   onChange: (patch: Partial<Generation>) => void;
 }) {
   const { t } = useT();
@@ -53,7 +56,7 @@ export function UpscaleFields({
 
   useEffect(() => {
     load();
-  }, []);
+  }, [refresh]);
 
   const selected = generation.upscaler || "builtin";
   const known = models.some((item) => item.id === selected);

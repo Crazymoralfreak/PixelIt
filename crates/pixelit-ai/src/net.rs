@@ -649,13 +649,29 @@ impl Net {
         progress: &mut dyn FnMut(u64),
         cancel: &CancelToken,
     ) -> Result<()> {
-        let limit = bytes.unwrap_or(20 * 1024 * 1024 * 1024);
-        self.receive(url, target, limit, bytes.is_some(), progress, cancel)?;
-        if let Some(expected) = bytes {
-            let have = fs::metadata(target).map_or(0, |meta| meta.len());
-            if have != expected {
-                let _ = fs::remove_file(target);
-                return Err(Error::new("checksumMismatch").with("url", url));
+        let hashed = sha256.is_some_and(|sha| !sha.is_empty());
+        // A catalogue size is often rounded. With a hash, the hash decides;
+        // the size only caps how much is read, with room for that rounding.
+        let limit = match bytes {
+            Some(size) if hashed => size.saturating_add(size / 20).max(size + 4096),
+            Some(size) => size,
+            None => 20 * 1024 * 1024 * 1024,
+        };
+        self.receive(
+            url,
+            target,
+            limit,
+            !hashed && bytes.is_some(),
+            progress,
+            cancel,
+        )?;
+        if !hashed {
+            if let Some(expected) = bytes {
+                let have = fs::metadata(target).map_or(0, |meta| meta.len());
+                if have != expected {
+                    let _ = fs::remove_file(target);
+                    return Err(Error::new("checksumMismatch").with("url", url));
+                }
             }
         }
         if let Some(sha) = sha256.filter(|sha| !sha.is_empty()) {

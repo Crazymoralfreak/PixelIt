@@ -52,7 +52,9 @@
       "vision": "Erkennung",
       "cli": "Befehlszeile",
       "agent": "Assistent",
-      "edit": "Editor"
+      "edit": "Editor",
+      "upscale": "Vergrößerung",
+      "refine": "Details ergänzen"
     },
     "state": {
       "queued": "Wartet",
@@ -231,7 +233,8 @@
     "upscale": "Hochskalieren",
     "restoreFaces": "Gesichter wiederherstellen",
     "inpaint": "Objekte entfernen",
-    "aiEdit": "KI-Bearbeitung"
+    "aiEdit": "KI-Bearbeitung",
+    "aiDetail": "KI-Details"
   },
   "op": {
     "mode": "Modus",
@@ -346,7 +349,17 @@
     "editStrength": "Stärke der Änderung",
     "editStrengthHint": "Je höher der Wert, desto weiter entfernt sich das Ergebnis vom Originalbild.",
     "generatorMissing": "Dieser Schritt braucht einen Bildgenerator.",
-    "editModelDefault": "Standard"
+    "editModelDefault": "Standard",
+    "detailAbout": "Der Generator geht über das Bild und ergänzt feine Details; der Inhalt bleibt. Beim Speichern wird die Datei in voller Größe gemalt.",
+    "detailAreaHint": "Übermalen Sie die Stelle, die mehr Details braucht. Ohne Markierung wird das ganze Bild überarbeitet.",
+    "detailPrompt": "Was das Bild zeigt",
+    "detailPromptHint": "Beschreiben Sie das Bild, wie es ist: nach diesem Text ergänzt der Generator die Details. Ein leeres Feld sendet „{prompt}“.",
+    "promptFromFile": "Anfrage aus der Datei übernehmen",
+    "promptFromFileHint": "Die Anfrage, mit der das Bild erzeugt wurde, sofern die Datei sie enthält.",
+    "promptFromFileNone": "Die Datei enthält keine Anfrage.",
+    "detailStrengthHint": "Wie weit sich der Generator vom Bild entfernen darf. Für Details genügen meist 25 bis 45.",
+    "asInStudio": "Wie im Studio",
+    "asInStudioHint": "Schritte, Treue zur Anfrage, Sampler, VAE, LoRA-Dateien und Embeddings, die sich das Studio für dieses Modell gemerkt hat."
   },
   "steps": {
     "empty": "Noch keine Schritte",
@@ -727,7 +740,8 @@
       "create": "Erstellt",
       "edit": "Geändert",
       "outpaint": "Erweitert",
-      "upscale": "Vergrößert"
+      "upscale": "Vergrößert",
+      "refine": "Details"
     },
     "builtin": {
       "photo": "Fotografie",
@@ -762,7 +776,44 @@
     "upscaleOptions": "Einstellungen der Vergrößerung",
     "noticeNeedsGenerator": "Details brauchen ComfyUI oder Forge. Das Bild wurde nur vergrößert.",
     "noticeNoPrompt": "Zu diesem Bild ist kein Prompt gespeichert, daher wurde es nur vergrößert.",
-    "noticeRefineFailed": "Der Generator hat nicht geantwortet, daher wurde das Bild nur vergrößert."
+    "noticeRefineFailed": "Der Generator hat nicht geantwortet, daher wurde das Bild nur vergrößert.",
+    "tuning": "Sampler, VAE, LoRA und Embeddings",
+    "tuningSilent": "Der Generator antwortet nicht, daher sind die Listen leer. Starten Sie ihn und klicken Sie auf „Aktualisieren“.",
+    "tuningUsual": "Standard des Generators",
+    "tuningUsualNamed": "Standard ({name})",
+    "tuningReset": "Zurücksetzen",
+    "sampler": "Sampler",
+    "samplerHint": "Sampler und Scheduler bestimmen Schärfe und feine Details. Häufig genutzt: Euler a oder DPM++ 2M mit dem Scheduler Karras.",
+    "scheduler": "Scheduler",
+    "vae": "VAE",
+    "vaeHint": "Ein eigener VAE ist nötig, wenn das Modell keinen enthält: Das Bild wirkt dann blass oder unscharf.",
+    "vaeOfModel": "Aus dem Modell",
+    "lora": "LoRA",
+    "loraHint": "Die Zahl ist die Stärke der LoRA. Meist zwischen 0,6 und 1.",
+    "loraAdd": "Hinzufügen…",
+    "loraNone": "Keine LoRA-Dateien",
+    "refine": "Details ergänzen",
+    "refineHint": "Der Generator geht noch einmal über das Bild und malt feine Details hinein. Die Größe bleibt gleich.",
+    "service": {
+      "ready": "läuft",
+      "starting": "startet…",
+      "stopped": "gestoppt",
+      "missing": "antwortet nicht"
+    },
+    "historyView": {
+      "groups": "Nach Prompt",
+      "grid": "Raster",
+      "list": "Liste"
+    },
+    "before": "Vorher",
+    "after": "Nachher",
+    "zoomHint": "Das Mausrad zoomt, Ziehen verschiebt das Bild, ein Doppelklick passt es wieder ein.",
+    "negativeLine": "Was vermieden werden soll: {text}",
+    "embedding": "Embeddings",
+    "embeddingHint": "Ein Embedding wirkt als Wort der Anfrage. Die gewählten werden von selbst an die Anfrage oder an das zu Vermeidende angehängt.",
+    "embeddingPrompt": "Zur Anfrage",
+    "embeddingNegative": "Zum Vermeiden",
+    "embeddingNone": "Keine Embedding-Dateien"
   },
   "vision": {
     "noModelTitle": "Kein Modell gewählt",
@@ -993,7 +1044,11 @@
       "logFile": "Datei anzeigen",
       "logCut": "Es wird nur das Ende des Protokolls gezeigt. Die Datei enthält alles.",
       "worksLocally": "Läuft ohne ComfyUI",
-      "file": "Datei"
+      "file": "Datei",
+      "downloaded": "Heruntergeladen",
+      "downloadedTo": "Gespeichert unter {path}",
+      "saveTo": "Wird gespeichert in {path}",
+      "showFile": "Datei zeigen"
     },
     "notSupportedYet": "Noch nicht unterstützt"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "Für diesen Computer gibt es kein festes Archiv von {id}",
     "noModelFolder": "Zuerst einen Ordner für diese Art von Modell hinzufügen",
     "upscaleModelFailed": "Das Vergrößerungsmodell lief nicht: {model}",
-    "upscalerMissing": "Das Vergrößerungsmodell wurde nicht gefunden: {model}"
+    "upscalerMissing": "Das Vergrößerungsmodell wurde nicht gefunden: {model}",
+    "refineNeedsGenerator": "Details lassen sich mit ComfyUI oder Forge ergänzen. Wählen Sie eines davon als Generator.",
+    "refineNoPrompt": "Zu diesem Bild ist kein Prompt gespeichert, daher lassen sich keine Details ergänzen.",
+    "refineTooLarge": "Das Bild ist zu groß, um Details zu ergänzen: {side} px an der langen Seite, erlaubt sind bis zu {limit} px."
   },
   "native": {
     "tray": {

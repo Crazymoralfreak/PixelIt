@@ -77,6 +77,7 @@ pub enum Op {
     RestoreFaces(RestoreFaces),
     Inpaint(Inpaint),
     AiEdit(AiEdit),
+    AiDetail(AiDetail),
 }
 
 impl Op {
@@ -96,6 +97,7 @@ impl Op {
             Self::RestoreFaces(_) => "restoreFaces",
             Self::Inpaint(_) => "inpaint",
             Self::AiEdit(_) => "aiEdit",
+            Self::AiDetail(_) => "aiDetail",
         }
     }
 
@@ -108,6 +110,7 @@ impl Op {
                 | Self::RestoreFaces(_)
                 | Self::Inpaint(_)
                 | Self::AiEdit(_)
+                | Self::AiDetail(_)
         )
     }
 
@@ -117,6 +120,9 @@ impl Op {
         match self {
             Self::Inpaint(spec) => !spec.prompt.trim().is_empty(),
             Self::AiEdit(spec) => !spec.prompt.trim().is_empty(),
+            // An empty prompt still runs: the generator is given a short
+            // description that asks for detail.
+            Self::AiDetail(_) => true,
             Self::Resize(_)
             | Self::Crop(_)
             | Self::Rotate(_)
@@ -553,6 +559,114 @@ pub struct Inpaint {
     pub prompt: String,
 }
 
+/// One LoRA file laid over a checkpoint.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Lora {
+    /// The name as the generator lists it.
+    pub name: String,
+    /// How strongly it is applied; 1 is the strength it was trained for.
+    pub weight: f32,
+}
+
+impl Default for Lora {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            weight: 1.0,
+        }
+    }
+}
+
+/// Most LoRA files of one request.
+pub const MAX_LORAS: usize = 8;
+
+/// One embedding, a textual inversion file, named in a prompt. It works only
+/// as a word of the text, so the generator is given the word.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Embedding {
+    /// The name as the generator lists it.
+    pub name: String,
+    /// How strongly the word counts; 1 is a plain word.
+    pub weight: f32,
+    /// Named in the negative prompt rather than in the prompt.
+    pub negative: bool,
+}
+
+impl Default for Embedding {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            weight: 1.0,
+            negative: false,
+        }
+    }
+}
+
+/// Most embeddings of one request.
+pub const MAX_EMBEDDINGS: usize = 8;
+
+/// What shapes a picture besides the checkpoint: the sampler, its schedule,
+/// a separate VAE, LoRA files and embeddings. ComfyUI and Forge take these;
+/// every name is the one that generator lists.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Tuning {
+    /// Empty keeps the sampler the generator starts with.
+    pub sampler: String,
+    /// Empty keeps the schedule the generator starts with.
+    pub scheduler: String,
+    /// Empty uses the VAE inside the checkpoint.
+    pub vae: String,
+    pub loras: Vec<Lora>,
+    pub embeddings: Vec<Embedding>,
+}
+
+impl Tuning {
+    /// The same choices with spaces trimmed and nameless files dropped. The
+    /// strength of a LoRA is kept between -4 and 4, the weight of an
+    /// embedding between 0.1 and 4.
+    #[must_use]
+    pub fn tidy(&self) -> Self {
+        let weight = |weight: f32, low: f32| {
+            if weight.is_finite() {
+                weight.clamp(low, 4.0)
+            } else {
+                1.0
+            }
+        };
+        let loras = self
+            .loras
+            .iter()
+            .filter(|lora| !lora.name.trim().is_empty())
+            .take(MAX_LORAS)
+            .map(|lora| Lora {
+                name: lora.name.trim().to_owned(),
+                weight: weight(lora.weight, -4.0),
+            })
+            .collect();
+        let embeddings = self
+            .embeddings
+            .iter()
+            .filter(|embedding| !embedding.name.trim().is_empty())
+            .take(MAX_EMBEDDINGS)
+            .map(|embedding| Embedding {
+                name: embedding.name.trim().to_owned(),
+                weight: weight(embedding.weight, 0.1),
+                negative: embedding.negative,
+            })
+            .collect();
+        Self {
+            sampler: self.sampler.trim().to_owned(),
+            scheduler: self.scheduler.trim().to_owned(),
+            vae: self.vae.trim().to_owned(),
+            loras,
+            embeddings,
+        }
+    }
+}
+
 /// A change described in words and drawn by the image generator of the
 /// settings.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -582,6 +696,55 @@ impl Default for AiEdit {
             variant: 0,
             provider: String::new(),
             model: String::new(),
+        }
+    }
+}
+
+/// A pass of the image generator over a picture that adds fine detail and
+/// keeps what the picture shows. Such a pass is worth only the size it was
+/// painted at, so the real run paints the full file again rather than
+/// stretching the reduced picture the editor has shown.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AiDetail {
+    /// What the picture shows. Empty asks for detail in general: the
+    /// generator is given a short description instead of this text.
+    pub prompt: String,
+    /// Area to paint detail in; without strokes it is the whole picture.
+    pub strokes: Vec<Stroke>,
+    /// How far the result may move from the picture, from `0` to `100`.
+    pub strength: f32,
+    /// Number of the attempt: another number asks for another result.
+    pub variant: u32,
+    /// Generator to use: `comfy`, `forge`, `sdCpp` or `cloud`. Empty uses the
+    /// generator of the settings.
+    pub provider: String,
+    /// Model of that generator. Empty uses the model of the settings.
+    pub model: String,
+    /// What the picture must not have. Empty uses the settings.
+    pub negative: String,
+    /// Sampling steps; `0` uses the settings.
+    pub steps: u32,
+    /// How closely the prompt is followed; `0` uses the settings.
+    pub cfg: f32,
+    /// The sampler, the schedule, the VAE, LoRA files and embeddings, for a
+    /// generator that takes them.
+    pub tuning: Tuning,
+}
+
+impl Default for AiDetail {
+    fn default() -> Self {
+        Self {
+            prompt: String::new(),
+            strokes: Vec::new(),
+            strength: 35.0,
+            variant: 0,
+            provider: String::new(),
+            model: String::new(),
+            negative: String::new(),
+            steps: 0,
+            cfg: 0.0,
+            tuning: Tuning::default(),
         }
     }
 }
@@ -874,6 +1037,18 @@ pub trait AiBackend: Sync {
         preview: bool,
         cancel: &CancelToken,
     ) -> Result<Image>;
+
+    /// Paints fine detail into the picture, which keeps what it shows:
+    /// inside `mask`, or everywhere without one. `preview` means the same as
+    /// for an edit.
+    fn detail(
+        &self,
+        image: &Image,
+        mask: Option<&Mask>,
+        spec: &AiDetail,
+        preview: bool,
+        cancel: &CancelToken,
+    ) -> Result<Image>;
 }
 
 /// Everything a step needs besides the image.
@@ -989,6 +1164,12 @@ pub fn apply_op(image: Image, op: &Op, context: &ApplyContext<'_>) -> Result<Ima
                 .then(|| ops::annotate::stroke_mask(image.width(), image.height(), &spec.strokes));
             ai.edit(&image, mask.as_ref(), spec, context.preview, context.cancel)
         }
+        Op::AiDetail(spec) => {
+            let ai = context.ai.ok_or_else(|| Error::new("aiUnavailable"))?;
+            let mask = (!spec.strokes.is_empty())
+                .then(|| ops::annotate::stroke_mask(image.width(), image.height(), &spec.strokes));
+            ai.detail(&image, mask.as_ref(), spec, context.preview, context.cancel)
+        }
     }
 }
 
@@ -1064,6 +1245,7 @@ mod tests {
             Op::RestoreFaces(RestoreFaces::default()),
             Op::Inpaint(Inpaint::default()),
             Op::AiEdit(AiEdit::default()),
+            Op::AiDetail(AiDetail::default()),
         ];
         for op in ops {
             let json = serde_json::to_value(&op).unwrap();
@@ -1176,6 +1358,21 @@ mod tests {
             "aiUnavailable"
         );
         assert!(!Op::Inpaint(Inpaint::default()).uses_generator());
+    }
+
+    #[test]
+    fn a_detail_pass_without_a_prompt_still_asks_the_generator() {
+        let cancel = CancelToken::new();
+        let context = ApplyContext::new(&NoResources, &cancel);
+        let image = Image::new(4, 4, crate::image::Depth::Eight, Color::WHITE).unwrap();
+        let detail = AiDetail::default();
+        let op = Op::AiDetail(detail);
+        assert!(op.uses_generator());
+        assert!(op.is_ai());
+        assert_eq!(
+            apply_op(image, &op, &context).unwrap_err().code,
+            "aiUnavailable"
+        );
     }
 
     #[test]

@@ -52,7 +52,9 @@
       "vision": "识别",
       "cli": "命令行",
       "agent": "助手",
-      "edit": "编辑器"
+      "edit": "编辑器",
+      "upscale": "放大",
+      "refine": "补细节"
     },
     "state": {
       "queued": "排队中",
@@ -231,7 +233,8 @@
     "upscale": "放大",
     "restoreFaces": "修复人脸",
     "inpaint": "移除物体",
-    "aiEdit": "AI 编辑"
+    "aiEdit": "AI 编辑",
+    "aiDetail": "AI 补细节"
   },
   "op": {
     "mode": "模式",
@@ -346,7 +349,17 @@
     "editStrength": "修改强度",
     "editStrengthHint": "数值越大，结果与原图的差别越大。",
     "generatorMissing": "此步骤需要图像生成器。",
-    "editModelDefault": "默认"
+    "editModelDefault": "默认",
+    "detailAbout": "生成器会重新走一遍图片并补上细节，画面内容不变。保存时会按文件的完整尺寸绘制。",
+    "detailAreaHint": "用画笔涂抹需要补细节的位置。未涂抹时处理整幅图像。",
+    "detailPrompt": "图片内容",
+    "detailPromptHint": "按图片本来的样子描述：生成器根据这段文字补细节。留空则发送“{prompt}”。",
+    "promptFromFile": "使用文件中的提示词",
+    "promptFromFileHint": "生成这张图片时用的提示词（如果文件里保存了）。",
+    "promptFromFileNone": "文件中没有保存提示词。",
+    "detailStrengthHint": "生成器可以偏离图片的程度。补细节通常 25–45 就够了。",
+    "asInStudio": "与工作室相同",
+    "asInStudioHint": "工作室为该模型记住的步数、提示词相关性、采样器、VAE、LoRA 和嵌入。"
   },
   "steps": {
     "empty": "还没有步骤",
@@ -727,7 +740,8 @@
       "create": "创建",
       "edit": "修改",
       "outpaint": "扩展",
-      "upscale": "放大"
+      "upscale": "放大",
+      "refine": "补细节"
     },
     "builtin": {
       "photo": "摄影",
@@ -762,7 +776,44 @@
     "upscaleOptions": "放大设置",
     "noticeNeedsGenerator": "补细节需要 ComfyUI 或 Forge。图片只做了放大。",
     "noticeNoPrompt": "这张图片没有保存提示词，所以只做了放大。",
-    "noticeRefineFailed": "生成器没有响应，所以图片只做了放大。"
+    "noticeRefineFailed": "生成器没有响应，所以图片只做了放大。",
+    "tuning": "采样器、VAE、LoRA 和嵌入",
+    "tuningSilent": "生成器没有响应，所以列表是空的。请启动它，然后点击“刷新”。",
+    "tuningUsual": "由生成器决定",
+    "tuningUsualNamed": "默认（{name}）",
+    "tuningReset": "重置",
+    "sampler": "采样器",
+    "samplerHint": "清晰度和细节取决于采样器和调度器。常用的是 Euler a，或 DPM++ 2M 配合 Karras 调度器。",
+    "scheduler": "调度器",
+    "vae": "VAE",
+    "vaeHint": "模型没有内置 VAE 时需要单独的 VAE，否则图片会发灰或模糊。",
+    "vaeOfModel": "使用模型自带的",
+    "lora": "LoRA",
+    "loraHint": "数字是 LoRA 的强度，通常在 0.6 到 1 之间。",
+    "loraAdd": "添加…",
+    "loraNone": "没有 LoRA 文件",
+    "refine": "补细节",
+    "refineHint": "生成器会再过一遍图片，补画细部。尺寸不变。",
+    "service": {
+      "ready": "运行中",
+      "starting": "正在启动…",
+      "stopped": "已停止",
+      "missing": "没有响应"
+    },
+    "historyView": {
+      "groups": "按提示词",
+      "grid": "网格",
+      "list": "列表"
+    },
+    "before": "之前",
+    "after": "之后",
+    "zoomHint": "滚轮缩放，拖动移动图片，双击恢复为适应窗口。",
+    "negativeLine": "不希望出现的内容：{text}",
+    "embedding": "嵌入",
+    "embeddingHint": "嵌入作为提示词中的一个词起作用。选中的会自动加到提示词或要避免的内容里。",
+    "embeddingPrompt": "加到提示词",
+    "embeddingNegative": "加到要避免的内容",
+    "embeddingNone": "没有嵌入文件"
   },
   "vision": {
     "noModelTitle": "尚未选择模型",
@@ -993,7 +1044,11 @@
       "logFile": "显示文件",
       "logCut": "只显示日志的结尾。完整内容在文件中。",
       "worksLocally": "无需 ComfyUI 即可使用",
-      "file": "文件"
+      "file": "文件",
+      "downloaded": "已下载",
+      "downloadedTo": "已保存到 {path}",
+      "saveTo": "将保存到 {path}",
+      "showFile": "显示文件"
     },
     "notSupportedYet": "暂不支持"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "这台电脑没有固定的 {id} 压缩包",
     "noModelFolder": "请先为这种模型添加一个文件夹",
     "upscaleModelFailed": "放大模型无法运行：{model}",
-    "upscalerMissing": "找不到放大模型：{model}"
+    "upscalerMissing": "找不到放大模型：{model}",
+    "refineNeedsGenerator": "补细节需要 ComfyUI 或 Forge。请选择其中一个作为生成器。",
+    "refineNoPrompt": "这张图片没有保存提示词，所以无法补细节。",
+    "refineTooLarge": "图片太大，无法补细节：长边为 {side} px，最多允许 {limit} px。"
   },
   "native": {
     "tray": {

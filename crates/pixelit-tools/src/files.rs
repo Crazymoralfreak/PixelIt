@@ -31,7 +31,10 @@ adjust{exposure,brightness,contrast,highlights,shadows,saturation,vibrance,tempe
 filter{kind:sharpen|blur|denoise|grain|vignette|grayscale|sepia|invert,amount,radius}; \
 watermark{kind:text|image,text,image,size,scale,anchor,margin,opacity,tile}; \
 removeBackground{background:'#rrggbb' or null}; upscale{factor:2|4}; restoreFaces{strength:0..100}; \
-aiEdit{prompt,strength:0..100} (changes the whole picture with the image generator of the settings). \
+aiEdit{prompt,strength:0..100} (changes the whole picture with the image generator of the settings); \
+aiDetail{prompt,strength:0..100,negative,steps,cfg} (the same generator paints fine detail and keeps what the picture shows; \
+the prompt describes the picture, an empty one sends 'highly detailed, sharp focus, intricate details', \
+the strength is near 35, omitted fields come from the settings). \
 Output fields: format (same|auto|jpeg|png|webp|avif|jxl|tiff|gif|bmp), quality 1..100, lossless, \
 target {kind:'bytes',bytes} or {kind:'quality',score}, metadata {mode:keep|strip}, \
 naming (template such as '{name}-{width}'), conflict (rename|skip). Omitted fields take defaults.";

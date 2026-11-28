@@ -42,6 +42,14 @@ function withFile(hit: ModelHit, index: number): ModelHit {
   return { ...hit, fileName: file.fileName, url: file.url, bytes: file.bytes, sha256: file.sha256 };
 }
 
+function fileOf(result: unknown): string {
+  if (typeof result !== "object" || result === null || !("file" in result)) {
+    return "";
+  }
+  const file = result.file;
+  return typeof file === "string" ? file : "";
+}
+
 function knownView(view: ResultView): ResultView {
   switch (view) {
     case "list":
@@ -590,9 +598,57 @@ function Folders({
   );
 }
 
+function ModelState({
+  hit,
+  place,
+  folder,
+  job,
+  failed,
+}: {
+  hit: ModelHit;
+  place: string;
+  folder: string;
+  job: JobInfo | undefined;
+  failed: JobInfo["error"];
+}) {
+  const { t, error } = useT();
+  const { showError } = useApp();
+  if (place !== "") {
+    return (
+      <>
+        <Tag tone="ok">{t("ai.apps.downloaded")}</Tag>
+        <div className="model-folder-path" title={place}>
+          {place}
+        </div>
+        <Button
+          small
+          onClick={(event) => {
+            event.stopPropagation();
+            void api.revealPath(place).catch(showError);
+          }}
+        >
+          {t("ai.apps.showFile")}
+        </Button>
+      </>
+    );
+  }
+  return (
+    <>
+      {folder !== "" ? (
+        <div className="model-folder-path" title={folder}>
+          {t("ai.apps.saveTo", { path: folder })}
+        </div>
+      ) : null}
+      {job ? <LoadState job={job} /> : null}
+      {failed ? <div className="component-facts">{error(failed)}</div> : null}
+      <LoadButton hit={hit} job={job} primary />
+    </>
+  );
+}
+
 function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSettings) => Promise<boolean> }) {
   const { t, td } = useT();
-  const { jobs, showError } = useApp();
+  const { jobs, showError, notify } = useApp();
   const [source, setSource] = useState<SearchSource>("civitai");
   const [text, setText] = useState("");
   const [kind, setKind] = useState<ModelKind>("checkpoints");
@@ -611,11 +667,59 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
   const loadingRef = useRef(false);
   const cursorRef = useRef("");
   const sentinel = useRef<HTMLDivElement>(null);
+  const watched = useRef(new Set<number>());
+  const told = useRef(new Set<number>());
   cursorRef.current = cursor;
   const chosen = opened ? withFile(opened, fileIndex) : null;
   const openedJob = chosen ? jobFor(jobs, chosen.fileName) : undefined;
   const shots = opened?.previews ?? [];
   const shownShot = shots[Math.min(shot, Math.max(shots.length - 1, 0))] ?? "";
+
+  const saved = new Map<string, string>();
+  for (const job of jobs) {
+    if (job.kind !== "install") {
+      continue;
+    }
+    if (job.state === "queued" || job.state === "running" || job.state === "paused") {
+      watched.current.add(job.id);
+    }
+    const file = fileOf(job.result);
+    if (job.state === "done" && file !== "") {
+      saved.set(job.title, file);
+    }
+  }
+
+  const placeOf = (hit: ModelHit): string => {
+    if (hit.installed) {
+      return hit.installed;
+    }
+    for (const name of [hit.fileName, ...(hit.files ?? []).map((file) => file.fileName)]) {
+      const path = saved.get(name);
+      if (path) {
+        return path;
+      }
+    }
+    return "";
+  };
+  const visible = hits.filter((hit) => !(hideInstalled && placeOf(hit) !== ""));
+
+  useEffect(() => {
+    for (const job of jobs) {
+      if (job.kind !== "install" || !watched.current.has(job.id) || told.current.has(job.id)) {
+        continue;
+      }
+      if (job.state === "done") {
+        told.current.add(job.id);
+        const file = fileOf(job.result);
+        if (file !== "") {
+          notify(t("ai.apps.downloadedTo", { path: file }));
+        }
+      } else if (job.state === "failed" && job.error) {
+        told.current.add(job.id);
+        showError(job.error);
+      }
+    }
+  }, [jobs, notify, showError, t]);
 
   const openHit = (hit: ModelHit) => {
     setOpened(hit);
@@ -733,8 +837,10 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
         </div>
       ) : null}
       {view === "list"
-        ? hits.map((hit) => {
+        ? visible.map((hit) => {
+            const place = placeOf(hit);
             const job = jobFor(jobs, hit.fileName);
+            const failed = jobs.find((item) => item.kind === "install" && item.title === hit.fileName && item.state === "failed")?.error;
             return (
               <div key={`${hit.source}-${hit.url}`} className="component model-row" onClick={() => openHit(hit)}>
                 <div className="component-main">
@@ -744,17 +850,18 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
                     {hit.baseModel ? ` · ${hit.baseModel}` : ""}
                     {worksLocally(hit) ? <Tag tone="ok">{t("ai.apps.worksLocally")}</Tag> : null}
                   </div>
-                  {job ? <LoadState job={job} /> : null}
                 </div>
-                <LoadButton hit={hit} job={job} primary />
+                <ModelState hit={hit} place={place} folder={ai.settings.apps.models[hit.kind]?.[0] ?? ""} job={job} failed={failed ?? null} />
               </div>
             );
           })
         : null}
       {view === "grid" ? (
         <div className="model-grid">
-          {hits.map((hit) => {
+          {visible.map((hit) => {
+            const place = placeOf(hit);
             const job = jobFor(jobs, hit.fileName);
+            const failed = jobs.find((item) => item.kind === "install" && item.title === hit.fileName && item.state === "failed")?.error;
             return (
               <div key={`${hit.source}-${hit.url}`} className="model-card" onClick={() => openHit(hit)}>
                 <ModelPicture url={hit.previews[0] ?? ""} frame="card" />
@@ -765,8 +872,7 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
                   {hit.baseModel || hit.fileName}
                   {worksLocally(hit) ? <Tag tone="ok">{t("ai.apps.worksLocally")}</Tag> : null}
                 </div>
-                {job ? <LoadState job={job} /> : null}
-                <LoadButton hit={hit} job={job} primary />
+                <ModelState hit={hit} place={place} folder={ai.settings.apps.models[hit.kind]?.[0] ?? ""} job={job} failed={failed ?? null} />
               </div>
             );
           })}
@@ -778,13 +884,19 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
           title={opened.name}
           onClose={() => setOpened(null)}
           footer={
-            <Button
-              variant="primary"
-              disabled={Boolean(openedJob) || !chosen}
-              onClick={() => chosen && api.appsDownload(chosen).catch(showError)}
-            >
-              {t("ai.apps.download")}
-            </Button>
+            placeOf(opened) !== "" ? (
+              <Button variant="primary" onClick={() => void api.revealPath(placeOf(opened)).catch(showError)}>
+                {t("ai.apps.showFile")}
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                disabled={Boolean(openedJob) || !chosen}
+                onClick={() => chosen && api.appsDownload(chosen).catch(showError)}
+              >
+                {t("ai.apps.download")}
+              </Button>
+            )
           }
         >
           <div className="model-shot">
@@ -808,6 +920,15 @@ function Search({ ai, onSettings }: { ai: AiStatus; onSettings: (settings: AiSet
               {opened.baseModel ? ` · ${opened.baseModel}` : ""}
               {worksLocally(opened) ? <Tag tone="ok">{t("ai.apps.worksLocally")}</Tag> : null}
             </div>
+            {placeOf(opened) !== "" ? (
+              <div className="model-folder-path" title={placeOf(opened)}>
+                {placeOf(opened)}
+              </div>
+            ) : (ai.settings.apps.models[opened.kind]?.[0] ?? "") !== "" ? (
+              <div className="model-folder-path" title={ai.settings.apps.models[opened.kind]?.[0]}>
+                {t("ai.apps.saveTo", { path: ai.settings.apps.models[opened.kind]?.[0] ?? "" })}
+              </div>
+            ) : null}
             {(opened.files?.length ?? 0) > 1 ? (
               <Field label={t("ai.apps.file")}>
                 <Select

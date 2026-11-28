@@ -20,7 +20,8 @@ use serde_json::{json, Value};
 use pixelit_core::{CancelToken, Error, Image, Result};
 use pixelit_engine::Paths;
 
-use crate::config::{AiSettings, GenerationProvider, ModelLibrary};
+use crate::checkpoints::chosen_model;
+use crate::config::{defaults_key, AiSettings, GenerationProvider, ModelLibrary, Tuning};
 use crate::generate::{self, GenerateRequest, Source, Tick};
 use crate::history;
 use crate::install;
@@ -33,9 +34,6 @@ pub const BUILTIN: &str = "builtin";
 
 const BUILTIN_NAME: &str = "Real-ESRGAN x4plus";
 const BUILTIN_ID: &str = "realesrgan-x4plus";
-
-/// A side longer than this is repainted in tiles, so the video card can hold it.
-const TILED_SIDE: u32 = 1280;
 
 const ASK: Duration = Duration::from_secs(3);
 
@@ -91,6 +89,8 @@ pub struct Notes {
     pub model: String,
     pub provider: GenerationProvider,
     pub seed: u64,
+    /// The sampler, the schedule, the VAE and LoRA files of the picture.
+    pub tuning: Tuning,
 }
 
 impl Notes {
@@ -103,8 +103,27 @@ impl Notes {
             model: outcome.model.clone(),
             provider: outcome.provider,
             seed: outcome.seeds.get(index).copied().unwrap_or(0),
+            tuning: outcome.tuning.clone(),
         }
     }
+}
+
+/// The tuning a repaint runs with: the picture's own when `provider` made it,
+/// otherwise the one remembered for the model that repaints now.
+fn tuning_for(
+    settings: &AiSettings,
+    notes: &Notes,
+    provider: GenerationProvider,
+    model: &str,
+) -> Tuning {
+    if notes.provider == provider {
+        return notes.tuning.tidy();
+    }
+    settings
+        .generation
+        .model_defaults
+        .get(&defaults_key(provider, model))
+        .map_or_default(|defaults| defaults.tuning.tidy())
 }
 
 /// The enlarged picture, and why the detail pass did not run.
@@ -182,46 +201,6 @@ pub fn comfy_upscale_graph(model: &str, upload: &str, width: u32, height: u32) -
     })
 }
 
-/// ComfyUI graph that repaints an uploaded picture. Large pictures use the
-/// tiled encoder and decoder.
-pub fn comfy_refine_graph(
-    prompt: &str,
-    negative: &str,
-    checkpoint: &str,
-    upload: &str,
-    steps: u32,
-    cfg: f32,
-    seed: u64,
-    strength: f32,
-    tiled: bool,
-) -> Value {
-    let encode = if tiled { "VAEEncodeTiled" } else { "VAEEncode" };
-    let decode = if tiled { "VAEDecodeTiled" } else { "VAEDecode" };
-    let mut encode_inputs = json!({ "pixels": ["8", 0], "vae": ["1", 2] });
-    let mut decode_inputs = json!({ "samples": ["5", 0], "vae": ["1", 2] });
-    if tiled {
-        encode_inputs["tile_size"] = json!(512);
-        encode_inputs["overlap"] = json!(64);
-        decode_inputs["tile_size"] = json!(512);
-        decode_inputs["overlap"] = json!(64);
-    }
-    json!({
-        "1": { "class_type": "CheckpointLoaderSimple", "inputs": { "ckpt_name": checkpoint } },
-        "2": { "class_type": "CLIPTextEncode", "inputs": { "text": prompt, "clip": ["1", 1] } },
-        "3": { "class_type": "CLIPTextEncode", "inputs": { "text": negative, "clip": ["1", 1] } },
-        "8": { "class_type": "LoadImage", "inputs": { "image": upload } },
-        "4": { "class_type": encode, "inputs": encode_inputs },
-        "5": { "class_type": "KSampler", "inputs": {
-            "seed": seed, "steps": steps, "cfg": cfg,
-            "sampler_name": "euler", "scheduler": "normal", "denoise": strength,
-            "model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0],
-            "latent_image": ["4", 0],
-        } },
-        "6": { "class_type": decode, "inputs": decode_inputs },
-        "7": { "class_type": "SaveImage", "inputs": { "filename_prefix": "PixelIt", "images": ["6", 0] } },
-    })
-}
-
 /// The body of Forge's single-image upscale, without the picture itself.
 pub fn forge_body(model: &str, factor: u32) -> Value {
     json!({
@@ -283,6 +262,7 @@ pub fn notes_of_file(paths: &Paths, file: &Path) -> Notes {
             model: record.model,
             provider: record.provider,
             seed,
+            tuning: record.tuning,
         };
     }
     if let Some(read) = fs::read(file).ok().and_then(|bytes| {
@@ -296,6 +276,7 @@ pub fn notes_of_file(paths: &Paths, file: &Path) -> Notes {
             model: read.model,
             provider: GenerationProvider::None,
             seed: read.seed,
+            tuning: Tuning::default(),
         };
     }
     Notes {
@@ -306,7 +287,49 @@ pub fn notes_of_file(paths: &Paths, file: &Path) -> Notes {
         model: String::new(),
         provider: GenerationProvider::None,
         seed: 0,
+        tuning: Tuning::default(),
     }
+}
+
+/// The longest side the detail pass takes on its own. A larger picture needs
+/// more video memory than a generator has.
+pub const REFINE_SIDE: u32 = 4096;
+
+/// Paints detail into a picture without changing its size: the generator
+/// repaints it with the request it was made from, as far as the strength of
+/// the settings allows.
+pub fn refine(
+    net: &Net,
+    paths: &Paths,
+    settings: &AiSettings,
+    image: &Image,
+    notes: &Notes,
+    cancel: &CancelToken,
+    tick: &Tick<'_>,
+) -> Result<Image> {
+    refine_check(
+        settings.generation.provider,
+        &notes.prompt,
+        image.width().max(image.height()),
+    )?;
+    let painted = repaint(net, paths, settings, image, notes, 0, 1, cancel, tick)?;
+    // A generator rounds the size to what its model takes.
+    crate::place(image, &painted, None)
+}
+
+/// Why the detail pass cannot run on its own, when it cannot.
+pub fn refine_check(provider: GenerationProvider, prompt: &str, side: u32) -> Result<()> {
+    match refine_decision(true, provider, prompt) {
+        (true, _) => {}
+        (false, "noPrompt") => return Err(Error::new("refineNoPrompt")),
+        (false, _) => return Err(Error::new("refineNeedsGenerator")),
+    }
+    if side > REFINE_SIDE {
+        return Err(Error::new("refineTooLarge")
+            .with("side", side)
+            .with("limit", REFINE_SIDE));
+    }
+    Ok(())
 }
 
 /// Enlarges `image` by 2 or 4, with the detail pass when the settings ask and
@@ -513,16 +536,32 @@ fn comfy_repaint(
     } else {
         settings.generation.cfg
     };
-    let graph = comfy_refine_graph(
-        &notes.prompt,
-        &notes.negative,
-        &checkpoint,
-        &upload,
+    let tuning = tuning_for(settings, notes, GenerationProvider::Comfy, &checkpoint);
+    let job = generate::Job {
+        prompt: &notes.prompt,
+        negative: &notes.negative,
+        width: image.width(),
+        height: image.height(),
         steps,
         cfg,
-        notes.seed,
-        settings.generation.upscale_strength,
-        image.width().max(image.height()) > TILED_SIDE,
+        seed: notes.seed,
+        count: 1,
+        strength: settings.generation.upscale_strength,
+        checkpoint: &checkpoint,
+        tuning: &tuning,
+    };
+    let (prompt, negative) = generate::comfy_texts(net, base, key.as_deref(), &job);
+    let job = generate::Job {
+        prompt: &prompt,
+        negative: &negative,
+        ..job
+    };
+    let graph = generate::comfy_graph(
+        &job,
+        &checkpoint,
+        Some(&upload),
+        false,
+        image.width().max(image.height()) > generate::TILED_SIDE,
     );
     generate::comfy_once(net, settings, &graph, cancel, tick, index, count, steps)
 }
@@ -541,6 +580,12 @@ fn forge_repaint(
     } else {
         String::new()
     };
+    let tuning = tuning_for(
+        settings,
+        notes,
+        GenerationProvider::Forge,
+        chosen_model(settings, GenerationProvider::Forge, &model),
+    );
     let request = GenerateRequest {
         prompt: notes.prompt.clone(),
         negative: notes.negative.clone(),
@@ -554,6 +599,7 @@ fn forge_repaint(
         provider: GenerationProvider::Forge,
         model,
         styles: Vec::new(),
+        tuning,
     };
     let outcome = generate::generate(
         net,
@@ -633,7 +679,7 @@ fn remote_comfy(net: &Net, settings: &AiSettings) -> Vec<String> {
     ) else {
         return Vec::new();
     };
-    names_of(&answer["UpscaleModelLoader"]["input"]["required"]["model_name"][0])
+    generate::comfy_choices(&answer, "UpscaleModelLoader", "model_name")
 }
 
 fn remote_forge(net: &Net, settings: &AiSettings) -> Vec<String> {
@@ -657,17 +703,6 @@ fn remote_forge(net: &Net, settings: &AiSettings) -> Vec<String> {
         .flatten()
         .filter_map(|model| model["name"].as_str())
         .filter(|name| !plain(name))
-        .map(str::to_owned)
-        .collect()
-}
-
-fn names_of(value: &Value) -> Vec<String> {
-    value
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|name| name.as_str())
-        .filter(|name| !name.is_empty())
         .map(str::to_owned)
         .collect()
 }
@@ -820,6 +855,7 @@ pub fn parameters_of(notes: &Notes, image: &Image) -> String {
         width: image.width(),
         height: image.height(),
         model: notes.model.clone(),
+        sampler: notes.tuning.sampler.clone(),
     })
 }
 
@@ -892,38 +928,79 @@ mod tests {
     }
 
     #[test]
-    fn a_large_picture_uses_the_tiled_nodes() {
-        let small = comfy_refine_graph(
-            "cat",
-            "",
-            "model.safetensors",
-            "in.png",
-            20,
-            6.0,
-            1,
-            0.35,
-            false,
+    fn the_detail_pass_says_why_it_cannot_run() {
+        let check = |provider, prompt, side| {
+            refine_check(provider, prompt, side).map_err(|error| error.code)
+        };
+        assert_eq!(check(GenerationProvider::Comfy, "a cat", 2688), Ok(()));
+        assert_eq!(
+            check(GenerationProvider::Forge, "a cat", REFINE_SIDE),
+            Ok(())
         );
-        assert_eq!(small["4"]["class_type"], "VAEEncode");
-        assert_eq!(small["6"]["class_type"], "VAEDecode");
-        assert!(small["4"]["inputs"].get("tile_size").is_none());
-        let denoise = small["5"]["inputs"]["denoise"].as_f64().unwrap();
-        assert!((denoise - 0.35).abs() < 0.001);
-        let large = comfy_refine_graph(
-            "cat",
-            "",
-            "model.safetensors",
-            "in.png",
-            20,
-            6.0,
-            1,
-            0.35,
-            true,
+        assert_eq!(
+            check(GenerationProvider::SdCpp, "a cat", 1024).unwrap_err(),
+            "refineNeedsGenerator"
         );
-        assert_eq!(large["4"]["class_type"], "VAEEncodeTiled");
-        assert_eq!(large["6"]["class_type"], "VAEDecodeTiled");
-        assert_eq!(large["4"]["inputs"]["tile_size"], 512);
-        assert_eq!(large["6"]["inputs"]["overlap"], 64);
+        assert_eq!(
+            check(GenerationProvider::Comfy, " ", 1024).unwrap_err(),
+            "refineNoPrompt"
+        );
+        assert_eq!(
+            check(GenerationProvider::Comfy, "a cat", REFINE_SIDE + 1).unwrap_err(),
+            "refineTooLarge"
+        );
+    }
+
+    #[test]
+    fn a_repaint_keeps_the_tuning_of_its_own_generator_only() {
+        let own = Tuning {
+            sampler: String::from("dpmpp_2m"),
+            scheduler: String::from("karras"),
+            ..Tuning::default()
+        };
+        let remembered = Tuning {
+            sampler: String::from("euler_ancestral"),
+            ..Tuning::default()
+        };
+        let mut settings = AiSettings::default();
+        settings.generation.model_defaults.insert(
+            defaults_key(GenerationProvider::Comfy, "dream.safetensors"),
+            crate::config::ModelDefaults {
+                tuning: remembered.clone(),
+                ..Default::default()
+            },
+        );
+        let mut notes = Notes {
+            prompt: String::from("a cat"),
+            negative: String::new(),
+            steps: 20,
+            cfg: 6.0,
+            model: String::from("dream.safetensors"),
+            provider: GenerationProvider::Comfy,
+            seed: 1,
+            tuning: own.clone(),
+        };
+        let pick = |notes: &Notes| {
+            tuning_for(
+                &settings,
+                notes,
+                GenerationProvider::Comfy,
+                "dream.safetensors",
+            )
+        };
+        assert_eq!(pick(&notes), own);
+        // Names of another program mean nothing to this one.
+        notes.provider = GenerationProvider::Forge;
+        assert_eq!(pick(&notes), remembered);
+        assert_eq!(
+            tuning_for(
+                &settings,
+                &notes,
+                GenerationProvider::Comfy,
+                "other.safetensors"
+            ),
+            Tuning::default()
+        );
     }
 
     #[test]
@@ -960,6 +1037,34 @@ mod tests {
         assert!(listed
             .iter()
             .any(|item| item.id == BUILTIN && item.available));
+    }
+
+    #[test]
+    fn a_model_of_a_running_comfy_is_offered_in_either_answer_format() {
+        let folder = tempfile::tempdir().unwrap();
+        let pt = folder.path().join("4x-UltraSharp.pt");
+        std::fs::write(&pt, b"x").unwrap();
+        // The answer ComfyUI gives today, and the one older builds gave.
+        let newer = json!({ "UpscaleModelLoader": { "input": { "required": {
+            "model_name": ["COMBO", { "multiselect": false, "options": ["4x-UltraSharp.pt"] }],
+        } } } });
+        let older = json!({ "UpscaleModelLoader": { "input": { "required": {
+            "model_name": [["4x-UltraSharp.pt"], {}],
+        } } } });
+        for answer in [newer, older] {
+            let names = generate::comfy_choices(&answer, "UpscaleModelLoader", "model_name");
+            assert_eq!(names, ["4x-UltraSharp.pt"]);
+            let listed = assemble(true, std::slice::from_ref(&pt), &names, &[]);
+            let model = listed
+                .iter()
+                .find(|item| item.name == "4x-UltraSharp.pt")
+                .unwrap();
+            assert_eq!(model.id, "comfy:4x-UltraSharp.pt");
+            assert!(model.available);
+            assert!(!listed.iter().any(|item| item.engine == Engine::File));
+        }
+        let other = json!({ "error": "no such node" });
+        assert!(generate::comfy_choices(&other, "UpscaleModelLoader", "model_name").is_empty());
     }
 
     #[test]

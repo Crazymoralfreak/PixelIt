@@ -52,7 +52,9 @@
       "vision": "Recognition",
       "cli": "Command line",
       "agent": "Assistant",
-      "edit": "Editor"
+      "edit": "Editor",
+      "upscale": "Upscaling",
+      "refine": "Adding detail"
     },
     "state": {
       "queued": "Queued",
@@ -231,7 +233,8 @@
     "upscale": "Upscale",
     "restoreFaces": "Restore faces",
     "inpaint": "Remove objects",
-    "aiEdit": "AI edit"
+    "aiEdit": "AI edit",
+    "aiDetail": "AI detail"
   },
   "op": {
     "mode": "Mode",
@@ -346,7 +349,17 @@
     "editStrength": "Strength of the change",
     "editStrengthHint": "The higher the value, the further the result is from the original picture.",
     "generatorMissing": "This step needs an image generator.",
-    "editModelDefault": "Default"
+    "editModelDefault": "Default",
+    "detailAbout": "The generator goes over the picture and adds fine detail; what it shows stays. On saving, the file is painted at its full size.",
+    "detailAreaHint": "Paint over the place that needs detail. With nothing marked the whole picture is gone over.",
+    "detailPrompt": "What the picture shows",
+    "detailPromptHint": "Describe the picture as it is: the generator paints the detail from this text. An empty field sends “{prompt}”.",
+    "promptFromFile": "Take the prompt from the file",
+    "promptFromFileHint": "The prompt the picture was generated with, when the file keeps it.",
+    "promptFromFileNone": "The file keeps no prompt.",
+    "detailStrengthHint": "How far the generator may move from the picture. 25 to 45 is usually enough for detail.",
+    "asInStudio": "As in the studio",
+    "asInStudioHint": "The steps, the prompt adherence, the sampler, the VAE, the LoRA files and the embeddings the studio remembers for this model."
   },
   "steps": {
     "empty": "No steps yet",
@@ -727,7 +740,8 @@
       "create": "Created",
       "edit": "Edited",
       "outpaint": "Extended",
-      "upscale": "Enlarged"
+      "upscale": "Enlarged",
+      "refine": "Detail"
     },
     "builtin": {
       "photo": "Photograph",
@@ -762,7 +776,44 @@
     "upscaleOptions": "Upscale settings",
     "noticeNeedsGenerator": "Detail needs ComfyUI or Forge. The picture was only enlarged.",
     "noticeNoPrompt": "This picture has no prompt stored, so it was only enlarged.",
-    "noticeRefineFailed": "The generator did not answer, so the picture was only enlarged."
+    "noticeRefineFailed": "The generator did not answer, so the picture was only enlarged.",
+    "tuning": "Sampler, VAE, LoRA and embeddings",
+    "tuningSilent": "The generator does not answer, so the lists are empty. Start it and press Refresh.",
+    "tuningUsual": "Generator default",
+    "tuningUsualNamed": "Default ({name})",
+    "tuningReset": "Reset",
+    "sampler": "Sampler",
+    "samplerHint": "The sampler and the scheduler decide sharpness and fine detail. Euler a or DPM++ 2M with the Karras scheduler are common choices.",
+    "scheduler": "Scheduler",
+    "vae": "VAE",
+    "vaeHint": "A separate VAE is needed when the model has none built in: the picture then comes out washed out or blurry.",
+    "vaeOfModel": "From the model",
+    "lora": "LoRA",
+    "loraHint": "The number is the strength of the LoRA. Usually between 0.6 and 1.",
+    "loraAdd": "Add…",
+    "loraNone": "No LoRA files",
+    "refine": "Add detail",
+    "refineHint": "The generator goes over the picture once more and paints in fine detail. The size stays the same.",
+    "service": {
+      "ready": "running",
+      "starting": "starting…",
+      "stopped": "stopped",
+      "missing": "no answer"
+    },
+    "historyView": {
+      "groups": "By request",
+      "grid": "Grid",
+      "list": "List"
+    },
+    "before": "Before",
+    "after": "After",
+    "zoomHint": "The mouse wheel zooms, a drag moves the picture, a double click brings it back to fit.",
+    "negativeLine": "What to avoid: {text}",
+    "embedding": "Embeddings",
+    "embeddingHint": "An embedding works as a word of the prompt. The chosen ones are added to the prompt or to what to avoid by themselves.",
+    "embeddingPrompt": "To the prompt",
+    "embeddingNegative": "To what to avoid",
+    "embeddingNone": "No embedding files"
   },
   "vision": {
     "noModelTitle": "No model is chosen",
@@ -993,7 +1044,11 @@
       "logFile": "Show file",
       "logCut": "Only the end of the log is shown. The file has all of it.",
       "worksLocally": "Works without ComfyUI",
-      "file": "File"
+      "file": "File",
+      "downloaded": "Downloaded",
+      "downloadedTo": "Saved to {path}",
+      "saveTo": "Saves to {path}",
+      "showFile": "Show file"
     },
     "notSupportedYet": "Not supported yet"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "There is no pinned archive of {id} for this computer",
     "noModelFolder": "Add a folder for this kind of model first",
     "upscaleModelFailed": "The upscaler could not run: {model}",
-    "upscalerMissing": "The upscaler was not found: {model}"
+    "upscalerMissing": "The upscaler was not found: {model}",
+    "refineNeedsGenerator": "Adding detail works with ComfyUI or Forge. Choose one of them as the generator.",
+    "refineNoPrompt": "This picture has no prompt stored, so detail cannot be added.",
+    "refineTooLarge": "The picture is too large for adding detail: {side} px on the long side, up to {limit} px is allowed."
   },
   "native": {
     "tray": {

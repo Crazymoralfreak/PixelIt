@@ -16,6 +16,7 @@ export function StyleBar({
   styles,
   showFinal,
   finalText,
+  finalNegative,
   onToggle,
   onShowFinal,
   onChanged,
@@ -24,6 +25,8 @@ export function StyleBar({
   styles: Style[];
   showFinal: boolean;
   finalText: string;
+  /** What the picture must not have, after the styles; empty when nothing is asked. */
+  finalNegative: string;
   onToggle: (id: string) => void;
   onShowFinal: (show: boolean) => void;
   onChanged: () => void;
@@ -46,6 +49,7 @@ export function StyleBar({
         <Checkbox checked={showFinal} onChange={onShowFinal} label={t("studio.showFinal")} />
       </div>
       {showFinal ? <p className="tool-text">{finalText || t("studio.finalEmpty")}</p> : null}
+      {showFinal && finalNegative !== "" ? <p className="tool-text">{t("studio.negativeLine", { text: finalNegative })}</p> : null}
       {open ? (
         <StyleDialog
           styles={styles}

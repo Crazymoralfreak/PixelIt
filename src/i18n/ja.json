@@ -52,7 +52,9 @@
       "vision": "認識",
       "cli": "コマンドライン",
       "agent": "アシスタント",
-      "edit": "エディター"
+      "edit": "エディター",
+      "upscale": "拡大",
+      "refine": "ディテールの追加"
     },
     "state": {
       "queued": "待機中",
@@ -231,7 +233,8 @@
     "upscale": "拡大",
     "restoreFaces": "顔の復元",
     "inpaint": "オブジェクトの削除",
-    "aiEdit": "AI 編集"
+    "aiEdit": "AI 編集",
+    "aiDetail": "AI ディテール"
   },
   "op": {
     "mode": "モード",
@@ -346,7 +349,17 @@
     "editStrength": "変更の強さ",
     "editStrengthHint": "値が大きいほど、結果は元の画像から離れます。",
     "generatorMissing": "このステップには画像生成器が必要です。",
-    "editModelDefault": "既定"
+    "editModelDefault": "既定",
+    "detailAbout": "ジェネレーターが画像をなぞって細かなディテールを足します。写っている内容は変わりません。保存時にはファイルを実寸で描き直します。",
+    "detailAreaHint": "ディテールを足したい部分をブラシで塗ってください。何も塗らない場合は画像全体が対象になります。",
+    "detailPrompt": "画像の内容",
+    "detailPromptHint": "画像をそのまま説明してください。この文章をもとにディテールを描き足します。空のままでは「{prompt}」が送られます。",
+    "promptFromFile": "ファイルのプロンプトを使う",
+    "promptFromFileHint": "ファイルに残っていれば、その画像を生成したときのプロンプトです。",
+    "promptFromFileNone": "ファイルにプロンプトが残っていません。",
+    "detailStrengthHint": "ジェネレーターが画像からどこまで離れてよいか。ディテールには通常 25〜45 で十分です。",
+    "asInStudio": "スタジオと同じ",
+    "asInStudioHint": "このモデル用にスタジオが覚えているステップ数、プロンプトへの忠実度、サンプラー、VAE、LoRA、エンベディングです。"
   },
   "steps": {
     "empty": "ステップはまだありません",
@@ -727,7 +740,8 @@
       "create": "作成",
       "edit": "修正",
       "outpaint": "拡張",
-      "upscale": "拡大"
+      "upscale": "拡大",
+      "refine": "ディテール"
     },
     "builtin": {
       "photo": "写真",
@@ -762,7 +776,44 @@
     "upscaleOptions": "拡大の設定",
     "noticeNeedsGenerator": "ディテールには ComfyUI か Forge が必要です。画像は拡大のみです。",
     "noticeNoPrompt": "この画像にはプロンプトが保存されていないため、拡大のみです。",
-    "noticeRefineFailed": "生成器が応答しなかったため、画像は拡大のみです。"
+    "noticeRefineFailed": "生成器が応答しなかったため、画像は拡大のみです。",
+    "tuning": "サンプラー、VAE、LoRA、エンベディング",
+    "tuningSilent": "生成器が応答しないため、一覧は空です。起動してから「更新」を押してください。",
+    "tuningUsual": "生成器の既定",
+    "tuningUsualNamed": "既定（{name}）",
+    "tuningReset": "リセット",
+    "sampler": "サンプラー",
+    "samplerHint": "シャープさと細かいディテールはサンプラーとスケジューラーで決まります。Euler a、または Karras スケジューラーと DPM++ 2M の組み合わせがよく使われます。",
+    "scheduler": "スケジューラー",
+    "vae": "VAE",
+    "vaeHint": "モデルに VAE が含まれていない場合は別の VAE が必要です。ないと画像が色あせたり、ぼやけたりします。",
+    "vaeOfModel": "モデルのもの",
+    "lora": "LoRA",
+    "loraHint": "数値は LoRA の強さです。通常は 0.6 から 1 です。",
+    "loraAdd": "追加…",
+    "loraNone": "LoRA ファイルがありません",
+    "refine": "ディテールを足す",
+    "refineHint": "生成器が画像をもう一度なぞり、細かいディテールを描き足します。サイズは変わりません。",
+    "service": {
+      "ready": "動作中",
+      "starting": "起動中…",
+      "stopped": "停止中",
+      "missing": "応答なし"
+    },
+    "historyView": {
+      "groups": "プロンプト別",
+      "grid": "グリッド",
+      "list": "リスト"
+    },
+    "before": "前",
+    "after": "後",
+    "zoomHint": "ホイールで拡大縮小、ドラッグで画像を移動、ダブルクリックで全体表示に戻ります。",
+    "negativeLine": "避けたい内容：{text}",
+    "embedding": "エンベディング",
+    "embeddingHint": "エンベディングはプロンプトの単語として働きます。選んだものはプロンプトか避けたい内容に自動で書き足されます。",
+    "embeddingPrompt": "プロンプトへ",
+    "embeddingNegative": "避けたい内容へ",
+    "embeddingNone": "エンベディングのファイルがありません"
   },
   "vision": {
     "noModelTitle": "モデルが選ばれていません",
@@ -993,7 +1044,11 @@
       "logFile": "ファイルを表示",
       "logCut": "ログの末尾だけを表示しています。全体はファイルにあります。",
       "worksLocally": "ComfyUI なしで動く",
-      "file": "ファイル"
+      "file": "ファイル",
+      "downloaded": "ダウンロード済み",
+      "downloadedTo": "保存しました: {path}",
+      "saveTo": "保存先: {path}",
+      "showFile": "ファイルを表示"
     },
     "notSupportedYet": "まだ未対応"
   },
@@ -1156,7 +1211,10 @@
     "noArchive": "このコンピューター向けの固定された {id} の書庫はありません",
     "noModelFolder": "先にこの種類のモデル用フォルダーを追加してください",
     "upscaleModelFailed": "拡大モデルを実行できませんでした: {model}",
-    "upscalerMissing": "拡大モデルが見つかりません: {model}"
+    "upscalerMissing": "拡大モデルが見つかりません: {model}",
+    "refineNeedsGenerator": "ディテールの追加には ComfyUI か Forge が必要です。どちらかを生成器に選んでください。",
+    "refineNoPrompt": "この画像にはプロンプトが保存されていないため、ディテールを足せません。",
+    "refineTooLarge": "ディテールを足すには画像が大きすぎます: 長辺 {side} px、上限は {limit} px です。"
   },
   "native": {
     "tray": {

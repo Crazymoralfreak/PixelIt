@@ -849,10 +849,29 @@ p {
   width: 760px;
 }
 
+.modal-full {
+  width: 100%;
+  height: 100%;
+}
+
+.modal-full .modal-body {
+  flex: 1;
+  min-height: 0;
+}
+
 .modal-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 14px 18px 0;
   font-size: 16px;
   font-weight: 600;
+}
+
+.modal-title-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .modal-body {
@@ -2145,44 +2164,249 @@ p {
   gap: 8px;
 }
 
-.studio-view {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr);
-  gap: 16px;
+.studio-group header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
-.studio-view img,
-.curtain img {
-  display: block;
-  width: 100%;
+.studio-group-side {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  max-width: 60%;
+}
+
+.studio-group-side .tool-text {
+  margin-bottom: 0;
+  text-align: right;
+}
+
+.studio-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.studio-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.studio-row {
+  display: grid;
+  grid-template-columns: auto 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.studio-row img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
   border-radius: 6px;
   background: var(--stage);
 }
 
-.curtain {
-  position: relative;
+.studio-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
-.curtain-top {
+.studio-row-text strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+
+.studio-row-text span {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.studio-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.studio-form-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.studio-service {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lora-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lora-list > .select {
+  align-self: flex-start;
+}
+
+.lora-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lora-name {
+  flex: 0 1 42%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* An embedding has one more control, so its row may take two lines. */
+.embedding-row {
+  flex-wrap: wrap;
+}
+
+.embedding-row .lora-name {
+  flex: 1 1 40%;
+}
+
+/* The picture dialog: the picture takes what the window gives, the request
+   and the buttons keep a column of their own that scrolls. */
+.studio-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.studio-view-side {
+  min-height: 0;
+  overflow: auto;
+}
+
+@media (max-width: 900px) {
+  .studio-view {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 40%);
+  }
+}
+
+/* A picture in a box it always fits; see PictureStage. */
+.stage {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--stage);
+  user-select: none;
+}
+
+.stage-fill {
+  height: 100%;
+}
+
+.stage-tile {
+  max-height: 78vh;
+}
+
+.stage-held {
+  cursor: grab;
+  touch-action: none;
+}
+
+.stage-held:active {
+  cursor: grabbing;
+}
+
+.stage-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.stage .stage-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  object-fit: contain;
+  border-radius: 0;
+  background: none;
+  transform-origin: 0 0;
+}
+
+.stage-line {
   position: absolute;
   top: 0;
-  left: 0;
-  height: 100%;
-  overflow: hidden;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
 }
 
-.curtain-top img {
-  width: auto;
-  max-width: none;
-  height: 100%;
+.stage-label {
+  position: absolute;
+  top: 8px;
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
 }
 
-.curtain-range {
+.stage-label-before {
+  left: 8px;
+}
+
+.stage-label-after {
+  right: 8px;
+}
+
+.stage-range {
   position: absolute;
   left: 8px;
   right: 8px;
   bottom: 8px;
   width: calc(100% - 16px);
+  accent-color: var(--accent);
+}
+
+.stage-tools {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
 }
 
 .model-views {
